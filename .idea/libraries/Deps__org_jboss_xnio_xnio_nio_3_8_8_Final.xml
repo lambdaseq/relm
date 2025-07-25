@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Deps: org.jboss.xnio/xnio-nio:3.8.8.Final">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/jboss/xnio/xnio-nio/3.8.8.Final/xnio-nio-3.8.8.Final.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

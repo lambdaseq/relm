@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Deps: cider/piggieback:0.6.0">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/cider/piggieback/0.6.0/piggieback-0.6.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

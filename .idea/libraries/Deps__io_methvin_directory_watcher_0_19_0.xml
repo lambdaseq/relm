@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Deps: io.methvin/directory-watcher:0.19.0">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/io/methvin/directory-watcher/0.19.0/directory-watcher-0.19.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Deps: org.babashka/sci:0.3.4">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/babashka/sci/0.3.4/sci-0.3.4.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

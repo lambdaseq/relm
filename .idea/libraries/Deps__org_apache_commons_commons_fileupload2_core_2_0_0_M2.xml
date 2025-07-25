@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Deps: org.apache.commons/commons-fileupload2-core:2.0.0-M2">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/apache/commons/commons-fileupload2-core/2.0.0-M2/commons-fileupload2-core-2.0.0-M2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

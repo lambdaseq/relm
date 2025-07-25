@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Deps: hashp:0.2.2">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/hashp/hashp/0.2.2/hashp-0.2.2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

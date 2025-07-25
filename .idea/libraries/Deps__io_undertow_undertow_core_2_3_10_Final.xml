@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Deps: io.undertow/undertow-core:2.3.10.Final">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/io/undertow/undertow-core/2.3.10.Final/undertow-core-2.3.10.Final.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
