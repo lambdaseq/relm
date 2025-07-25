@@ -1,32 +1,29 @@
 (ns examples.counter.core
-  (:require [com.lambdaseq.relm.core :as relm]
+  (:require [com.lambdaseq.relm.core :as relm :refer-macros [defcomponent]]
             [replicant.dom :as r]
             [hashp.core]))
 
-(defn init [context]
-  [{:count 0} context])
+(def counter-id 0)
 
-(defn transition [state context [type :as _message] _event]
-  (case type
-    :increment
-    [(update state :count inc) context]
-    :decrement
-    [(update state :count dec) context]))
+(defcomponent Counter
+  (init [context]
+        [{:count 0} context])
+  (view [{:keys [count]} _context]
+        [:div
+         [:h2 "Counter"]
+         ; Implement some counter logic here
+         [:p "Current count: " count]
+         [:button {:on {:click [::increment counter-id]}} "Increment"]
+         [:button {:on {:click [::decrement counter-id]}} "Decrement"]]))
 
-(defn view [{:keys [count]} _context]
-  [:div
-   [:h2 "Counter"]
-   ; Implement some counter logic here
-   [:p "Current count: " count]
-   [:button {:on {:click [:increment]}} "Increment"]
-   [:button {:on {:click [:decrement]}} "Decrement"]])
+(defmethod relm/transition ::increment
+  [state context _message _event]
+  [(update state :count inc) context])
 
-(def Counter
-  (relm/component
-    {:init init
-     :transition transition
-     :view view}))
+(defmethod relm/transition ::decrement
+  [state context _message _event]
+  [(update state :count dec) context])
 
-(js/console.log "Relm Counter Example")
+(r/set-dispatch! relm/dispatch)
 
-(r/render js/document.body (Counter))
+(r/render js/document.body (Counter counter-id))

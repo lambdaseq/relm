@@ -9,6 +9,14 @@
     </option>
   </component>
   <component name="DepsProjectsManager">
+    <option name="dirTypeMappings">
+      <set>
+        <FolderState>
+          <option name="dirUrl" value="file://$PROJECT_DIR$/test" />
+          <option name="type" value="TEST_SOURCE" />
+        </FolderState>
+      </set>
+    </option>
     <option name="projectFiles">
       <set>
         <option value="file://$PROJECT_DIR$/deps.edn" />
