@@ -1,29 +1,22 @@
 (ns examples.counter.core
-  (:require [com.lambdaseq.relm.core :as relm :refer-macros [defcomponent]]
-            [replicant.dom :as r]
+  (:require [com.lambdaseq.relm.core :as relm]
             [hashp.core]))
 
-(def counter-id 0)
+(def state (atom {:count 0}))
 
-(defcomponent Counter
-  (init [context]
-        [{:count 0} context])
-  (view [{:keys [count]} _context]
-        [:div
-         [:h2 "Counter"]
-         ; Implement some counter logic here
-         [:p "Current count: " count]
-         [:button {:on {:click [::increment counter-id]}} "Increment"]
-         [:button {:on {:click [::decrement counter-id]}} "Decrement"]]))
+(defn Counter [{:keys [count] :as _state}]
+  [:div
+   [:h1 "Counter: " count]
+   [:button {:on {:click [::increment]}} "+"]
+   [:button {:on {:click [::decrement]}} "-"]])
 
 (defmethod relm/transition ::increment
-  [state context _message _event]
-  [(update state :count inc) context])
+  [state _message _event]
+  (update state :count inc))
 
 (defmethod relm/transition ::decrement
-  [state context _message _event]
-  [(update state :count dec) context])
+  [state _message _event]
+  (update state :count dec))
 
-(r/set-dispatch! relm/dispatch)
-
-(r/render js/document.body (Counter counter-id))
+(relm/start-app! {:state state
+                  :root  Counter})
