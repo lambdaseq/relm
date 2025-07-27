@@ -27,6 +27,7 @@
   [state context _message _event]
   [(update state :count dec) context])
 
+; Need to set `relm`'s dispatch function
 (r/set-dispatch! relm/dispatch)
 
 ; First argument is a globally unique component id and the second argument are the args that will be used by the init function

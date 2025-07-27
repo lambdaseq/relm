@@ -94,6 +94,5 @@
   ```"
   [{:keys [init view]}]
   (fn [component-id args]
-    [:div {:id                   component-id
-           :replicant/on-mount   [::init-component component-id args init view]
+    [:div {:replicant/on-mount   [::init-component component-id args init view]
            :replicant/on-unmount [::deinit-component component-id]}]))
