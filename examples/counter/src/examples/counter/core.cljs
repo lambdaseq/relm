@@ -29,5 +29,6 @@
 
 (r/set-dispatch! relm/dispatch)
 
+; First argument is a globally unique component id and the second argument are the args that will be used by the init function
 (r/render js/document.body (Counter :counter
                                     {:init-count 0}))
