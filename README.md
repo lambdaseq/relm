@@ -37,9 +37,10 @@ The library follows the Elm architecture with three main parts:
 Here's a simple counter component:
 
 ```clojure
-(ns examples.counter.core
+(ns examples.counter
   (:require [com.lambdaseq.relm.core :as relm]
-            [replicant.dom :as r]))
+            [replicant.dom :as r]
+            [hashp.core]))
 
 ;; Initialize the component state
 (defn init [_context {:keys [init-count] :as _args}]
@@ -51,7 +52,8 @@ Here's a simple counter component:
    [:h2 "Counter"]
    [:p "Current count: " count]
    [:button {:on {:click [::increment component-id]}} "Increment"]
-   [:button {:on {:click [::decrement component-id]}} "Decrement"]])
+   [:button {:on {:click [::decrement component-id]}} "Decrement"]
+   [:button {:on {:click [::show-count component-id]}} "Show Count"]])
 
 ;; Define the component
 (def Counter
@@ -59,7 +61,16 @@ Here's a simple counter component:
     {:init init
      :view view}))
 
+;; Define an effect handler for alerts
+(defmethod relm/fx ::alert
+  [[_ message]]
+  (js/alert message))
+
 ;; Define message handlers
+(defmethod relm/update ::show-count
+  [{:keys [count] :as state} context _message _event]
+  [state context [::alert (str "Count: " count)]])
+
 (defmethod relm/update ::increment
   [state context _message _event]
   [(update state :count inc) context])
@@ -99,8 +110,13 @@ Define message handlers using the `relm/update` multimethod:
 ```clojure
 (defmethod relm/update ::message-type
   [state context message event]
-  [new-state new-context])
+  [new-state new-context effects])
 ```
+
+The update function should return a vector of three elements:
+- `new-state`: The updated component state
+- `new-context`: The updated global context
+- `effects`: Side effects to be executed (can be a single effect vector or a vector of effect vectors)
 
 The dispatch function can handle both single messages and collections of messages:
 
@@ -111,6 +127,36 @@ The dispatch function can handle both single messages and collections of message
 ;; Handling multiple messages at once
 (relm/dispatch event [[::message-type-1 component-id] 
                       [::message-type-2 component-id]])
+```
+
+### Side Effects
+
+Define side effect handlers using the `relm/fx` multimethod:
+
+```clojure
+(defmethod relm/fx ::effect-type
+  [[_ & args]]
+  ;; Perform side effect here
+  )
+```
+
+Side effects are dispatched by returning them from update handlers. You can return:
+- A single effect vector: `[::effect-type arg1 arg2]`
+- Multiple effects: `[[::effect-type-1 arg1] [::effect-type-2 arg2]]`
+- No effects: `[]`
+
+Example:
+
+```clojure
+;; Define an effect handler
+(defmethod relm/fx ::http-request
+  [[_ url options callback]]
+  (http/request url options callback))
+
+;; Use the effect in an update handler
+(defmethod relm/update ::fetch-data
+  [state context _message _event]
+  [state context [::http-request "/api/data" {:method "GET"} ::handle-response]])
 ```
 
 ### Rendering

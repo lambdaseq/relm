@@ -11,18 +11,44 @@
   (and (vector? v)
        (vector? (first v))))
 
+(defmulti fx
+  "Multimethod for handling side effects dispatched by message handlers.
+  
+  Dispatches on the first element of the effect vector. Effect handlers should perform
+  side-effectful operations like network requests, storage operations, etc.
+  
+  Arguments:
+    effect - A vector where the first element is the effect type keyword
+             and remaining elements are effect-specific arguments.
+  
+  Example:
+  ```clojure
+  (defmethod fx! ::http-request
+    [[_ url options callback]]
+    (http/request url options callback))
+  ```"
+  (fn [effect]
+    (first effect)))
+
+(defn -dispatch-fx! [effects]
+  (if (vector-of-vectors? effects)
+    (doseq [effect effects]
+      (fx effect))
+    (fx effects)))
+
 (defmulti update
   "Handles state updates based on event messages.
 
   This multimethod is dispatched on the first element of the message vector.
   It takes the current state, context, message, and event as arguments and
-  should return a vector of [new-state new-context].
+  should return a vector of [new-state new-context effects].
 
   Example:
   ```clojure
   (defmethod relm/update ::increment
     [state context _message _event]
-    [(update state :count inc) context])
+    ; No effects dispatched
+    [(update state :count inc) context [])
   ```"
   (fn [_state _context message _event]
     (first message)))
@@ -56,9 +82,10 @@
     (let [{:keys [!state]} (get @!components component-id)
           context @!context
           state @!state
-          [new-state new-context] (update state context message event)]
+          [new-state new-context fx] (update state context message event)]
       (reset! !state new-state)
-      (reset! !context new-context))))
+      (reset! !context new-context)
+      (-dispatch-fx! fx))))
 
 (defn dispatch
   "Handles message dispatching for components.

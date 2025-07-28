@@ -12,12 +12,21 @@
    ; Implement some counter logic here
    [:p "Current count: " count]
    [:button {:on {:click [::increment component-id]}} "Increment"]
-   [:button {:on {:click [::decrement component-id]}} "Decrement"]])
+   [:button {:on {:click [::decrement component-id]}} "Decrement"]
+   [:button {:on {:click [::show-count component-id]}} "Show Count"]])
 
 (def Counter
   (relm/component
     {:init init
      :view view}))
+
+(defmethod relm/fx ::alert
+  [[_ message]]
+  (js/alert message))
+
+(defmethod relm/update ::show-count
+  [{:keys [count] :as state} context _message _event]
+  [state context [::alert (str "Count: " count)]])
 
 (defmethod relm/update ::increment
   [state context _message _event]
