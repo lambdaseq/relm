@@ -1,4 +1,4 @@
 {:paths ["src"]
- :deps  {com.lambdaseq/relm   {:local/root "../"}
+ :deps  {com.lambdaseq/relm   {:local/root "../core"}
          thheller/shadow-cljs {:mvn/version "3.1.8"}
          hashp/hashp          {:mvn/version "0.2.2"}}}

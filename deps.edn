@@ -1,8 +1,1 @@
-{:paths ["src"]
- :deps  {org.clojure/clojure       {:mvn/version "1.12.1"}
-         org.clojure/clojurescript {:mvn/version "1.11.60"}
-         no.cjohansen/replicant    {:mvn/version "2025.06.21"}}
- :aliases
- {:dev  {:extra-deps {hashp/hashp {:mvn/version "0.2.2"}}
-         :main-opts  ["-e" "(require,'hashp.core)"]}
-  :test {:extra-paths ["test"]}}}
+{:deps {com.lambdaseq/relm.core {:local/root "./core"}}}
