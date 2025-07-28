@@ -1,4 +1,4 @@
-(ns examples.counter.core
+(ns examples.counter
   (:require [com.lambdaseq.relm.core :as relm]
             [replicant.dom :as r]
             [hashp.core]))
@@ -19,11 +19,11 @@
     {:init init
      :view view}))
 
-(defmethod relm/transition ::increment
+(defmethod relm/update ::increment
   [state context _message _event]
   [(update state :count inc) context])
 
-(defmethod relm/transition ::decrement
+(defmethod relm/update ::decrement
   [state context _message _event]
   [(update state :count dec) context])
 

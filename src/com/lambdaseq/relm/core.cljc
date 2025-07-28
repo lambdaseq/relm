@@ -1,8 +1,9 @@
 (ns com.lambdaseq.relm.core
+  (:refer-clojure :exclude [update])
   (:require [replicant.dom :as r]
             [replicant.hiccup :as rh]))
 
-(defonce !context (atom nil))
+(defonce !context (atom {}))
 
 (defonce !components (atom {}))
 
@@ -10,8 +11,8 @@
   (and (vector? v)
        (vector? (first v))))
 
-(defmulti transition
-  "Handles state transitions based on messages.
+(defmulti update
+  "Handles state updates based on event messages.
 
   This multimethod is dispatched on the first element of the message vector.
   It takes the current state, context, message, and event as arguments and
@@ -19,7 +20,7 @@
 
   Example:
   ```clojure
-  (defmethod transition ::increment
+  (defmethod relm/update ::increment
     [state context _message _event]
     [(update state :count inc) context])
   ```"
@@ -55,7 +56,7 @@
     (let [{:keys [!state]} (get @!components component-id)
           context @!context
           state @!state
-          [new-state new-context] (transition state context message event)]
+          [new-state new-context] (update state context message event)]
       (reset! !state new-state)
       (reset! !context new-context))))
 
@@ -74,7 +75,7 @@
   - `::init-component`: Initializes a component with the given args, init function, and view function
   - `::deinit-component`: Cleans up a component when it's unmounted
 
-  For other message types, it calls the appropriate `transition` multimethod implementation."
+  For other message types, it calls the appropriate `event` multimethod implementation."
   [event message-or-messages]
   (if (vector-of-vectors? message-or-messages)
     (doseq [message message-or-messages
@@ -110,14 +111,14 @@
           state (init context args)]
       (-> (view component-id state context)
           (rh/update-attrs
-            update :replicant/on-mount
+            clojure.core/update :replicant/on-mount
             (fn [on-mount]
               (if (vector-of-vectors? on-mount)
                 (into [[::init-component component-id state view]] on-mount)
                 [[::init-component component-id state view]
                  on-mount])))
           (rh/update-attrs
-            update :replicant/on-unmount
+            clojure.core/update :replicant/on-unmount
             (fn [on-unmount]
               (if (vector-of-vectors? on-unmount)
                 (into [[::deinit-component component-id]] on-unmount)

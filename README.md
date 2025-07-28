@@ -60,11 +60,11 @@ Here's a simple counter component:
      :view view}))
 
 ;; Define message handlers
-(defmethod relm/transition ::increment
+(defmethod relm/update ::increment
   [state context _message _event]
   [(update state :count inc) context])
 
-(defmethod relm/transition ::decrement
+(defmethod relm/update ::decrement
   [state context _message _event]
   [(update state :count dec) context])
 
@@ -94,10 +94,10 @@ And return the initial state for the component (not a vector of [state, context]
 
 ### Message Handling
 
-Define message handlers using the `relm/transition` multimethod:
+Define message handlers using the `relm/update` multimethod:
 
 ```clojure
-(defmethod relm/transition ::message-type
+(defmethod relm/update ::message-type
   [state context message event]
   [new-state new-context])
 ```

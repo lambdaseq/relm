@@ -5,4 +5,4 @@
  {:counter {:target     :browser
             :output-dir "public/js"
             :asset-path "/js"
-            :modules    {:main {:entries [examples.counter.core]}}}}}
+            :modules    {:main {:entries [examples.main]}}}}}
