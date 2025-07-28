@@ -6,6 +6,10 @@
 
 (defonce !components (atom {}))
 
+(defn vector-of-vectors? [v]
+  (and (vector? v)
+       (vector? (first v))))
+
 (defmulti transition
   "Handles state transitions based on messages.
 
@@ -72,9 +76,9 @@
 
   For other message types, it calls the appropriate `transition` multimethod implementation."
   [event message-or-messages]
-  (if (and (vector? message-or-messages)
-           (vector? (first message-or-messages)))
-    (doseq [message message-or-messages]
+  (if (vector-of-vectors? message-or-messages)
+    (doseq [message message-or-messages
+            :when (some? message)]
       (-handle-message event message))
     (-handle-message event message-or-messages)))
 
@@ -108,8 +112,14 @@
           (rh/update-attrs
             update :replicant/on-mount
             (fn [on-mount]
-              (into [[::init-component component-id state view]] on-mount)))
+              (if (vector-of-vectors? on-mount)
+                (into [[::init-component component-id state view]] on-mount)
+                [[::init-component component-id state view]
+                 on-mount])))
           (rh/update-attrs
             update :replicant/on-unmount
             (fn [on-unmount]
-              (into [[::deinit-component component-id]] on-unmount)))))))
+              (if (vector-of-vectors? on-unmount)
+                (into [[::deinit-component component-id]] on-unmount)
+                [[::deinit-component component-id]
+                 on-unmount])))))))
