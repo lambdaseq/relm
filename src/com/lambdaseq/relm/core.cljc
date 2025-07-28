@@ -2,9 +2,9 @@
   (:require [replicant.dom :as r]
             [replicant.hiccup :as rh]))
 
-(def !context (atom nil))
+(defonce !context (atom nil))
 
-(def !components (atom {}))
+(defonce !components (atom {}))
 
 (defmulti transition
   "Handles state transitions based on messages.
