@@ -1,11 +1,12 @@
 (ns com.lambdaseq.relm.core
-  (:require [replicant.dom :as r]))
+  (:require [replicant.dom :as r]
+            [replicant.hiccup :as rh]))
 
 (def !context (atom nil))
 
 (def !components (atom {}))
 
-(defmulti transition 
+(defmulti transition
   "Handles state transitions based on messages.
 
   This multimethod is dispatched on the first element of the message vector.
@@ -27,22 +28,10 @@
 (defn- -state-change-watch-reference-key [component-id]
   (str "state-change-" component-id))
 
-(defn dispatch
-  "Handles message dispatching for components.
-
-  This function is the central message handler for the relm system. It processes
-  messages and updates component state accordingly. It should be set as the
-  dispatch function for replicant using `(r/set-dispatch! relm/dispatch)`.
-
-  Special message types:
-  - `::init-component`: Initializes a component with the given args, init function, and view function
-  - `::deinit-component`: Cleans up a component when it's unmounted
-
-  For other message types, it calls the appropriate `transition` multimethod implementation."
-  [{:keys [replicant/node] :as event} [message-type component-id :as message]]
+(defn -handle-message [{:keys [replicant/node] :as event} [message-type component-id :as message]]
   (case message-type
-    ::init-component (let [[_ _ args init view] message
-                           !state (atom nil)]
+    ::init-component (let [[_ _ state view] message
+                           !state (atom state)]
                        (add-watch !context (-context-change-watch-reference-key component-id)
                                   (fn [_ _ old-context context]
                                     (when (not= old-context context)
@@ -53,22 +42,41 @@
                                     (when (not= old-state state)
                                       (r/render node (view component-id state @!context)))))
                        (swap! !components assoc component-id
-                              {:init   init
-                               :view   view
-                               :!state !state})
-                       (let [[state context] (init @!state args)]
-                         (reset! !state state)
-                         (reset! !context context)))
+                              {:view   view
+                               :!state !state}))
     ::deinit-component (let [{:keys [!state] :as _component} (get @!components component-id)]
                          (remove-watch !context (-context-change-watch-reference-key component-id))
                          (remove-watch !state (-state-change-watch-reference-key component-id))
                          (swap! !components dissoc component-id))
-    (let [{:keys [!state]} (get #p @!components #p component-id)
+    (let [{:keys [!state]} (get @!components component-id)
           context @!context
           state @!state
           [new-state new-context] (transition state context message event)]
       (reset! !state new-state)
       (reset! !context new-context))))
+
+(defn dispatch
+  "Handles message dispatching for components.
+
+  This function is the central message handler for the relm system. It processes
+  messages and updates component state accordingly. It should be set as the
+  dispatch function for replicant using `(r/set-dispatch! relm/dispatch)`.
+
+  The dispatch function can handle both single messages and collections of messages:
+  - Single message: `(dispatch event [::message-type component-id])`
+  - Multiple messages: `(dispatch event [[::message-type-1 component-id] [::message-type-2 component-id]])`
+
+  Special message types:
+  - `::init-component`: Initializes a component with the given args, init function, and view function
+  - `::deinit-component`: Cleans up a component when it's unmounted
+
+  For other message types, it calls the appropriate `transition` multimethod implementation."
+  [event message-or-messages]
+  (if (and (vector? message-or-messages)
+           (vector? (first message-or-messages)))
+    (doseq [message message-or-messages]
+      (-handle-message event message))
+    (-handle-message event message-or-messages)))
 
 (defn component
   "Creates a new component with the specified initialization and view functions.
@@ -78,7 +86,7 @@
 
   Parameters:
   - `init`: A function that takes the current context and component args and returns
-            a vector of [initial-state updated-context]
+            an initial state
   - `view`: A function that takes component-id, state, and context and returns
             a hiccup-style representation of the component's view
 
@@ -86,7 +94,7 @@
   ```clojure
   (def Counter
     (component
-      {:init (fn [context args] [{:count 0} context])
+      {:init (fn [context args] {:count 0})
        :view (fn [id state context] [:div \"Count: \" (:count state)])}))
 
   ;; Usage:
@@ -94,5 +102,14 @@
   ```"
   [{:keys [init view]}]
   (fn [component-id args]
-    [:div {:replicant/on-mount   [::init-component component-id args init view]
-           :replicant/on-unmount [::deinit-component component-id]}]))
+    (let [context @!context
+          state (init context args)]
+      (-> (view component-id state context)
+          (rh/update-attrs
+            update :replicant/on-mount
+            (fn [on-mount]
+              (into [[::init-component component-id state view]] on-mount)))
+          (rh/update-attrs
+            update :replicant/on-unmount
+            (fn [on-unmount]
+              (into [[::deinit-component component-id]] on-unmount)))))))

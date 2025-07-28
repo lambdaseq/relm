@@ -3,8 +3,8 @@
             [replicant.dom :as r]
             [hashp.core]))
 
-(defn init [context {:keys [init-count] :as _args}]
-  [{:count init-count} context])
+(defn init [_context {:keys [init-count] :as _args}]
+  {:count init-count})
 
 (defn view [component-id {:keys [count]} _context]
   [:div

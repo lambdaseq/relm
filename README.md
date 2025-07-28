@@ -42,8 +42,8 @@ Here's a simple counter component:
             [replicant.dom :as r]))
 
 ;; Initialize the component state
-(defn init [context {:keys [init-count] :as _args}]
-  [{:count init-count} context])
+(defn init [_context {:keys [init-count] :as _args}]
+  {:count init-count})
 
 ;; Render the view based on the current state
 (defn view [component-id {:keys [count]} _context]
@@ -86,6 +86,12 @@ Here's a simple counter component:
 
 Creates a new component with the specified initialization and view functions.
 
+The `init-fn` should take two arguments:
+- `context`: The current global context
+- `args`: Component-specific arguments
+
+And return the initial state for the component (not a vector of [state, context] as in previous versions).
+
 ### Message Handling
 
 Define message handlers using the `relm/transition` multimethod:
@@ -94,6 +100,17 @@ Define message handlers using the `relm/transition` multimethod:
 (defmethod relm/transition ::message-type
   [state context message event]
   [new-state new-context])
+```
+
+The dispatch function can handle both single messages and collections of messages:
+
+```clojure
+;; Handling a single message
+(relm/dispatch event [::message-type component-id])
+
+;; Handling multiple messages at once
+(relm/dispatch event [[::message-type-1 component-id] 
+                      [::message-type-2 component-id]])
 ```
 
 ### Rendering
