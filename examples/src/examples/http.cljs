@@ -9,7 +9,7 @@
 
 (defmethod relm/update ::posts-fetched
   [state context [_ _ {:keys [body]}] _event]
-  (let [posts (js->clj body :keywordize-keys true)]
+  (let [posts (js->clj (js/JSON.parse body) :keywordize-keys true)]
     [(assoc state :posts posts) context]))
 
 (defmethod relm/update ::posts-failed
@@ -22,8 +22,7 @@
                   {:url        "https://jsonplaceholder.typicode.com/posts"
                    :method     :get
                    :mode       :cors
-                   :on-success [::posts-fetched component-id]
-                   :on-failure [::posts-failed component-id]}]])
+                   :on-success [::posts-fetched component-id]}]])
 
 (defn view [component-id {:keys [posts]} _]
   [:div [:h1 "Posts"]
@@ -40,3 +39,4 @@
   (relm/component
     {:init init
      :view view}))
+
