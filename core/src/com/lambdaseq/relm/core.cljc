@@ -31,10 +31,11 @@
     (first effect)))
 
 (defn -dispatch-fx! [effects]
-  (if (vector-of-vectors? effects)
-    (doseq [effect effects]
-      (fx effect))
-    (fx effects)))
+  (when effects
+    (if (vector-of-vectors? effects)
+      (doseq [effect effects]
+        (fx effect))
+      (fx effects))))
 
 (defmulti update
   "Handles state updates based on event messages.

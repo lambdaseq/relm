@@ -15,11 +15,6 @@
    [:button {:on {:click [::decrement component-id]}} "Decrement"]
    [:button {:on {:click [::show-count component-id]}} "Show Count"]])
 
-(def Counter
-  (relm/component
-    {:init init
-     :view view}))
-
 (defmethod relm/fx ::alert
   [[_ message]]
   (js/alert message))
@@ -36,9 +31,7 @@
   [state context _message _event]
   [(update state :count dec) context])
 
-; Need to set `relm`'s dispatch function
-(r/set-dispatch! relm/dispatch)
-
-; First argument is a globally unique component id and the second argument are the args that will be used by the init function
-(r/render js/document.body (Counter :counter
-                                    {:init-count 0}))
+(def Counter
+  (relm/component
+    {:init init
+     :view view}))
