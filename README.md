@@ -159,6 +159,73 @@ Example:
   [state context [::http-request "/api/data" {:method "GET"} ::handle-response]])
 ```
 
+### HTTP Requests
+
+The `com.lambdaseq.relm.http` namespace provides functionality for making HTTP requests. It's a port of [re-frame-fetch-fx](https://github.com/superstructor/re-frame-fetch-fx) adapted for the relm architecture.
+
+To use it, require the namespace:
+
+```clojure
+(ns your.namespace
+  (:require [com.lambdaseq.relm.core :as relm]
+            [com.lambdaseq.relm.http :as relm.http]))
+```
+
+#### Making HTTP Requests
+
+Use the `::relm.http/fetch` effect to make HTTP requests:
+
+```clojure
+(defmethod relm/update ::fetch-data
+  [state context [_ component-id] _event]
+  [state context [::relm.http/fetch
+                  {:url        "https://api.example.com/data"
+                   :method     :get
+                   :mode       :cors
+                   :on-success [::data-fetched component-id]
+                   :on-failure [::data-fetch-failed component-id]}]])
+```
+
+#### Handling Responses
+
+Define handlers for successful and failed requests:
+
+```clojure
+(defmethod relm/update ::data-fetched
+  [state context [_ _ {:keys [body]}] _event]
+  [(assoc state :data body) context])
+
+(defmethod relm/update ::data-fetch-failed
+  [state context [_ _ error] _event]
+  [(assoc state :error error) context])
+```
+
+#### Request Options
+
+The fetch effect accepts various options:
+
+- `:url` - The URL to request (required)
+- `:method` - HTTP method (:get, :post, :put, etc.)
+- `:params` - Query parameters to append to the URL
+- `:headers` - HTTP headers to include
+- `:body` - Request body
+- `:request-content-type` - Content type of the request (:json will automatically stringify the body)
+- `:timeout` - Request timeout in milliseconds
+- `:mode` - CORS mode (:cors, :no-cors, :same-origin)
+- `:credentials` - Credentials mode (:include, :omit, :same-origin)
+- `:on-success` - Event vector to dispatch on successful response
+- `:on-failure` - Event vector to dispatch on failed response
+
+#### Aborting Requests
+
+Use the `::relm.http/abort` effect to abort in-flight requests:
+
+```clojure
+(defmethod relm/update ::abort-request
+  [state context [_ request-id] _event]
+  [state context [::relm.http/abort {:request-id request-id}]])
+```
+
 ### Rendering
 
 Use replicant's rendering with relm's dispatch:
