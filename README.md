@@ -258,6 +258,34 @@ Use replicant's rendering with relm's dispatch:
 (r/render target-element (component args))
 ```
 
+## Comparison with re-frame
+
+relm and re-frame share many similarities as they are both inspired by the Elm architecture, but they have some key differences:
+
+### Similarities
+- **Event-driven architecture**: Both use events/messages to drive state changes
+- **Pure functions for state updates**: Both encourage using pure functions to update state based on events
+- **Effect handling**: Both separate effects from state updates
+
+### Differences
+- **Abstraction level**: relm is built on top of replicant, while re-frame is built on top of Reagent
+- **React**: relm does not use any underlying framework like React. It only depends on `replicant` for rendering
+- **Purely Functional**: In contrast to re-frame, user code in `relm` should be purely function (view functions included). Like re-frame, all side-effects should be done in effect handlers
+- **Subscription model**: While re-frame provides subscriptions to access program's state,
+  in relm local and global states are passed as arguments to your purely-functional view function
+- **Local component state**: relm components have their own local state, while re-frame typically keeps all state in the global app-db,
+and local state is done using reagent atoms
+
+## Comparison with ELM Architecture
+
+relm is inspired by the Elm architecture but implemented in Clojure/ClojureScript. Here's how they compare:
+
+### Similarities
+- **Model-View-Update pattern**: Both follow the same core pattern for state management
+- **Unidirectional data flow**: Both enforce a one-way data flow from state to view
+- **Message-based updates**: Both use messages to trigger state updates
+- **Pure view functions**: Both render views as pure functions of state
+
 ## License
 
 Copyright © 2023 LambdaSeq
