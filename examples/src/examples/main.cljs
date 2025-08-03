@@ -2,13 +2,15 @@
   (:require [com.lambdaseq.relm.core :as relm]
             [examples.counter :refer [Counter]]
             [examples.http :refer [HttpExample]]
+            [examples.navigation :refer [NavigationExample]]
             [replicant.dom :as r]))
 
 (defn init [_ _])
 
 (defn view [_ _ _]
   #_(Counter {:init-count 0})
-  (HttpExample :http-example {}))
+  #_(HttpExample :http-example {})
+  (NavigationExample :navigation-example {}))
 
 (def Examples
   (relm/component
