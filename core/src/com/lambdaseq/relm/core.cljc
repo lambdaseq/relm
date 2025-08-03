@@ -157,3 +157,7 @@
                 (into [[::deinit-component]] on-unmount)
                 [[::deinit-component]
                  on-unmount])))))))
+
+(defmethod fx :dispatch
+  [dom-event [_ event]]
+  (dispatch dom-event event))

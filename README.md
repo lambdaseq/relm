@@ -158,6 +158,30 @@ Example:
   [state context [::http-request "/api/data" {:method "GET"} ::handle-response]])
 ```
 
+#### Dispatching Additional Events from Effects
+
+You can use the `:dispatch` effect to trigger additional events from within an event handler:
+
+```clojure
+;; Define an update handler that dispatches multiple events
+(defmethod relm/update ::process-data
+  [state context _message _event]
+  [state 
+   context 
+   [[:dispatch [::log-activity "Data processing started"]]]])
+
+;; Chain multiple events with a single effect
+(defmethod relm/update ::complex-operation
+  [state context _message _event]
+  [state 
+   context 
+   [[:dispatch [[::update-status "Processing..."]
+                [::fetch-data]
+                [::notify-user "Operation in progress"]]]]])
+```
+
+In the second example, the `:dispatch` effect is used to trigger multiple events at once, allowing you to chain operations together.
+
 ### HTTP Requests
 
 The `com.lambdaseq.relm.http` namespace provides functionality for making HTTP requests. It's a port of [re-frame-fetch-fx](https://github.com/superstructor/re-frame-fetch-fx) adapted for the relm architecture.
