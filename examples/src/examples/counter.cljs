@@ -1,22 +1,21 @@
 (ns examples.counter
   (:require [com.lambdaseq.relm.core :as relm]
-            [replicant.dom :as r]
             [hashp.core]))
 
 (defn init [_context {:keys [init-count] :as _args}]
   {:count init-count})
 
-(defn view [component-id {:keys [count]} _context]
+(defn view [{:keys [count]} _context]
   [:div
    [:h2 "Counter"]
    ; Implement some counter logic here
    [:p "Current count: " count]
-   [:button {:on {:click [::increment component-id]}} "Increment"]
-   [:button {:on {:click [::decrement component-id]}} "Decrement"]
-   [:button {:on {:click [::show-count component-id]}} "Show Count"]])
+   [:button {:on {:click [::increment]}} "Increment"]
+   [:button {:on {:click [::decrement]}} "Decrement"]
+   [:button {:on {:click [::show-count]}} "Show Count"]])
 
 (defmethod relm/fx ::alert
-  [[_ message]]
+  [_event [_ message]]
   (js/alert message))
 
 (defmethod relm/update ::show-count

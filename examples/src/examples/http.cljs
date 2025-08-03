@@ -8,7 +8,7 @@
   {:posts []})
 
 (defmethod relm/update ::posts-fetched
-  [state context [_ _ {:keys [body]}] _event]
+  [state context [_ {:keys [body]}] _event]
   (let [posts (js->clj (js/JSON.parse body) :keywordize-keys true)]
     [(assoc state :posts posts) context]))
 
@@ -17,21 +17,21 @@
   [state context])
 
 (defmethod relm/update ::fetch-posts
-  [state context [_ component-id] _event]
+  [state context _ _event]
   [state context [::relm.http/fetch
                   {:url        "https://jsonplaceholder.typicode.com/posts"
                    :method     :get
                    :mode       :cors
-                   :on-success [::posts-fetched component-id]}]])
+                   :on-success [::posts-fetched]}]])
 
-(defn view [component-id {:keys [posts]} _]
+(defn view [{:keys [posts]} _]
   [:div [:h1 "Posts"]
    (if (seq posts)
      [:ul
       (for [post posts]
         [:li [:a {:href (:url post)} (:title post)]])]
      [:p "No posts yet"])
-   [:button {:on {:click [::fetch-posts component-id]}}
+   [:button {:on {:click [::fetch-posts]}}
     "Fetch Posts"]])
 
 

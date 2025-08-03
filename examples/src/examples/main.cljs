@@ -7,8 +7,7 @@
 (defn init [_ _])
 
 (defn view [_ _ _]
-  #_(Counter :counter
-             {:init-count 0})
+  #_(Counter {:init-count 0})
   (HttpExample :http-example {}))
 
 (def Examples

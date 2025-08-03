@@ -177,7 +177,8 @@
   (atom {}))
 
 (defn body-success-handler
-  [{:keys [request-id on-success on-failure]
+  [dom-event
+   {:keys [request-id on-success on-failure]
     :or   {on-success [::fetch-no-on-success]
            on-failure [::fetch-no-on-failure]}}
    response
@@ -197,10 +198,11 @@
         event (conj handler response)]
     (when-not (or (= (first event) ::fetch-no-on-success)
                   (= (first event) ::fetch-no-on-failure))
-      (core/dispatch nil event))))
+      (core/dispatch dom-event event))))
 
 (defn body-problem-handler
-  [{:keys [request-id on-failure]
+  [dom-event
+   {:keys [request-id on-failure]
     :or   {on-failure [::fetch-no-on-failure]}}
    response
    {:keys [reader-kw] :as _reader}
@@ -214,16 +216,17 @@
         event           (conj on-failure response)]
     (when-not (or (= (first event) ::fetch-no-on-success)
                   (= (first event) ::fetch-no-on-failure))
-      (core/dispatch nil event))))
+      (core/dispatch dom-event event))))
 
 (defn response-success-handler
   "Reads the js/Response JavaScript Object stream to completion. Returns nil."
-  [request js-response]
+  [dom-event request js-response]
   (let [response                       (js-response->clj js-response)
         {:keys [reader-kw] :as reader} (response->reader request response)]
     (if (or (= "0" (get-in response [:headers :content-length]))
             (= 204 (:status response)))
-      (body-success-handler request
+      (body-success-handler dom-event
+                            request
                             response
                             {:reader-fn identity}
                             nil)
@@ -233,8 +236,8 @@
             :blob (.blob js-response)
             :array-buffer (.arrayBuffer js-response)
             :text (.text js-response))
-          (.then (partial body-success-handler request response reader))
-          (.catch (partial body-problem-handler request response reader))))))
+          (.then (partial body-success-handler dom-event request response reader))
+          (.catch (partial body-problem-handler dom-event request response reader))))))
 
 (defn js-error->problem [js-error]
   (cond
@@ -243,7 +246,8 @@
     :else                              :fetch))
 
 (defn response-problem-handler
-  [{:keys [request-id on-failure]
+  [dom-event
+   {:keys [request-id on-failure]
     :or   {on-failure [::fetch-no-on-failure]}}
    js-error]
   (swap! request-id->js-abort-controller dissoc request-id)
@@ -254,17 +258,18 @@
         event           (conj on-failure response)]
     (when-not (or (= (first event) ::fetch-no-on-success)
                   (= (first event) ::fetch-no-on-failure))
-      (core/dispatch nil event))))
+      (core/dispatch dom-event event))))
 
 (defn fetch
   "Initialise the request. Returns nil."
-  [{:keys [url timeout params request-id on-request-id abort-signal] :as request
+  [dom-event
+   {:keys [url timeout params request-id on-request-id abort-signal] :as request
     :or   {request-id (keyword (gensym "fetch-fx-"))}}]
   (when (vector? on-request-id)
     (let [event (conj on-request-id request-id)]
       (when-not (or (= (first event) ::fetch-no-on-success)
                     (= (first event) ::fetch-no-on-failure))
-        (core/dispatch nil event))))
+        (core/dispatch dom-event event))))
   (let [request'            (assoc request :request-id request-id)
         url'                (str url (params->str params))
         js-abort-controller (when-not abort-signal (js/AbortController.))
@@ -274,19 +279,19 @@
                     assoc
                     request-id))
     (-> (timeout-race (js/fetch url' (request->js-init request' abort-signal')) timeout)
-        (.then (partial response-success-handler request'))
-        (.catch (partial response-problem-handler request')))))
+        (.then (partial response-success-handler dom-event request'))
+        (.catch (partial response-problem-handler dom-event request')))))
 
 (defn fetch-fx
-  [effect]
+  [event effect]
   (let [seq-of-effects (->seq effect)]
     (doseq [effect seq-of-effects]
       (let [with-defaults effect]
-        (fetch with-defaults)))))
+        (fetch event with-defaults)))))
 
 (defmethod core/fx ::fetch
-  [[_ effect]]
-  (fetch-fx effect))
+  [event [_ effect]]
+  (fetch-fx event effect))
 
 (defn abort
   [{:keys [request-id]}]
@@ -302,5 +307,5 @@
       (abort effect))))
 
 (defmethod core/fx ::abort
-  [effect]
+  [_ effect]
   (abort-fx effect))

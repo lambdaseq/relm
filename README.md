@@ -47,13 +47,13 @@ Here's a simple counter component:
   {:count init-count})
 
 ;; Render the view based on the current state
-(defn view [component-id {:keys [count]} _context]
+(defn view [{:keys [count]} _context]
   [:div
    [:h2 "Counter"]
    [:p "Current count: " count]
-   [:button {:on {:click [::increment component-id]}} "Increment"]
-   [:button {:on {:click [::decrement component-id]}} "Decrement"]
-   [:button {:on {:click [::show-count component-id]}} "Show Count"]])
+   [:button {:on {:click [::increment]}} "Increment"]
+   [:button {:on {:click [::decrement]}} "Decrement"]
+   [:button {:on {:click [::show-count]}} "Show Count"]])
 
 ;; Define the component
 (def Counter
@@ -83,8 +83,7 @@ Here's a simple counter component:
 (r/set-dispatch! relm/dispatch)
 
 ;; Render the component to the DOM
-(r/render js/document.body (Counter :counter
-                                   {:init-count 0}))
+(r/render js/document.body (Counter {:init-count 0}))
 ```
 
 ## API
@@ -122,11 +121,11 @@ The dispatch function can handle both single messages and collections of message
 
 ```clojure
 ;; Handling a single message
-(relm/dispatch event [::message-type component-id])
+(relm/dispatch event [::message-type])
 
 ;; Handling multiple messages at once
-(relm/dispatch event [[::message-type-1 component-id] 
-                      [::message-type-2 component-id]])
+(relm/dispatch event [[::message-type-1] 
+                      [::message-type-2]])
 ```
 
 ### Side Effects
@@ -177,13 +176,13 @@ Use the `::relm.http/fetch` effect to make HTTP requests:
 
 ```clojure
 (defmethod relm/update ::fetch-data
-  [state context [_ component-id] _event]
+  [state context _ _event]
   [state context [::relm.http/fetch
                   {:url        "https://api.example.com/data"
                    :method     :get
                    :mode       :cors
-                   :on-success [::data-fetched component-id]
-                   :on-failure [::data-fetch-failed component-id]}]])
+                   :on-success [::data-fetched]
+                   :on-failure [::data-fetch-failed]}]])
 ```
 
 #### Handling Responses
@@ -192,11 +191,11 @@ Define handlers for successful and failed requests:
 
 ```clojure
 (defmethod relm/update ::data-fetched
-  [state context [_ _ {:keys [body]}] _event]
+  [state context [_ {:keys [body]}] _event]
   [(assoc state :data body) context])
 
 (defmethod relm/update ::data-fetch-failed
-  [state context [_ _ error] _event]
+  [state context [_ error] _event]
   [(assoc state :error error) context])
 ```
 
@@ -232,7 +231,7 @@ Use replicant's rendering with relm's dispatch:
 
 ```clojure
 (r/set-dispatch! relm/dispatch)
-(r/render target-element (component component-id args))
+(r/render target-element (component args))
 ```
 
 ## License

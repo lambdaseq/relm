@@ -13,29 +13,29 @@
 
 (defmulti fx
   "Multimethod for handling side effects dispatched by message handlers.
-  
+
   Dispatches on the first element of the effect vector. Effect handlers should perform
   side-effectful operations like network requests, storage operations, etc.
-  
+
   Arguments:
     effect - A vector where the first element is the effect type keyword
              and remaining elements are effect-specific arguments.
-  
+
   Example:
   ```clojure
   (defmethod fx! ::http-request
     [[_ url options callback]]
     (http/request url options callback))
   ```"
-  (fn [effect]
+  (fn [_ effect]
     (first effect)))
 
-(defn -dispatch-fx! [effects]
+(defn -dispatch-fx! [event effects]
   (when effects
     (if (vector-of-vectors? effects)
       (doseq [effect effects]
-        (fx effect))
-      (fx effects))))
+        (fx event effect))
+      (fx event effects))))
 
 (defmulti update
   "Handles state updates based on event messages.
@@ -60,33 +60,38 @@
 (defn- -state-change-watch-reference-key [component-id]
   (str "state-change-" component-id))
 
-(defn -handle-message [{:keys [replicant/node] :as event} [message-type component-id :as message]]
+(defn- -get-node-parent-component [node]
+  (or (get @!components node)
+      (recur (.-parentNode node))))
+
+(defn -handle-message [{:keys [replicant/node] :as event} [message-type :as message]]
   (case message-type
-    ::init-component (let [[_ _ state view] message
-                           !state (atom state)]
+    ::init-component (let [[_ state view] message
+                           !state (atom state)
+                           component-id (random-uuid)]
                        (add-watch !context (-context-change-watch-reference-key component-id)
                                   (fn [_ _ old-context context]
                                     (when (not= old-context context)
-                                      (r/render node (view component-id @!state context)))))
+                                      (r/render node (view @!state context)))))
                        (add-watch !state (-state-change-watch-reference-key component-id)
                                   (fn [_ _ old-state state]
-                                    old-state state
                                     (when (not= old-state state)
-                                      (r/render node (view component-id state @!context)))))
-                       (swap! !components assoc component-id
-                              {:view   view
+                                      (r/render node (view state @!context)))))
+                       (swap! !components assoc node
+                              {:component-id component-id
+                               :view   view
                                :!state !state}))
-    ::deinit-component (let [{:keys [!state] :as _component} (get @!components component-id)]
+    ::deinit-component (let [{:keys [!state component-id] :as _component} (get @!components node)]
                          (remove-watch !context (-context-change-watch-reference-key component-id))
                          (remove-watch !state (-state-change-watch-reference-key component-id))
-                         (swap! !components dissoc component-id))
-    (let [{:keys [!state]} (get @!components component-id)
+                         (swap! !components dissoc node))
+    (let [{:keys [!state]} (-get-node-parent-component node)
           context @!context
           state @!state
           [new-state new-context fx] (update state context message event)]
       (reset! !state new-state)
       (reset! !context new-context)
-      (-dispatch-fx! fx))))
+      (-dispatch-fx! event fx))))
 
 (defn dispatch
   "Handles message dispatching for components.
@@ -96,8 +101,8 @@
   dispatch function for replicant using `(r/set-dispatch! relm/dispatch)`.
 
   The dispatch function can handle both single messages and collections of messages:
-  - Single message: `(dispatch event [::message-type component-id])`
-  - Multiple messages: `(dispatch event [[::message-type-1 component-id] [::message-type-2 component-id]])`
+  - Single message: `(dispatch event [::message-type])`
+  - Multiple messages: `(dispatch event [[::message-type-1] [::message-type-2]])`
 
   Special message types:
   - `::init-component`: Initializes a component with the given args, init function, and view function
@@ -114,13 +119,13 @@
 (defn component
   "Creates a new component with the specified initialization and view functions.
 
-  Returns a function that, when called with a (globally unique) component-id and args, creates a
-  replicant component that will be managed by the relm system.
+  Returns a function that, when called with args, creates a replicant component 
+  that will be managed by the relm system.
 
   Parameters:
   - `init`: A function that takes the current context and component args and returns
             an initial state
-  - `view`: A function that takes component-id, state, and context and returns
+  - `view`: A function that takes state and context and returns
             a hiccup-style representation of the component's view
 
   Example:
@@ -128,27 +133,27 @@
   (def Counter
     (component
       {:init (fn [context args] {:count 0})
-       :view (fn [id state context] [:div \"Count: \" (:count state)])}))
+       :view (fn [state context] [:div \"Count: \" (:count state)])}))
 
   ;; Usage:
-  (Counter :my-counter {:some \"args\"})
+  (Counter {:some \"args\"})
   ```"
   [{:keys [init view]}]
-  (fn [component-id args]
+  (fn [args]
     (let [context @!context
           state (init context args)]
-      (-> (view component-id state context)
+      (-> (view state context)
           (rh/update-attrs
             clojure.core/update :replicant/on-mount
             (fn [on-mount]
               (if (vector-of-vectors? on-mount)
-                (into [[::init-component component-id state view]] on-mount)
-                [[::init-component component-id state view]
+                (into [[::init-component state view]] on-mount)
+                [[::init-component state view]
                  on-mount])))
           (rh/update-attrs
             clojure.core/update :replicant/on-unmount
             (fn [on-unmount]
               (if (vector-of-vectors? on-unmount)
-                (into [[::deinit-component component-id]] on-unmount)
-                [[::deinit-component component-id]
+                (into [[::deinit-component]] on-unmount)
+                [[::deinit-component]
                  on-unmount])))))))

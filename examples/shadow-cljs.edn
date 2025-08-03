@@ -2,7 +2,7 @@
 {:deps true
  :dev-http {8080 "public"}
  :builds
- {:counter {:target     :browser
+ {:examples {:target     :browser
             :output-dir "public/js"
             :asset-path "/js"
             :modules    {:main {:entries [examples.main]}}}}}
