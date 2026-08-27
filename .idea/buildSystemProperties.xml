@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="BuildSystemProperties">
+    <option name="modules">
+      <map>
+        <entry key="core-deps-sync">
+          <value>
+            <ModuleState>
+              <option name="buildSystemId" value="CLOJURE_DEPS" />
+              <option name="displayName" value="core" />
+            </ModuleState>
+          </value>
+        </entry>
+        <entry key="examples-deps-sync">
+          <value>
+            <ModuleState>
+              <option name="buildSystemId" value="CLOJURE_DEPS" />
+              <option name="displayName" value="examples" />
+            </ModuleState>
+          </value>
+        </entry>
+        <entry key="relm-deps-sync">
+          <value>
+            <ModuleState>
+              <option name="buildSystemId" value="CLOJURE_DEPS" />
+              <option name="displayName" value="relm" />
+            </ModuleState>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

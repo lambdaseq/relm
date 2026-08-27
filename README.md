@@ -82,8 +82,8 @@ Here's a simple counter component:
 ;; Set up the dispatch function
 (r/set-dispatch! relm/dispatch)
 
-;; Render the component to the DOM
-(r/render js/document.body (Counter {:init-count 0}))
+;; Render the root component to the DOM
+(relm/render js/document.body Counter {:init-count 0})
 ```
 
 ## API

@@ -1,11 +1,15 @@
 (ns com.lambdaseq.relm.core
-  (:refer-clojure :exclude [update])
-  (:require [replicant.dom :as r]
+  (:refer-clojure :exclude [update render])
+  (:require [clojure.string :as string]
+            [replicant.dom :as r]
             [replicant.hiccup :as rh]))
 
-(defonce !context (atom {}))
+(defonce !app-state
+  (atom {:context {}
+         :components {}
+         :root nil}))
 
-(defonce !components (atom {}))
+(defonce ^:private !rendering? (atom false))
 
 (defn vector-of-vectors? [v]
   (and (vector? v)
@@ -49,49 +53,93 @@
   (defmethod relm/update ::increment
     [state context _message _event]
     ; No effects dispatched
-    [(update state :count inc) context [])
+    [(update state :count inc) context []])
   ```"
   (fn [_state _context message _event]
     (first message)))
 
-(defn- -context-change-watch-reference-key [component-id]
-  (str "context-change-" component-id))
+(defn- -get-component-id [node]
+  #?(:cljs
+     (loop [curr node]
+       (when curr
+         (if (and (.-getAttribute curr) (.getAttribute curr "data-relm-component-id"))
+           (.getAttribute curr "data-relm-component-id")
+           (recur (.-parentNode curr)))))
+     :clj nil))
 
-(defn- -state-change-watch-reference-key [component-id]
-  (str "state-change-" component-id))
+(defn- -eval-root [component args]
+  (if (fn? component)
+    (if (some? args)
+      (component args)
+      (component))
+    component))
 
-(defn- -get-node-parent-component [node]
-  (or (get @!components node)
-      (recur (.-parentNode node))))
+(defn- -do-render-root! []
+  (when-not @!rendering?
+    (when-let [{:keys [node component args]} (:root @!app-state)]
+      (when (and node component)
+        (reset! !rendering? true)
+        (try
+          (r/render node (-eval-root component args))
+          (finally
+            (reset! !rendering? false)))))))
+
+(defn- -on-app-state-change [_ _ old-state new-state]
+  (when (and (:root new-state)
+             (or (not= (:context old-state) (:context new-state))
+                 (not= (:components old-state) (:components new-state))))
+    (-do-render-root!)))
+
+(defonce ^:private -init-watch
+  (add-watch !app-state :relm/root-render -on-app-state-change))
+
+(defn render
+  "Renders the root component into the given DOM node and tracks it in `!app-state`.
+
+  Parameters:
+  - `node`: DOM element node to render into
+  - `root-component`: Root component function created with `relm/component` (or hiccup)
+  - `args`: Optional arguments map to pass to `root-component` (defaults to {})
+
+  Example:
+  ```clojure
+  (relm/render js/document.body Examples)
+  ;; or
+  (relm/render js/document.body Examples {:some \"args\"})
+  ```"
+  ([node root-component]
+   (render node root-component {}))
+  ([node root-component args]
+   (swap! !app-state assoc :root {:node node :component root-component :args (or args {})})
+   (-do-render-root!)))
 
 (defn -handle-message [{:keys [replicant/node] :as event} [message-type :as message]]
   (case message-type
-    ::init-component (let [[_ state view] message
-                           !state (atom state)
-                           component-id (random-uuid)]
-                       (add-watch !context (-context-change-watch-reference-key component-id)
-                                  (fn [_ _ old-context context]
-                                    (when (not= old-context context)
-                                      (r/render node (view @!state context)))))
-                       (add-watch !state (-state-change-watch-reference-key component-id)
-                                  (fn [_ _ old-state state]
-                                    (when (not= old-state state)
-                                      (r/render node (view state @!context)))))
-                       (swap! !components assoc node
-                              {:component-id component-id
-                               :view   view
-                               :!state !state}))
-    ::deinit-component (let [{:keys [!state component-id] :as _component} (get @!components node)]
-                         (remove-watch !context (-context-change-watch-reference-key component-id))
-                         (remove-watch !state (-state-change-watch-reference-key component-id))
-                         (swap! !components dissoc node))
-    (let [{:keys [!state]} (-get-node-parent-component node)
-          context @!context
-          state @!state
-          [new-state new-context fx] (update state context message event)]
-      (reset! !state new-state)
-      (reset! !context new-context)
-      (-dispatch-fx! event fx))))
+    ::init-component
+    (let [[_ comp-id initial-state] message
+          comp-id-str (str comp-id)]
+      (when-not (contains? (:components @!app-state) comp-id-str)
+        (swap! !app-state assoc-in [:components comp-id-str :state] initial-state)))
+
+    ::deinit-component
+    (let [[_ comp-id] message
+          comp-id-str (str comp-id)]
+      (swap! !app-state update :components dissoc comp-id-str))
+
+    (let [comp-id (-get-component-id node)
+          component-info (when comp-id
+                           (get-in @!app-state [:components comp-id]))
+          state (:state component-info)
+          context (:context @!app-state)
+          result (update state context message event)
+          [new-state new-context effects] (if (vector? result)
+                                            result
+                                            [result context])]
+      (swap! !app-state (fn [app]
+                          (cond-> app
+                            comp-id (assoc-in [:components comp-id :state] new-state)
+                            (some? new-context) (assoc :context new-context))))
+      (-dispatch-fx! event effects))))
 
 (defn dispatch
   "Handles message dispatching for components.
@@ -105,16 +153,59 @@
   - Multiple messages: `(dispatch event [[::message-type-1] [::message-type-2]])`
 
   Special message types:
-  - `::init-component`: Initializes a component with the given args, init function, and view function
+  - `::init-component`: Initializes a component in global state
   - `::deinit-component`: Cleans up a component when it's unmounted
 
-  For other message types, it calls the appropriate `event` multimethod implementation."
+  For other message types, it calls the appropriate `update` multimethod implementation."
   [event message-or-messages]
   (if (vector-of-vectors? message-or-messages)
     (doseq [message message-or-messages
             :when (some? message)]
       (-handle-message event message))
     (-handle-message event message-or-messages)))
+
+(defn- resolve-component-id [default-id args]
+  (cond
+    (map? args)
+    (or (:id args)
+        (:component-id args)
+        (:key (meta args))
+        (:key args)
+        (some (fn [[k v]]
+                (when (and (keyword? k)
+                           (string/ends-with? (name k) "-id"))
+                  v))
+              args)
+        default-id)
+
+    (some? args)
+    args
+
+    :else
+    default-id))
+
+(defn- -render-component [default-id-or-id init view args]
+  (let [args (or args {})
+        comp-id (str (if (and (string? default-id-or-id) (not (map? default-id-or-id)))
+                       (resolve-component-id default-id-or-id args)
+                       (resolve-component-id (str default-id-or-id) args)))
+        context (:context @!app-state)
+        state (if (contains? (:components @!app-state) comp-id)
+                (get-in @!app-state [:components comp-id :state])
+                (let [initial-state (init context args)]
+                  (swap! !app-state assoc-in [:components comp-id :state] initial-state)
+                  initial-state))
+        hiccup (view state context)]
+    (when hiccup
+      (-> hiccup
+          (rh/update-attrs assoc :data-relm-component-id comp-id)
+          (rh/update-attrs
+            clojure.core/update :replicant/on-unmount
+            (fn [on-unmount]
+              (if (vector-of-vectors? on-unmount)
+                (into [[::deinit-component comp-id]] on-unmount)
+                [[::deinit-component comp-id]
+                 on-unmount])))))))
 
 (defn component
   "Creates a new component with the specified initialization and view functions.
@@ -124,7 +215,7 @@
 
   Parameters:
   - `init`: A function that takes the current context and component args and returns
-            an initial state
+            an initial state (defaults to `(fn [_ _] nil)`)
   - `view`: A function that takes state and context and returns
             a hiccup-style representation of the component's view
 
@@ -139,24 +230,16 @@
   (Counter {:some \"args\"})
   ```"
   [{:keys [init view]}]
-  (fn [args]
-    (let [context @!context
-          state (init context args)]
-      (-> (view state context)
-          (rh/update-attrs
-            clojure.core/update :replicant/on-mount
-            (fn [on-mount]
-              (if (vector-of-vectors? on-mount)
-                (into [[::init-component state view]] on-mount)
-                [[::init-component state view]
-                 on-mount])))
-          (rh/update-attrs
-            clojure.core/update :replicant/on-unmount
-            (fn [on-unmount]
-              (if (vector-of-vectors? on-unmount)
-                (into [[::deinit-component]] on-unmount)
-                [[::deinit-component]
-                 on-unmount])))))))
+  (let [default-id (str (random-uuid))
+        init-fn (or init (fn [_ _] nil))
+        view-fn (or view (constantly nil))]
+    (fn
+      ([]
+       (-render-component default-id init-fn view-fn {}))
+      ([args]
+       (-render-component default-id init-fn view-fn args))
+      ([id args]
+       (-render-component id init-fn view-fn args)))))
 
 (defmethod fx :dispatch
   [dom-event [_ event]]
