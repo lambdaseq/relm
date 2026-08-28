@@ -362,12 +362,52 @@ Both `relm` and `re-frame` provide structured, unidirectional data-flow architec
 
 ### Comparison with Elm
 
-| Feature | `relm` | Elm |
+`relm` is directly inspired by **The Elm Architecture (TEA)** and its Model-View-Update (MVU) paradigm, bringing its pure functional simplicity to the Clojure/ClojureScript ecosystem. However, `relm` adapts TEA to leverage Clojure's strengths—such as open multimethods, data-first programming (Hiccup/EDN), and flexible component isolation—addressing common pain points with scaling Elm applications.
+
+| Dimension | `relm` | Elm |
 |---|---|---|
-| **Language** | Clojure / ClojureScript | Elm |
-| **Architecture** | Model-View-Update + Effects | Model-View-Update + Commands/Subscriptions |
-| **Component Support** | Hierarchical components with local state + global context | Single root model / nested update pipelines |
-| **Syntax** | Clojure Hiccup data structures | Typed Elm HTML expressions |
+| **Architecture** | Model-View-Update + Side Effects (`[state context effects]`) | Model-View-Update + Commands (`(Model, Cmd Msg)`) & Subscriptions (`Sub Msg`) |
+| **Component Model** | **First-class hierarchical components** with isolated local state + shared global context | **Monolithic model**: Single root `Model` tree; nesting requires manual message/command wrapping |
+| **View Paradigm** | Pure functions `(fn [state context] hiccup)` returning plain Clojure data structures | Pure functions `Model -> Html Msg` returning typed Elm HTML expressions |
+| **DOM Renderer** | [Replicant](https://github.com/cjohansen/replicant) (data-driven VDOM with DOM-event-free dispatch) | Elm Virtual DOM (integrated compiler runtime) |
+| **Message System** | **Open multimethods** (`relm/update`) dispatched on namespaced keywords | **Closed algebraic data types** (`type Msg = ...`) with exhaustive `case` expressions |
+| **Side Effects** | Ordered vector of effect vectors `[[::fx-type ...]]` with extensible `relm/fx` multimethods | Opaque `Cmd Msg` and `Sub Msg` managed by the Elm runtime; JS interop via Ports |
+| **Language & Typing** | Clojure / ClojureScript (dynamic, data-driven, REPL-interactive) | Elm (statically typed, pure functional, compile-time sound) |
+| **JS Interop** | Direct, seamless JavaScript interop and custom effect handlers | Restricted through boundary Ports, Flags, and Web Components |
+
+#### 1. Component Model & State Scoping
+
+- **relm**: Provides first-class, reusable components (`relm/component`). Each component instance automatically manages its own isolated state map (`[:components component-id :state]`) while having access to shared global `context`. Child components can be embedded without parent boilerplate—messages dispatched from child views route directly to the target component instance without parent coordination.
+- **Elm**: Strictly avoids traditional components in favor of a single monolithic root `Model`. Scaling or nesting UI modules in Elm requires manual plumbing ("Outscaling"):
+  - The parent model must hold the child model (`{ child : Child.Model }`).
+  - The parent `Msg` must wrap child messages (`type Msg = ChildMsg Child.Msg | ...`).
+  - The parent `update` must manually route the message to `Child.update` and lift child commands via `Cmd.map ChildMsg childCmd`.
+
+#### 2. Pure Functional Views: Hiccup Data vs. Typed HTML DSL
+
+- **relm**: Views are pure functions returning **Clojure data structures** (Hiccup vectors, maps, keywords). Views are inspected, transformed, composed, and serialized using standard sequence functions (`map`, `filter`, `assoc`, `into`). Event handlers are plain data vectors (`{:on {:click [::increment]}}`), decoupling UI declaration from DOM event objects.
+- **Elm**: Views are pure functions returning typed `Html Msg` values generated via functions like `div [] [ button [ onClick Increment ] [ text "+" ] ]`. While type-safe, UI structures are opaque AST values rather than standard data structures that can be manipulated using general collections APIs.
+
+#### 3. Message Dispatch: Open Multimethods vs. Closed Sum Types
+
+- **relm (`relm/update`)**:
+  - Message handling is powered by open Clojure multimethods.
+  - New messages and update logic can be defined modularly across multiple namespaces and third-party libraries without altering a centralized type definition.
+  - Handlers return an explicit vector `[new-state new-context effects]`.
+- **Elm (`update`)**:
+  - Messages are defined in a closed algebraic sum type (`type Msg = Increment | Decrement | Submit String`).
+  - The central `update` function uses pattern matching (`case msg of ...`).
+  - While the compiler guarantees total exhaustiveness, introducing new messages requires modifying the central union type and all relevant `case` branches.
+
+#### 4. Side Effects & Runtime Interoperability
+
+- **relm (`relm/fx`)**:
+  - Side effects are represented as plain data: ordered vectors of effect vectors (e.g. `[[::relm.http/fetch {...}] [::log "done"]]`).
+  - Handlers are open multimethods (`relm/fx`) that can easily invoke browser APIs, third-party libraries, or asynchronous promises.
+  - Asynchronous effects resume data flow by calling `(relm/dispatch event [::on-success result])`.
+- **Elm (`Cmd` / `Sub` & Ports)**:
+  - Side effects are represented as opaque `Cmd Msg` or `Sub Msg` values created by built-in platform libraries (e.g., `Http.send`, `Time.every`).
+  - Interacting with outside JavaScript or browser APIs not covered by Elm's standard library requires setting up Ports (message-passing channels with serialization) or Web Components.
 
 ---
 
