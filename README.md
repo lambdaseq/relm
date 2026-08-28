@@ -318,13 +318,47 @@ The `reitit` module provides full client-side routing, popstate history synchron
 
 ### Comparison with re-frame
 
-| Feature | `relm` | `re-frame` |
+Both `relm` and `re-frame` provide structured, unidirectional data-flow architectures for ClojureScript applications, but they differ fundamentally in how they handle views, state scoping, events, and side effects.
+
+| Dimension | `relm` | `re-frame` |
 |---|---|---|
-| **DOM Renderer** | Replicant (lightweight data-driven VDOM) | React via Reagent |
-| **Component State** | Isolated local state per component instance + global context | Single global `app-db` (local state via Reagent atoms) |
-| **Reactivity Model** | Pure functional re-renders on state/context updates | Signal graph with reactive subscriptions (`reg-sub`) |
-| **Side Effects** | Multimethod `relm/fx` returning effect vectors | Effect handlers (`reg-fx`) |
-| **Dependencies** | Minimal (Replicant only for core) | React, Reagent, re-frame |
+| **View Paradigm** | **Pure functions** `(fn [state context] hiccup)` without reactive atoms or derefs | Reagent components (Form-1/2/3) dereferencing reactive `Reaction`s/`RAtom`s |
+| **DOM Renderer** | [Replicant](https://github.com/cjohansen/replicant) (lightweight, pure data-driven VDOM) | React via [Reagent](https://reagent-project.github.io/) |
+| **State Model** | **Hybrid**: Isolated local state per component instance + shared global context | **Single global store**: `app-db` holds all app state (or local Reagent atoms) |
+| **Event System** | Pure `relm/update` multimethods returning `[new-state new-context effects]` | Interceptor chain with `reg-event-db` / `reg-event-fx` |
+| **Effect System** | Ordered vector of effect vectors `[[::fx-type ...]]` processed by `relm/fx` multimethods | Effect map `{:fx-key ...}` processed by `reg-fx` handlers |
+| **Reactivity** | Explicit render trigger on state/context change | Reactive signal graph (`reg-sub` subscriptions) |
+| **Dependencies** | Minimal (Replicant only for core, zero React dependency) | React, Reagent, and re-frame |
+
+#### 1. Pure Functional Views vs. Reactive Subscriptions
+
+- **relm**: Views are **pure, deterministic functions** of their arguments: `(fn [state context] hiccup)`. A view does not dereference atoms, maintain internal subscriptions, or interact with hidden reactive state graphs. Given the same `state` and `context`, a view always returns the exact same Hiccup data structure. Rendering is powered by Replicant, eliminating React wrapper overhead and lifecycle hooks.
+- **re-frame**: Views are Reagent components that subscribe to the global signal graph using `(subscribe [:query-id])`. Reagent components track dereferences (`@sub`) during execution and automatically re-render when reactive signals emit new values. While powerful, this introduces reactive subscriptions directly into the view layer.
+
+#### 2. Event & Message Systems
+
+- **relm (`relm/update`)**:
+  - Events are handled by the `relm/update` multimethod dispatched on message type: `(defmethod relm/update ::msg-type [state context message event])`.
+  - The handler is a pure function that explicitly receives both the component's private `state` and the global shared `context`.
+  - The return signature is explicit: `[new-state new-context effects]`.
+  - Component instances are targeted automatically through the event metadata, enabling straightforward component isolation without global path collisions.
+- **re-frame (`reg-event-db` / `reg-event-fx`)**:
+  - Events are handled via interceptor pipelines registered with `reg-event-db` or `reg-event-fx`.
+  - `reg-event-db` receives `(fn [db event-vec])` and returns a new global `app-db`.
+  - `reg-event-fx` receives a coeffects map `(fn [{:keys [db]} event-vec])` and returns an effects description map (e.g. `{:db new-db :fx [...]}`).
+  - All state transformations operate against the single global `app-db` tree.
+
+#### 3. Side Effects Systems
+
+- **relm (`relm/fx`)**:
+  - Side effects are declared as an **ordered vector of effect vectors**: `[[::fx-type arg1 arg2] ...]`.
+  - Handlers are defined using the `relm/fx` multimethod: `(defmethod relm/fx ::fx-type [event [_ arg1 arg2]] ...)`.
+  - Asynchronous effects dispatch follow-up messages using `(relm/dispatch event [::on-success data])` or via the built-in `[:dispatch [::next-msg]]` effect.
+  - Because effects are vectors, their execution order is guaranteed and linear.
+- **re-frame (`reg-fx`)**:
+  - Side effects are declared as a map of effect handlers: `{:http-xhrio {...} :dispatch [:event]}` or a vector of pairs `{:fx [[:dispatch [:event]] [:http-xhrio {...}]]}`.
+  - Effect handlers are registered globally via `(reg-fx :fx-key (fn [val] ...))`.
+  - Follow-up events are triggered by dispatching to the global re-frame event queue (`re-frame.core/dispatch`).
 
 ### Comparison with Elm
 
