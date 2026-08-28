@@ -105,8 +105,8 @@ Add the required modules to your `deps.edn`:
    - **Local State**: State private to each component instance (e.g. counter values, form input, open/close toggles).
    - **Global Context**: Shared state accessible by all components (e.g. current user, theme, active route).
 2. **View**: Pure function of `(state, context)` returning Replicant Hiccup data structures.
-3. **Update**: Pure multimethod `(update state context message event)` returning `[new-state new-context effects]`.
-4. **Effects**: Multimethod `(fx event effect)` executing side effects (HTTP requests, browser history changes, timers, alerts).
+3. **Update**: Pure multimethod `(update state context message event)` returning `[new-state new-context effects]` where `effects` is always a vector of effect vectors (e.g. `[[::alert "Hi!"]]`).
+4. **Effects**: Multimethod `(fx event effect)` executing individual side effects (HTTP requests, browser history changes, timers, alerts).
 
 ---
 
@@ -154,7 +154,7 @@ Add the required modules to your `deps.edn`:
 
 (defmethod relm/update ::show-alert
   [{:keys [count] :as state} context _message _event]
-  [state context [::alert (str "Current count is " count)]])
+  [state context [[::alert (str "Current count is " count)]]])
 
 ;; 6. Wire Replicant dispatch to Relm
 (r/set-dispatch! relm/dispatch)
@@ -207,17 +207,16 @@ The `core` module includes a built-in Fetch API effect handler with automated JS
 
 (defmethod relm/update ::fetch-posts
   [state context _ _]
-  [state context [::relm.http/fetch
-                  {:url        "https://jsonplaceholder.typicode.com/posts"
-                   :method     :get
-                   :mode       :cors
-                   :on-success [::posts-fetched]
-                   :on-failure [::posts-failed]}]])
+  [state context [[::relm.http/fetch
+                   {:url        "https://jsonplaceholder.typicode.com/posts"
+                    :method     :get
+                    :mode       :cors
+                    :on-success [::posts-fetched]
+                    :on-failure [::posts-failed]}]]])
 
 (defmethod relm/update ::posts-fetched
   [state context [_ {:keys [body]}] _]
-  (let [posts (if (string? body) (js->clj (js/JSON.parse body) :keywordize-keys true) body)]
-    [(assoc state :posts posts) context]))
+  [(assoc state :posts body) context])
 
 (defmethod relm/update ::posts-failed
   [state context [_ {:keys [problem problem-message]}] _]
@@ -230,7 +229,7 @@ The `core` module includes a built-in Fetch API effect handler with automated JS
 ;; Abort an in-flight request by request-id
 (defmethod relm/update ::cancel
   [state context [_ request-id] _]
-  [state context [::relm.http/abort {:request-id request-id}]])
+  [state context [[::relm.http/abort {:request-id request-id}]]])
 ```
 
 ---
@@ -255,8 +254,8 @@ Perform browser navigation actions directly via effect handlers:
   [state context [[::nav/replace-state nil path]]])
 
 ;; Navigate back or reload
-(defmethod relm/update ::go-back [state context _ _] [state context [::nav/back]])
-(defmethod relm/update ::reload-app [state context _ _] [state context [::nav/reload]])
+(defmethod relm/update ::go-back [state context _ _] [state context [[::nav/back]]])
+(defmethod relm/update ::reload-app [state context _ _] [state context [[::nav/reload]]])
 ```
 
 ---

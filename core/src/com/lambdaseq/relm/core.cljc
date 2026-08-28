@@ -36,7 +36,7 @@
 
 (defn vector-of-vectors?
   "Returns true if `v` is a vector whose first element is also a vector.
-  Used to detect batches of messages or side effects (e.g. `[[::fx-1] [::fx-2]]`)."
+  Used to detect batches of messages (e.g. `[[::msg-1] [::msg-2]]`)."
   [v]
   (and (vector? v)
        (vector? (first v))))
@@ -67,14 +67,12 @@
     (first event-or-effect)))
 
 (defn -dispatch-fx!
-  "Executes one or more side effects returned by an update handler.
-  Handles either a single effect vector `[::fx-type ...]` or a batch `[[::fx-1] [::fx-2]]`."
+  "Executes side effects returned by an update handler.
+  Expects `effects` to be a vector of effect vectors (e.g. `[[::fx-1] [::fx-2]]`)."
   [event effects]
-  (when effects
-    (if (vector-of-vectors? effects)
-      (doseq [effect effects]
-        (fx event effect))
-      (fx event effects))))
+  (doseq [effect effects
+          :when (some? effect)]
+    (fx event effect)))
 
 ;; -----------------------------------------------------------------------------
 ;; State Update Multimethod
@@ -86,6 +84,9 @@
   Dispatched on the first element of the message vector (the message type keyword).
   Takes `[state context message event]` and returns a vector of:
     `[new-state new-context effects]` or `[new-state new-context]` or `new-state`
+
+  When side effects are returned, they must always be a vector of effect vectors:
+    `[[::fx-type ...]]`
 
   Arguments:
   - `state`   Current local state of the component receiving the event

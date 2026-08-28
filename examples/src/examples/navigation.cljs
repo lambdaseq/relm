@@ -31,37 +31,37 @@
 ;; Dispatches a navigation side effect to assign a new URL.
 (defmethod relm/update ::navigate-to
   [state context [_ url] _]
-  [state context [::nav/navigate-to url]])
+  [state context [[::nav/navigate-to url]]])
 
 ;; Dispatches a page reload side effect.
 (defmethod relm/update ::reload-page
   [state context _ _]
-  [state context [::nav/reload]])
+  [state context [[::nav/reload]]])
 
 ;; Dispatches a URL replace side effect without adding a history record.
 (defmethod relm/update ::replace-url
   [state context [_ url] _]
-  [state context [::nav/replace url]])
+  [state context [[::nav/replace url]]])
 
 ;; Dispatches a side effect to navigate back in browser history.
 (defmethod relm/update ::go-back
   [state context _ _]
-  [state context [::nav/back]])
+  [state context [[::nav/back]]])
 
 ;; Dispatches a push-state effect to push a new entry onto the HTML5 history stack.
 (defmethod relm/update ::push-state
   [state context [_ url] _]
-  [state context [::nav/push-state (js-obj "page" url) url]])
+  [state context [[::nav/push-state (js-obj "page" url) url]]])
 
 ;; Dispatches a replace-state effect to update current history entry.
 (defmethod relm/update ::replace-state
   [state context [_ url] _]
-  [state context [::nav/replace-state (js-obj "page" url) url]])
+  [state context [[::nav/replace-state (js-obj "page" url) url]]])
 
 ;; Dispatches a history.go effect with relative step integer `n`.
 (defmethod relm/update ::go-to-position
   [state context [_ n] _]
-  [state context [::nav/go n]])
+  [state context [[::nav/go n]]])
 
 ;; -----------------------------------------------------------------------------
 ;; View

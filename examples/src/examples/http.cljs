@@ -4,7 +4,7 @@
   Demonstrates:
   - Initializing local state for async data (`:posts`)
   - Triggering HTTP fetch side effect via `[::relm.http/fetch ...]`
-  - Handling successful responses and parsing JSON payloads into state
+  - Handling successful responses with automatically decoded JSON payloads into state
   - Handling fetch failure callbacks
   - Rendering loading / data states in Hiccup"
   (:require [com.lambdaseq.relm.core :as relm]
@@ -23,13 +23,10 @@
 ;; Update Handlers
 ;; -----------------------------------------------------------------------------
 
-;; Handles successful fetch response, parsing JSON response body into Clojure data.
+;; Handles successful fetch response with automatically decoded JSON response body.
 (defmethod relm/update ::posts-fetched
   [state context [_ {:keys [body]}] _event]
-  (let [posts (if (string? body)
-                (js->clj (js/JSON.parse body) :keywordize-keys true)
-                body)]
-    [(assoc state :posts posts) context]))
+  [(assoc state :posts body) context])
 
 ;; Handles fetch failure or network error.
 (defmethod relm/update ::posts-failed
@@ -39,12 +36,12 @@
 ;; Emits the `::relm.http/fetch` side effect to retrieve posts from JSONPlaceholder API.
 (defmethod relm/update ::fetch-posts
   [state context _ _event]
-  [state context [::relm.http/fetch
-                  {:url        "https://jsonplaceholder.typicode.com/posts"
-                   :method     :get
-                   :mode       :cors
-                   :on-success [::posts-fetched]
-                   :on-failure [::posts-failed]}]])
+  [state context [[::relm.http/fetch
+                   {:url        "https://jsonplaceholder.typicode.com/posts"
+                    :method     :get
+                    :mode       :cors
+                    :on-success [::posts-fetched]
+                    :on-failure [::posts-failed]}]]])
 
 ;; -----------------------------------------------------------------------------
 ;; View

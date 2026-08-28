@@ -25,6 +25,12 @@
   {:reader-kw :text
    :reader-fn identity})
 
+(def default-response-content-types
+  "Default mapping of Content-Type header patterns to response body reader keywords."
+  {"application/json" :json
+   #"^application/(.+\+)?json" :json
+   "text/plain" :text})
+
 ;; -----------------------------------------------------------------------------
 ;; Utilities
 ;; -----------------------------------------------------------------------------
@@ -157,17 +163,22 @@
   Returns a reader map with keys:
   - `:reader-kw` Method to invoke on the JS Response (`:json`, `:text`, `:blob`, `:array-buffer`, `:form-data`)
   - `:reader-fn` Transformation function applied to the decoded body"
-  [{:keys [response-content-types]} response]
-  (let [content-type (get-in response [:headers :content-type] "text/plain")
-        reader (reduce-kv
-                 (fn [ret pattern reader]
-                   (if (or (and (string? pattern) (= content-type pattern))
-                           (and (regexp? pattern) (re-find pattern content-type)))
-                     (reduced reader)
-                     ret))
-                 default-text-reader
-                 response-content-types)]
-    (->reader reader)))
+  [{:keys [response-content-types response-content-type]} response]
+  (if response-content-type
+    (->reader response-content-type)
+    (let [content-type (get-in response [:headers :content-type] "text/plain")
+          reader (reduce-kv
+                   (fn [ret pattern reader]
+                     (if (or (and (string? pattern)
+                                  (or (= content-type pattern)
+                                      (string/starts-with? content-type pattern)))
+                             (and (regexp? pattern)
+                                  (re-find pattern content-type)))
+                       (reduced reader)
+                       ret))
+                   default-text-reader
+                   (merge default-response-content-types response-content-types))]
+      (->reader reader))))
 
 (defn timeout-race
   "Wraps a JavaScript `Promise` in a timeout race that rejects with `:timeout` after `timeout` milliseconds."

@@ -51,7 +51,7 @@
 ;; Emits a side effect to show the current count in an alert dialog without modifying state.
 (defmethod relm/update ::show-count
   [{:keys [count] :as state} context _message _event]
-  [state context [::alert (str "Count: " count)]])
+  [state context [[::alert (str "Count: " count)]]])
 
 ;; Increments the local counter by 1.
 (defmethod relm/update ::increment
