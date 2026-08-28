@@ -1,39 +1,56 @@
 (ns com.lambdaseq.relm.http
+  "HTTP side-effect module for Relm built on the Fetch API.
+
+  Provides `core/fx` side effects for making asynchronous HTTP requests (`::fetch`)
+  and aborting active requests (`::abort`). Handles JSON serialization, query parameter
+  encoding, response header parsing, response body decoding based on Content-Type,
+  request timeouts, and error handling with automated message dispatching back into Relm."
   (:require [com.lambdaseq.relm.core :as core]
             [clojure.string :as string]
             [goog.object :as obj]))
 
+;; -----------------------------------------------------------------------------
+;; Default Body Readers
+;; -----------------------------------------------------------------------------
+
 (def default-json-reader
+  "Default reader configuration for JSON response payloads.
+  Converts parsed JavaScript objects into Clojure maps with keywordized keys."
   {:reader-kw :json
    :reader-fn #(js->clj % :keywordize-keys true)})
 
 (def default-text-reader
+  "Default fallback reader configuration for text/plain response payloads.
+  Returns the raw string response body unmodified."
   {:reader-kw :text
    :reader-fn identity})
 
+;; -----------------------------------------------------------------------------
 ;; Utilities
-;; =============================================================================
+;; -----------------------------------------------------------------------------
 
 (defn ->seq
-  "Returns x if x satisfies ISequential, otherwise vector of x."
+  "Ensures `x` is wrapped in a sequential collection. Returns `x` if sequential, otherwise `[x]`."
   [x]
   (if (sequential? x) x [x]))
 
 (defn ->str
-  "Returns the name String of x if x is a symbol or keyword, otherwise
-   x.toString()."
+  "Converts `x` into a String. Returns the name if keyword or symbol, otherwise `(str x)`."
   [x]
   (if (or (symbol? x)
           (keyword? x))
     (name x)
     (str x)))
 
-(defn encode-kv [k v]
+(defn encode-kv
+  "URI-encodes a key-value pair as `key=value` string."
+  [k v]
   (str (js/encodeURIComponent (->str k)) "="
        (js/encodeURIComponent (->str v))))
 
 (defn params->str
-  "Returns a URI-encoded string of the params."
+  "Encodes a map of query parameters into a URL query string prefixed with `?`.
+  Supports vector values as repeated query parameters."
   [params]
   (if (zero? (count params))
     ""
@@ -45,7 +62,7 @@
       (str "?" (string/join "&" pairs)))))
 
 (defn headers->js
-  "Returns a new js/Headers JavaScript object of the ClojureScript map of headers."
+  "Converts a ClojureScript map of headers into a JavaScript `Headers` instance."
   [headers]
   (reduce-kv
     (fn [js-headers header-name header-value]
@@ -56,7 +73,7 @@
     headers))
 
 (defn request->js-init
-  "Returns an init options js/Object to use as the second argument to js/fetch."
+  "Builds the options configuration object (JavaScript object) passed as the second argument to `js/fetch`."
   [{:keys [method headers request-content-type body mode credentials cache redirect referrer integrity]}
    abort-signal]
   (let [mode        (or mode "same-origin")
@@ -70,41 +87,38 @@
                              headers)
                       headers)]
     (doto
-      #js {;; There is always a signal, either given as argument when an external AbortController is used,
-           ;; or created by our own internal AbortController instance.
+      #js {;; AbortSignal provided either externally or by our internal AbortController
            :signal      abort-signal
 
-           ;; There is always a method, as dispatch is via sub-effects like :get.
+           ;; HTTP method (GET, POST, PUT, DELETE, etc.)
            :method      (->str method)
 
-           ;; Although the below keys are usually optional, the default between
-           ;; different browsers is inconsistent so we always set our own default.
-
-           ;; Possible: cors no-cors same-origin navigate
+           ;; Request mode: cors, no-cors, same-origin, navigate
            :mode        (->str mode)
 
-           ;; Possible: omit same-origin include
+           ;; Request credentials: omit, same-origin, include
            :credentials (->str credentials)
 
-           ;; Possible: follow error manual
+           ;; Redirect handling: follow, error, manual
            :redirect    (->str redirect)}
 
-      ;; Everything else is optional...
+      ;; Headers
       (cond-> headers' (obj/set "headers" (headers->js headers')))
 
+      ;; Request body
       (cond-> body (obj/set "body" body'))
 
-      ;; Possible: default no-store reload no-cache force-cache only-if-cached
+      ;; Cache mode: default, no-store, reload, no-cache, force-cache, only-if-cached
       (cond-> cache (obj/set "cache" (->str cache)))
 
-      ;; Possible: no-referrer client
+      ;; Referrer policy
       (cond-> referrer (obj/set "referrer" (->str referrer)))
 
       ;; Sub-resource integrity string
       (cond-> integrity (obj/set "integrity" (->str integrity))))))
 
 (defn js-headers->clj
-  "Returns a new ClojureScript map of the js/Headers JavaScript object."
+  "Converts a JavaScript `Headers` object into a ClojureScript map with keywordized keys."
   [js-headers]
   (reduce
     (fn [headers [header-name header-value]]
@@ -113,7 +127,7 @@
     (es6-iterator-seq (.entries js-headers))))
 
 (defn js-response->clj
-  "Returns a new ClojureScript map of the js/Response JavaScript object."
+  "Converts a JavaScript `Response` object into a ClojureScript map containing response metadata."
   [^js js-response]
   {:url         (.-url js-response)
    :ok?         (.-ok js-response)
@@ -125,8 +139,7 @@
    :headers     (js-headers->clj (.-headers js-response))})
 
 (defn ->reader
-  "Wrap a normal keyword on a reader map (see `response->header`), and
-   set a default json body reader."
+  "Normalizes reader configurations, resolving keyword shortcuts like `:json` to reader maps."
   [reader-or-kw]
   (cond
     ;; default json body reader
@@ -140,11 +153,10 @@
     :else reader-or-kw))
 
 (defn response->reader
-  "Returns a reader map or the `default-text-reader` to use for the body of the
-   response according to the Content-Type header.
-   A reader map is one with 2 keys:
-   - `reader-kw`: a keyword to indicate what js/Body method should be used.
-   - `reader-fn`: a function that processes the `js-body` as required."
+  "Selects the appropriate response body reader based on the response's `Content-Type` header.
+  Returns a reader map with keys:
+  - `:reader-kw` Method to invoke on the JS Response (`:json`, `:text`, `:blob`, `:array-buffer`, `:form-data`)
+  - `:reader-fn` Transformation function applied to the decoded body"
   [{:keys [response-content-types]} response]
   (let [content-type (get-in response [:headers :content-type] "text/plain")
         reader (reduce-kv
@@ -158,9 +170,7 @@
     (->reader reader)))
 
 (defn timeout-race
-  "Returns a js/Promise JavaScript object that is a race between another
-   js/Promise JavaScript object and timeout in ms if timeout is not nil,
-   otherwise js-promise."
+  "Wraps a JavaScript `Promise` in a timeout race that rejects with `:timeout` after `timeout` milliseconds."
   [js-promise timeout]
   (if timeout
     (.race js/Promise
@@ -170,13 +180,16 @@
                     (js/setTimeout #(reject :timeout) timeout)))])
     js-promise))
 
-;; Effects and Handlers
-;; =============================================================================
+;; -----------------------------------------------------------------------------
+;; Effects and Response Handlers
+;; -----------------------------------------------------------------------------
 
 (def request-id->js-abort-controller
+  "Registry atom tracking active JavaScript AbortController instances indexed by `request-id`."
   (atom {}))
 
 (defn body-success-handler
+  "Dispatches success event after response body has been read and processed."
   [dom-event
    {:keys [request-id on-success on-failure]
     :or   {on-success [::fetch-no-on-success]
@@ -201,6 +214,7 @@
       (core/dispatch dom-event event))))
 
 (defn body-problem-handler
+  "Dispatches failure event when decoding or parsing the response body fails."
   [dom-event
    {:keys [request-id on-failure]
     :or   {on-failure [::fetch-no-on-failure]}}
@@ -219,7 +233,7 @@
       (core/dispatch dom-event event))))
 
 (defn response-success-handler
-  "Reads the js/Response JavaScript Object stream to completion. Returns nil."
+  "Reads the JS `Response` stream according to the resolved reader and forwards to body handlers."
   [dom-event request js-response]
   (let [response                       (js-response->clj js-response)
         {:keys [reader-kw] :as reader} (response->reader request response)]
@@ -239,13 +253,16 @@
           (.then (partial body-success-handler dom-event request response reader))
           (.catch (partial body-problem-handler dom-event request response reader))))))
 
-(defn js-error->problem [js-error]
+(defn js-error->problem
+  "Maps JavaScript fetch errors/exceptions to relm problem keywords (`:timeout`, `:aborted`, `:fetch`)."
+  [js-error]
   (cond
     (= :timeout js-error)              :timeout
     (= "AbortError" (.-name js-error)) :aborted
     :else                              :fetch))
 
 (defn response-problem-handler
+  "Dispatches failure event when network transport, timeout, or abort errors occur."
   [dom-event
    {:keys [request-id on-failure]
     :or   {on-failure [::fetch-no-on-failure]}}
@@ -261,7 +278,19 @@
       (core/dispatch dom-event event))))
 
 (defn fetch
-  "Initialise the request. Returns nil."
+  "Initializes and executes an HTTP Fetch request.
+  Options map:
+  - `:url`                  URL string to fetch
+  - `:method`               HTTP method keyword/string (`:get`, `:post`, `:put`, etc.)
+  - `:params`               Query parameters map
+  - `:headers`              HTTP headers map
+  - `:body`                 Request body payload
+  - `:request-content-type` Content type shortcut (e.g. `:json`)
+  - `:timeout`              Request timeout in milliseconds
+  - `:request-id`           Unique request ID keyword (auto-generated if omitted)
+  - `:on-request-id`        Callback message vector receiving the generated `request-id`
+  - `:on-success`           Message vector dispatched on successful response `(conj on-success response)`
+  - `:on-failure`           Message vector dispatched on error `(conj on-failure response)`"
   [dom-event
    {:keys [url timeout params request-id on-request-id abort-signal] :as request
     :or   {request-id (keyword (gensym "fetch-fx-"))}}]
@@ -283,17 +312,21 @@
         (.catch (partial response-problem-handler dom-event request')))))
 
 (defn fetch-fx
+  "Executes one or more fetch effect specifications."
   [event effect]
   (let [seq-of-effects (->seq effect)]
     (doseq [effect seq-of-effects]
       (let [with-defaults effect]
         (fetch event with-defaults)))))
 
+;; Effect handler for executing HTTP fetch requests.
+;; Effect format: `[::fetch request-map]` or `[::fetch [req-1 req-2 ...]]`
 (defmethod core/fx ::fetch
   [event [_ effect]]
   (fetch-fx event effect))
 
 (defn abort
+  "Aborts an in-flight HTTP request identified by `:request-id`."
   [{:keys [request-id]}]
   (let [js-abort-controller (get @request-id->js-abort-controller request-id)]
     (when js-abort-controller
@@ -301,11 +334,14 @@
       (.abort js-abort-controller))))
 
 (defn abort-fx
+  "Executes one or more abort effect specifications."
   [effect]
   (let [seq-of-effects (->seq effect)]
     (doseq [effect seq-of-effects]
       (abort effect))))
 
+;; Effect handler for aborting active HTTP fetch requests.
+;; Effect format: `[::abort {:request-id req-id}]`
 (defmethod core/fx ::abort
-  [_ effect]
+  [_ [_ effect]]
   (abort-fx effect))

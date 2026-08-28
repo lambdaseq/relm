@@ -1,30 +1,44 @@
 (ns examples.nested
+  "Hierarchical / nested component example for Relm.
+
+  Demonstrates:
+  - Multi-level component tree: `NestedExample` (parent) -> `CardComponent` (child) -> `CounterItem` (grandchild)
+  - Automatic isolation of local component state across multiple instances using unique component IDs
+  - Context-driven reactivity: all components share and react to global context updates (e.g. `:theme`)
+  - Dynamic collections of nested components with Hiccup metadata `:key` support"
   (:require [com.lambdaseq.relm.core :as relm]))
 
 ;; -----------------------------------------------------------------------------
 ;; Level 2: Nested Child Component (CounterItem)
 ;; -----------------------------------------------------------------------------
 
-(defn- counter-init [_context {:keys [id label initial-count step]
-                               :or {initial-count 0 step 1}}]
+(defn- counter-init
+  "Initializes local state for an individual CounterItem instance."
+  [_context {:keys [id label initial-count step]
+             :or {initial-count 0 step 1}}]
   {:id id
    :label label
    :count initial-count
    :step step})
 
+;; Increments CounterItem instance count by configured step value.
 (defmethod relm/update ::child-increment
   [state context _ _]
   [(update state :count + (:step state 1)) context])
 
+;; Decrements CounterItem instance count by configured step value.
 (defmethod relm/update ::child-decrement
   [state context _ _]
   [(update state :count - (:step state 1)) context])
 
+;; Resets CounterItem count to initial count.
 (defmethod relm/update ::child-reset
   [state context [_ initial-count] _]
   [(assoc state :count (or initial-count 0)) context])
 
-(defn- counter-view [{:keys [label count step]} context]
+(defn- counter-view
+  "Renders a leaf CounterItem component with theme styling from global context."
+  [{:keys [label count step]} context]
   [:div {:style {:border "1px solid #ccc"
                  :border-radius "6px"
                  :padding "12px"
@@ -39,6 +53,7 @@
     [:button {:on {:click [::child-reset 0]}} "Reset"]]])
 
 (def CounterItem
+  "Leaf counter component instance used within CardComponent."
   (relm/component
     {:init counter-init
      :view counter-view}))
@@ -47,19 +62,24 @@
 ;; Level 1: Nested Child Component (CardComponent)
 ;; -----------------------------------------------------------------------------
 
-(defn- card-init [_context {:keys [card-id title subtitle default-count]
-                            :or {default-count 0}}]
+(defn- card-init
+  "Initializes local state for an individual CardComponent instance."
+  [_context {:keys [card-id title subtitle default-count]
+             :or {default-count 0}}]
   {:card-id card-id
    :title title
    :subtitle subtitle
    :collapsed? false
    :initial-count default-count})
 
+;; Toggles collapsible expanded/collapsed view state for this card instance.
 (defmethod relm/update ::toggle-card
   [state context _ _]
   [(update state :collapsed? not) context])
 
-(defn- card-view [{:keys [title subtitle collapsed? initial-count card-id]} context]
+(defn- card-view
+  "Renders collapsible card containing an inner nested CounterItem child component."
+  [{:keys [title subtitle collapsed? initial-count card-id]} context]
   [:div {:style {:border "2px solid #6366f1"
                  :border-radius "8px"
                  :padding "16px"
@@ -85,6 +105,7 @@
                     :step 1})])])
 
 (def CardComponent
+  "Card container component embedding nested CounterItem."
   (relm/component
     {:init card-init
      :view card-view}))
@@ -93,17 +114,21 @@
 ;; Root / Parent Component: NestedExample (Dashboard)
 ;; -----------------------------------------------------------------------------
 
-(defn init [_context _args]
+(defn init
+  "Initializes root dashboard state with a collection of card descriptors."
+  [_context _args]
   {:title "Nested Components Example"
    :cards [{:id 1 :title "Card A" :subtitle "First nested component section" :count 5}
            {:id 2 :title "Card B" :subtitle "Second nested component section" :count 10}
            {:id 3 :title "Card C" :subtitle "Third nested component section" :count 20}]})
 
+;; Toggles global application theme (`:light` <-> `:dark`) inside context.
 (defmethod relm/update ::toggle-global-theme
   [state context _ _]
   (let [new-theme (if (= (:theme context) :dark) :light :dark)]
     [state (assoc context :theme new-theme)]))
 
+;; Appends a new card descriptor into the dashboard's local card list.
 (defmethod relm/update ::add-card
   [state context _ _]
   (let [next-id (inc (count (:cards state)))
@@ -113,7 +138,9 @@
                   :count 0}]
     [(update state :cards conj new-card) context]))
 
-(defn view [{:keys [title cards]} context]
+(defn view
+  "Renders the dashboard parent component containing dynamic list of child cards."
+  [{:keys [title cards]} context]
   [:div {:style {:font-family "sans-serif"
                  :max-width "600px"
                  :margin "20px auto"
@@ -144,6 +171,7 @@
                       :default-count (:count card)}))]])
 
 (def NestedExample
+  "Root nested component container for the example dashboard."
   (relm/component
     {:init init
      :view view}))

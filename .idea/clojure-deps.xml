@@ -16,6 +16,10 @@
           <option name="type" value="TEST_SOURCE" />
         </FolderState>
         <FolderState>
+          <option name="dirUrl" value="file://$PROJECT_DIR$/reitit/test" />
+          <option name="type" value="TEST_SOURCE" />
+        </FolderState>
+        <FolderState>
           <option name="dirUrl" value="file://$PROJECT_DIR$/test" />
           <option name="type" value="TEST_SOURCE" />
         </FolderState>
@@ -23,7 +27,11 @@
     </option>
     <option name="projectFiles">
       <set>
+        <option value="file://$PROJECT_DIR$/core/deps.edn" />
+        <option value="file://$PROJECT_DIR$/deps.edn" />
         <option value="file://$PROJECT_DIR$/examples/counter/deps.edn" />
+        <option value="file://$PROJECT_DIR$/examples/deps.edn" />
+        <option value="file://$PROJECT_DIR$/reitit/deps.edn" />
       </set>
     </option>
   </component>

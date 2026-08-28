@@ -1,64 +1,116 @@
 (ns com.lambdaseq.relm.core
+  "Core Elm-architecture implementation on top of Replicant for Clojure/ClojureScript.
+
+  Provides:
+  - Component lifecycle management (`component`, `render`) with isolated local states
+  - Global application context shared across all components
+  - Message-based state updates via the `update` multimethod
+  - Side-effect handling via the `fx` multimethod
+  - Centralized message dispatching (`dispatch`) integrated with Replicant DOM events"
   (:refer-clojure :exclude [update render])
   (:require [clojure.string :as string]
             [replicant.dom :as r]
             [replicant.hiccup :as rh]))
 
-(defonce !app-state
+;; -----------------------------------------------------------------------------
+;; Global Application State
+;; -----------------------------------------------------------------------------
+
+(defonce ^{:doc "Central atom holding the entire application runtime state.
+  Structure:
+  - `:context`     Map of global context shared by all components (e.g. routing, themes, user session)
+  - `:components`  Map of `{<comp-id-str> {:state <local-state>}}` storing isolated local states
+  - `:root`        Map of `{:node <dom-node> :component <root-comp> :args <args-map>}`"}
+  !app-state
   (atom {:context {}
          :components {}
          :root nil}))
 
-(defonce ^:private !rendering? (atom false))
+(defonce ^:private ^{:doc "Flag used to prevent re-entrant rendering cycles."}
+  !rendering?
+  (atom false))
 
-(defn vector-of-vectors? [v]
+;; -----------------------------------------------------------------------------
+;; Utilities
+;; -----------------------------------------------------------------------------
+
+(defn vector-of-vectors?
+  "Returns true if `v` is a vector whose first element is also a vector.
+  Used to detect batches of messages or side effects (e.g. `[[::fx-1] [::fx-2]]`)."
+  [v]
   (and (vector? v)
        (vector? (first v))))
 
-(defmulti fx
-  "Multimethod for handling side effects dispatched by message handlers.
+;; -----------------------------------------------------------------------------
+;; Side Effects Multimethod
+;; -----------------------------------------------------------------------------
 
-  Dispatches on the first element of the effect vector. Effect handlers should perform
-  side-effectful operations like network requests, storage operations, etc.
+(defmulti fx
+  "Multimethod for handling side effects returned by message handlers.
+
+  Dispatches on the first element of the effect vector. Effect handlers perform
+  asynchronous or side-effectful operations (HTTP requests, DOM changes, navigation, timers)
+  and can dispatch follow-up messages back to the relm runtime.
 
   Arguments:
-    effect - A vector where the first element is the effect type keyword
-             and remaining elements are effect-specific arguments.
+    event  - The triggering DOM/synthetic event map (or nil if triggered programmatically)
+    effect - Vector where the first element is the effect type keyword and remaining
+             elements are effect arguments (e.g. `[::fetch request-map]`).
 
   Example:
   ```clojure
-  (defmethod fx! ::http-request
-    [[_ url options callback]]
-    (http/request url options callback))
+  (defmethod relm/fx ::alert
+    [_event [_ message]]
+    (js/alert message))
   ```"
-  (fn [_ effect]
-    (first effect)))
+  (fn [_ event-or-effect]
+    (first event-or-effect)))
 
-(defn -dispatch-fx! [event effects]
+(defn -dispatch-fx!
+  "Executes one or more side effects returned by an update handler.
+  Handles either a single effect vector `[::fx-type ...]` or a batch `[[::fx-1] [::fx-2]]`."
+  [event effects]
   (when effects
     (if (vector-of-vectors? effects)
       (doseq [effect effects]
         (fx event effect))
       (fx event effects))))
 
-(defmulti update
-  "Handles state updates based on event messages.
+;; -----------------------------------------------------------------------------
+;; State Update Multimethod
+;; -----------------------------------------------------------------------------
 
-  This multimethod is dispatched on the first element of the message vector.
-  It takes the current state, context, message, and event as arguments and
-  should return a vector of [new-state new-context effects].
+(defmulti update
+  "Handles state transitions based on dispatched event messages.
+
+  Dispatched on the first element of the message vector (the message type keyword).
+  Takes `[state context message event]` and returns a vector of:
+    `[new-state new-context effects]` or `[new-state new-context]` or `new-state`
+
+  Arguments:
+  - `state`   Current local state of the component receiving the event
+  - `context` Current global application context map
+  - `message` Dispatched message vector (e.g. `[::increment 5]`)
+  - `event`   DOM/synthetic event map provided by Replicant (contains target node, etc.)
 
   Example:
   ```clojure
   (defmethod relm/update ::increment
-    [state context _message _event]
-    ; No effects dispatched
-    [(update state :count inc) context []])
+    [state context [_ by] _event]
+    [(clojure.core/update state :count + (or by 1))
+     context
+     [[::log-analytics \"incremented\"]]])
   ```"
   (fn [_state _context message _event]
     (first message)))
 
-(defn- -get-component-id [node]
+;; -----------------------------------------------------------------------------
+;; Component Identification & Rendering Internals
+;; -----------------------------------------------------------------------------
+
+(defn- -get-component-id
+  "Traverses up the DOM tree from `node` to locate the enclosing `data-relm-component-id` attribute."
+  [node]
   #?(:cljs
      (loop [curr node]
        (when curr
@@ -67,14 +119,18 @@
            (recur (.-parentNode curr)))))
      :clj nil))
 
-(defn- -eval-root [component args]
+(defn- -eval-root
+  "Evaluates the root component function with optional arguments to obtain Hiccup data."
+  [component args]
   (if (fn? component)
     (if (some? args)
       (component args)
       (component))
     component))
 
-(defn- -do-render-root! []
+(defn- -do-render-root!
+  "Performs a Replicant render pass for the registered root component into its target DOM node."
+  []
   (when-not @!rendering?
     (when-let [{:keys [node component args]} (:root @!app-state)]
       (when (and node component)
@@ -84,7 +140,10 @@
           (finally
             (reset! !rendering? false)))))))
 
-(defn- -on-app-state-change [_ _ old-state new-state]
+(defn- -on-app-state-change
+  "Watch function invoked whenever `!app-state` changes. Triggers re-rendering when context
+  or component local state is modified."
+  [_ _ old-state new-state]
   (when (and (:root new-state)
              (or (not= (:context old-state) (:context new-state))
                  (not= (:components old-state) (:components new-state))))
@@ -93,19 +152,21 @@
 (defonce ^:private -init-watch
   (add-watch !app-state :relm/root-render -on-app-state-change))
 
+;; -----------------------------------------------------------------------------
+;; Public Rendering API
+;; -----------------------------------------------------------------------------
+
 (defn render
   "Renders the root component into the given DOM node and tracks it in `!app-state`.
 
   Parameters:
-  - `node`: DOM element node to render into
-  - `root-component`: Root component function created with `relm/component` (or hiccup)
-  - `args`: Optional arguments map to pass to `root-component` (defaults to {})
+  - `node`: DOM element node to render into (e.g. `js/document.body` or element from `getElementById`)
+  - `root-component`: Root component function created with `relm/component` (or Hiccup structure)
+  - `args`: Optional arguments map to pass to `root-component` (defaults to `{}`)
 
   Example:
   ```clojure
-  (relm/render js/document.body Examples)
-  ;; or
-  (relm/render js/document.body Examples {:some \"args\"})
+  (relm/render js/document.body AppRoot {:initial-theme :dark})
   ```"
   ([node root-component]
    (render node root-component {}))
@@ -113,7 +174,18 @@
    (swap! !app-state assoc :root {:node node :component root-component :args (or args {})})
    (-do-render-root!)))
 
-(defn -handle-message [{:keys [replicant/node] :as event} [message-type :as message]]
+;; -----------------------------------------------------------------------------
+;; Dispatch and Message Handling
+;; -----------------------------------------------------------------------------
+
+(defn -handle-message
+  "Internal message processor for a single message.
+  - Handles lifecycle messages (`::init-component`, `::deinit-component`).
+  - Resolves target component ID from the event/DOM node.
+  - Invokes `update` multimethod with current component state and global context.
+  - Updates `!app-state` with new component state and context.
+  - Executes any returned side effects."
+  [{:keys [replicant/node] :as event} [message-type :as message]]
   (case message-type
     ::init-component
     (let [[_ comp-id initial-state] message
@@ -147,15 +219,15 @@
 
   This function is the central message handler for the relm system. It processes
   messages and updates component state accordingly. It should be set as the
-  dispatch function for replicant using `(r/set-dispatch! relm/dispatch)`.
+  dispatch function for replicant using `(replicant.dom/set-dispatch! relm/dispatch)`.
 
   The dispatch function can handle both single messages and collections of messages:
   - Single message: `(dispatch event [::message-type])`
   - Multiple messages: `(dispatch event [[::message-type-1] [::message-type-2]])`
 
-  Special message types:
-  - `::init-component`: Initializes a component in global state
-  - `::deinit-component`: Cleans up a component when it's unmounted
+  Lifecycle message types handled internally:
+  - `::init-component`: Initializes a component's local state in `!app-state`
+  - `::deinit-component`: Cleans up a component when it is unmounted from the DOM
 
   For other message types, it calls the appropriate `update` multimethod implementation."
   [event message-or-messages]
@@ -165,7 +237,15 @@
       (-handle-message event message))
     (-handle-message event message-or-messages)))
 
-(defn- resolve-component-id [default-id args]
+;; -----------------------------------------------------------------------------
+;; Component Constructor
+;; -----------------------------------------------------------------------------
+
+(defn- resolve-component-id
+  "Extracts or derives a stable unique component ID from component arguments map
+  (checking `:id`, `:component-id`, `:key`, metadata `:key`, or `*-id` keys),
+  falling back to `default-id`."
+  [default-id args]
   (cond
     (map? args)
     (or (:id args)
@@ -185,7 +265,13 @@
     :else
     default-id))
 
-(defn- -render-component [default-id-or-id init view args]
+(defn- -render-component
+  "Renders an individual component instance:
+  1. Resolves a unique ID for the component instance.
+  2. Initializes state via `(init context args)` on first mount.
+  3. Evaluates `(view state context)` to obtain Hiccup.
+  4. Injects `:data-relm-component-id` and `:replicant/on-unmount` hook into root Hiccup element."
+  [default-id-or-id init view args]
   (let [args (or args {})
         comp-id (str (if (and (string? default-id-or-id) (not (map? default-id-or-id)))
                        (resolve-component-id default-id-or-id args)
@@ -217,26 +303,34 @@
                 [::deinit-component comp-id])))))))
 
 (defn component
-  "Creates a new component with the specified initialization and view functions.
+  "Creates a new Elm-style component with initialization and view functions.
 
-  Returns a function that, when called with args, creates a replicant component 
-  that will be managed by the relm system.
+  Returns a component function that, when invoked (with 0, 1, or 2 arguments),
+  produces Hiccup markup managed by the relm runtime.
 
-  Parameters:
-  - `init`: A function that takes the current context and component args and returns
-            an initial state (defaults to `(fn [_ _] nil)`)
-  - `view`: A function that takes state and context and returns
-            a hiccup-style representation of the component's view
+  Component options map:
+  - `:init` Function `(fn [context args] initial-state)` returning initial local state (defaults to `(fn [_ _] nil)`)
+  - `:view` Function `(fn [state context] hiccup)` returning Hiccup structure representing the UI
+
+  Invocation arities for returned component:
+  - `(MyComponent)` - Renders with auto-generated ID and empty args
+  - `(MyComponent args-map)` - Renders with ID resolved from `args-map` (e.g. `:id`)
+  - `(MyComponent explicit-id args-map)` - Renders with explicit instance ID
 
   Example:
   ```clojure
   (def Counter
-    (component
-      {:init (fn [context args] {:count 0})
-       :view (fn [state context] [:div \"Count: \" (:count state)])}))
+    (relm/component
+      {:init (fn [_context {:keys [initial-count] :or {initial-count 0}}]
+               {:count initial-count})
+       :view (fn [{:keys [count]} _context]
+               [:div
+                [:p \"Count: \" count]
+                [:button {:on {:click [::increment]}} \"+1\"]])}))
 
-  ;; Usage:
-  (Counter {:some \"args\"})
+  ;; Render instances with distinct state:
+  (Counter {:id \"counter-a\" :initial-count 10})
+  (Counter {:id \"counter-b\" :initial-count 20})
   ```"
   [{:keys [init view]}]
   (let [default-id (str (random-uuid))
@@ -250,6 +344,8 @@
       ([id args]
        (-render-component id init-fn view-fn args)))))
 
+;; Built-in effect handler for dispatching follow-up messages from inside effect flows.
+;; Format: `[:dispatch [::message-name ...]]`
 (defmethod fx :dispatch
   [dom-event [_ event]]
   (dispatch dom-event event))

@@ -1,1 +1,2 @@
-{:deps {com.lambdaseq/relm.core {:local/root "./core"}}}
+{:deps {com.lambdaseq/relm.core   {:local/root "./core"}
+        com.lambdaseq/relm.reitit {:local/root "./reitit"}}}

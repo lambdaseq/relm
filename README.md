@@ -1,6 +1,6 @@
 # relm
 
-A simple abstraction layer on top of replicant inspired by Elm architecture for Clojure/ClojureScript applications.
+A simple, purely functional abstraction layer on top of [Replicant](https://github.com/cjohansen/replicant) inspired by the Elm architecture for Clojure and ClojureScript applications.
 
 ## Status
 
@@ -8,69 +8,142 @@ This library is a Work In Progress (WIP) and the API may change.
 
 ## Overview
 
-`relm` provides a clean, functional approach to building user interfaces in Clojure/ClojureScript using the Elm architecture pattern. It wraps [replicant](https://github.com/replicant) to provide a simpler, more declarative API for building components with managed state.
+`relm` provides a clean, predictable, and functional approach to building user interfaces in Clojure/ClojureScript using the Elm Architecture pattern (Model-View-Update + Effects). It manages component lifecycles, isolated local states, global shared context, and side effects while leveraging Replicant for lightweight, fast DOM rendering.
 
-Key features:
-- Component-based architecture
-- Centralized (global and local) state management
-- Predictable data flow
-- Pure functional view rendering
+### Key Features
+
+- **Component-based Architecture**: Independent components created via `(relm/component ...)`.
+- **Hybrid State Management**: Isolated local component state combined with a reactive global application context.
+- **Pure Functional Views**: Pure view functions `(fn [state context] hiccup)` that decouple rendering from state mutations.
+- **Declarative Updates & Effects**: Predictable message handlers (`relm/update`) and asynchronous side-effect handlers (`relm/fx`).
+- **Modular Ecosystem**:
+  - `com.lambdaseq/relm.core`: Core Elm runtime, component lifecycle, rendering, Replicant dispatcher, browser history effects, and HTTP fetch module.
+  - `com.lambdaseq/relm.reitit`: Declarative client-side routing integration with [Metosin Reitit](https://github.com/metosin/reitit).
+
+---
+
+## Module Structure
+
+The project is structured into modular libraries:
+
+```
+relm/
+├── core/                           # Core library (com.lambdaseq/relm.core)
+│   └── src/com/lambdaseq/relm/
+│       ├── core.cljc               # Component lifecycle, state management, render, dispatch, fx/update
+│       ├── http.cljc               # Fetch API side effects (::fetch, ::abort) and body readers
+│       └── navigation.cljc         # Browser navigation & History API effects (::push-state, etc.)
+│
+├── reitit/                         # Routing module (com.lambdaseq/relm.reitit)
+│   ├── src/com/lambdaseq/relm/
+│   │   └── reitit.cljc             # Reitit router integration, context route synchronization, navigation events
+│   └── test/com/lambdaseq/relm/
+│       └── reitit_test.cljc        # Comprehensive unit tests for Reitit routing
+│
+└── examples/                       # Interactive demonstration application
+    └── src/examples/
+        ├── main.cljs               # App shell, Reitit router setup, and root layout
+        ├── counter.cljs            # Simple local state, counter actions, and alert effects
+        ├── http.cljs               # Async API requests, JSON decoding, and error handling
+        ├── navigation.cljs         # Browser and HTML5 History API effects
+        └── nested.cljs             # Multi-level nested components and global theme context
+```
+
+---
 
 ## Installation
 
-Add the following dependency to your `deps.edn`:
+Add the required modules to your `deps.edn`:
 
 ```clojure
-{:deps {com.lambdaseq/relm {:git/url "https://github.com/lambdaseq/relm"
-                            :sha "..."}}}
+{:deps {com.lambdaseq/relm.core   {:git/url "https://github.com/lambdaseq/relm"
+                                   :sha     "..."
+                                   :deps/root "core"}
+        com.lambdaseq/relm.reitit {:git/url "https://github.com/lambdaseq/relm"
+                                   :sha     "..."
+                                   :deps/root "reitit"}}}
 ```
 
-## Usage
+---
 
-The library follows the Elm architecture with three main parts:
-- **Model**: The state of your application
-- **View**: A way to render your state as HTML
-- **Update**: A way to update your state based on messages
+## Core Concepts & Architecture
 
-### Basic Example
+`relm` follows the Elm Architecture:
 
-Here's a simple counter component:
+```
+                  +--------------------------------+
+                  |            DOM Event           |
+                  +--------------------------------+
+                                  |
+                                  v
+                  +--------------------------------+
+                  |        relm/dispatch           |
+                  +--------------------------------+
+                                  |
+                                  v
+                  +--------------------------------+
+                  |          relm/update           |
+                  |  [state context msg event]     |
+                  +--------------------------------+
+                     /            |             \
+                    /             |              \
+                   v              v               v
+            +-----------+  +-------------+  +-------------+
+            | new-state |  | new-context |  |   effects   |
+            +-----------+  +-------------+  +-------------+
+                  |               |                |
+                  +-------+-------+                v
+                          |                 +-------------+
+                          v                 |   relm/fx   |
+                  +----------------+        +-------------+
+                  |  Re-render DOM |               |
+                  |  (Replicant)   |               v
+                  +----------------+        (Async/Follow-up Msg)
+```
+
+1. **Model**:
+   - **Local State**: State private to each component instance (e.g. counter values, form input, open/close toggles).
+   - **Global Context**: Shared state accessible by all components (e.g. current user, theme, active route).
+2. **View**: Pure function of `(state, context)` returning Replicant Hiccup data structures.
+3. **Update**: Pure multimethod `(update state context message event)` returning `[new-state new-context effects]`.
+4. **Effects**: Multimethod `(fx event effect)` executing side effects (HTTP requests, browser history changes, timers, alerts).
+
+---
+
+## Usage Guide
+
+### 1. Basic Component
 
 ```clojure
 (ns examples.counter
   (:require [com.lambdaseq.relm.core :as relm]
-            [replicant.dom :as r]
-            [hashp.core]))
+            [replicant.dom :as r]))
 
-;; Initialize the component state
-(defn init [_context {:keys [init-count] :as _args}]
+;; 1. Initialize local component state
+(defn init [_context {:keys [init-count] :or {init-count 0}}]
   {:count init-count})
 
-;; Render the view based on the current state
+;; 2. Render view as pure function of (state, context)
 (defn view [{:keys [count]} _context]
   [:div
    [:h2 "Counter"]
    [:p "Current count: " count]
-   [:button {:on {:click [::increment]}} "Increment"]
-   [:button {:on {:click [::decrement]}} "Decrement"]
-   [:button {:on {:click [::show-count]}} "Show Count"]])
+   [:button {:on {:click [::increment]}} "+1"]
+   [:button {:on {:click [::decrement]}} "-1"]
+   [:button {:on {:click [::show-alert]}} "Alert"]])
 
-;; Define the component
+;; 3. Define the component
 (def Counter
   (relm/component
     {:init init
      :view view}))
 
-;; Define an effect handler for alerts
+;; 4. Define side effect handler
 (defmethod relm/fx ::alert
-  [[_ message]]
+  [_event [_ message]]
   (js/alert message))
 
-;; Define message handlers
-(defmethod relm/update ::show-count
-  [{:keys [count] :as state} context _message _event]
-  [state context [::alert (str "Count: " count)]])
-
+;; 5. Define message update handlers: return [new-state new-context effects]
 (defmethod relm/update ::increment
   [state context _message _event]
   [(update state :count inc) context])
@@ -79,212 +152,215 @@ Here's a simple counter component:
   [state context _message _event]
   [(update state :count dec) context])
 
-;; Set up the dispatch function
+(defmethod relm/update ::show-alert
+  [{:keys [count] :as state} context _message _event]
+  [state context [::alert (str "Current count is " count)]])
+
+;; 6. Wire Replicant dispatch to Relm
 (r/set-dispatch! relm/dispatch)
 
-;; Render the root component to the DOM
+;; 7. Mount root component into DOM
 (relm/render js/document.body Counter {:init-count 0})
 ```
 
-## API
+---
 
-### Component Creation
+### 2. Nested & Hierarchical Components
+
+Each component instance created with `(relm/component ...)` automatically manages its own isolated state:
 
 ```clojure
-(relm/component {:init init-fn :view view-fn})
+(def ChildCounter
+  (relm/component
+    {:init (fn [_ctx {:keys [start]}] {:count (or start 0)})
+     :view (fn [{:keys [count]} ctx]
+             [:div {:style {:color (if (= (:theme ctx) :dark) "#fff" "#000")}}
+              [:span "Count: " count]
+              [:button {:on {:click [::increment]}} "+"]])}))
+
+(def ParentDashboard
+  (relm/component
+    {:init (fn [_ctx _args] {:items [1 2 3]})
+     :view (fn [{:keys [items]} ctx]
+             [:div
+              [:h1 "Dashboard"]
+              [:button {:on {:click [::toggle-theme]}} "Toggle Theme"]
+              (for [id items]
+                ^{:key id}
+                (ChildCounter {:id (str "counter-" id) :start (* id 10)}))])}))
 ```
 
-Creates a new component with the specified initialization and view functions.
+- Pass an `:id` or `:key` in args to assign a stable component identity.
+- Local state is cleaned up automatically when components unmount.
+- When `::toggle-theme` updates global `context`, all child components re-render with the new context.
 
-The `init-fn` should take two arguments:
-- `context`: The current global context
-- `args`: Component-specific arguments
+---
 
-And return the initial state for the component (not a vector of [state, context] as in previous versions).
+### 3. HTTP Requests (`com.lambdaseq.relm.http`)
 
-### Message Handling
-
-Define message handlers using the `relm/update` multimethod:
+The `core` module includes a built-in Fetch API effect handler with automated JSON decoding and cancellation:
 
 ```clojure
-(defmethod relm/update ::message-type
-  [state context message event]
-  [new-state new-context effects])
-```
-
-The update function should return a vector of three elements:
-- `new-state`: The updated component state
-- `new-context`: The updated global context
-- `effects`: Side effects to be executed (can be a single effect vector or a vector of effect vectors)
-
-The dispatch function can handle both single messages and collections of messages:
-
-```clojure
-;; Handling a single message
-(relm/dispatch event [::message-type])
-
-;; Handling multiple messages at once
-(relm/dispatch event [[::message-type-1] 
-                      [::message-type-2]])
-```
-
-### Side Effects
-
-Define side effect handlers using the `relm/fx` multimethod:
-
-```clojure
-(defmethod relm/fx ::effect-type
-  [[_ & args]]
-  ;; Perform side effect here
-  )
-```
-
-Side effects are dispatched by returning them from update handlers. You can return:
-- A single effect vector: `[::effect-type arg1 arg2]`
-- Multiple effects: `[[::effect-type-1 arg1] [::effect-type-2 arg2]]`
-- No effects: `[]`
-
-Example:
-
-```clojure
-;; Define an effect handler
-(defmethod relm/fx ::http-request
-  [[_ url options callback]]
-  (http/request url options callback))
-
-;; Use the effect in an update handler
-(defmethod relm/update ::fetch-data
-  [state context _message _event]
-  [state context [::http-request "/api/data" {:method "GET"} ::handle-response]])
-```
-
-#### Dispatching Additional Events from Effects
-
-You can use the `:dispatch` effect to trigger additional events from within an event handler:
-
-```clojure
-;; Define an update handler that dispatches multiple events
-(defmethod relm/update ::process-data
-  [state context _message _event]
-  [state 
-   context 
-   [[:dispatch [::log-activity "Data processing started"]]]])
-
-;; Chain multiple events with a single effect
-(defmethod relm/update ::complex-operation
-  [state context _message _event]
-  [state 
-   context 
-   [[:dispatch [[::update-status "Processing..."]
-                [::fetch-data]
-                [::notify-user "Operation in progress"]]]]])
-```
-
-In the second example, the `:dispatch` effect is used to trigger multiple events at once, allowing you to chain operations together.
-
-### HTTP Requests
-
-The `com.lambdaseq.relm.http` namespace provides functionality for making HTTP requests. It's a port of [re-frame-fetch-fx](https://github.com/superstructor/re-frame-fetch-fx) adapted for the relm architecture.
-
-To use it, require the namespace:
-
-```clojure
-(ns your.namespace
+(ns my-app.http-example
   (:require [com.lambdaseq.relm.core :as relm]
             [com.lambdaseq.relm.http :as relm.http]))
-```
 
-#### Making HTTP Requests
-
-Use the `::relm.http/fetch` effect to make HTTP requests:
-
-```clojure
-(defmethod relm/update ::fetch-data
-  [state context _ _event]
+(defmethod relm/update ::fetch-posts
+  [state context _ _]
   [state context [::relm.http/fetch
-                  {:url        "https://api.example.com/data"
+                  {:url        "https://jsonplaceholder.typicode.com/posts"
                    :method     :get
                    :mode       :cors
-                   :on-success [::data-fetched]
-                   :on-failure [::data-fetch-failed]}]])
+                   :on-success [::posts-fetched]
+                   :on-failure [::posts-failed]}]])
+
+(defmethod relm/update ::posts-fetched
+  [state context [_ {:keys [body]}] _]
+  (let [posts (if (string? body) (js->clj (js/JSON.parse body) :keywordize-keys true) body)]
+    [(assoc state :posts posts) context]))
+
+(defmethod relm/update ::posts-failed
+  [state context [_ {:keys [problem problem-message]}] _]
+  [(assoc state :error problem-message) context])
 ```
-
-#### Handling Responses
-
-Define handlers for successful and failed requests:
-
-```clojure
-(defmethod relm/update ::data-fetched
-  [state context [_ {:keys [body]}] _event]
-  [(assoc state :data body) context])
-
-(defmethod relm/update ::data-fetch-failed
-  [state context [_ error] _event]
-  [(assoc state :error error) context])
-```
-
-#### Request Options
-
-The fetch effect accepts various options:
-
-- `:url` - The URL to request (required)
-- `:method` - HTTP method (:get, :post, :put, etc.)
-- `:params` - Query parameters to append to the URL
-- `:headers` - HTTP headers to include
-- `:body` - Request body
-- `:request-content-type` - Content type of the request (:json will automatically stringify the body)
-- `:timeout` - Request timeout in milliseconds
-- `:mode` - CORS mode (:cors, :no-cors, :same-origin)
-- `:credentials` - Credentials mode (:include, :omit, :same-origin)
-- `:on-success` - Event vector to dispatch on successful response
-- `:on-failure` - Event vector to dispatch on failed response
 
 #### Aborting Requests
 
-Use the `::relm.http/abort` effect to abort in-flight requests:
-
 ```clojure
-(defmethod relm/update ::abort-request
-  [state context [_ request-id] _event]
+;; Abort an in-flight request by request-id
+(defmethod relm/update ::cancel
+  [state context [_ request-id] _]
   [state context [::relm.http/abort {:request-id request-id}]])
 ```
 
-### Rendering
+---
 
-Use replicant's rendering with relm's dispatch:
+### 4. Browser Navigation & History (`com.lambdaseq.relm.navigation`)
+
+Perform browser navigation actions directly via effect handlers:
 
 ```clojure
-(r/set-dispatch! relm/dispatch)
-(r/render target-element (component args))
+(ns my-app.nav-example
+  (:require [com.lambdaseq.relm.core :as relm]
+            [com.lambdaseq.relm.navigation :as nav]))
+
+;; Push state to history
+(defmethod relm/update ::go-to-page
+  [state context [_ path] _]
+  [state context [[::nav/push-state nil path]]])
+
+;; Replace history entry
+(defmethod relm/update ::redirect
+  [state context [_ path] _]
+  [state context [[::nav/replace-state nil path]]])
+
+;; Navigate back or reload
+(defmethod relm/update ::go-back [state context _ _] [state context [::nav/back]])
+(defmethod relm/update ::reload-app [state context _ _] [state context [::nav/reload]])
 ```
 
-## Comparison with re-frame
+---
 
-relm and re-frame share many similarities as they are both inspired by the Elm architecture, but they have some key differences:
+### 5. Routing with Reitit (`com.lambdaseq.relm.reitit`)
 
-### Similarities
-- **Event-driven architecture**: Both use events/messages to drive state changes
-- **Pure functions for state updates**: Both encourage using pure functions to update state based on events
-- **Effect handling**: Both separate effects from state updates
+The `reitit` module provides full client-side routing, popstate history synchronization, and context-based route inspection:
 
-### Differences
-- **Abstraction level**: relm is built on top of replicant, while re-frame is built on top of Reagent
-- **React**: relm does not use any underlying framework like React. It only depends on `replicant` for rendering
-- **Purely Functional**: In contrast to re-frame, user code in `relm` should be purely function (view functions included). Like re-frame, all side-effects should be done in effect handlers
-- **Subscription model**: While re-frame provides subscriptions to access program's state,
-  in relm local and global states are passed as arguments to your purely-functional view function
-- **Local component state**: relm components have their own local state, while re-frame typically keeps all state in the global app-db,
-and local state is done using reagent atoms
+```clojure
+(ns my-app.main
+  (:require [com.lambdaseq.relm.core :as relm]
+            [com.lambdaseq.relm.reitit :as relm.reitit]
+            [reitit.core :as reitit]
+            [replicant.dom :as r]))
 
-## Comparison with ELM Architecture
+;; 1. Define routes table
+(def routes
+  [["/" {:name :home
+         :view (fn [] (HomeView {}))}]
+   ["/users" {:name :users
+              :view (fn [] (UsersView {}))}]
+   ["/user/:id" {:name :user
+                 :view (fn [] (UserView {}))}]])
 
-relm is inspired by the Elm architecture but implemented in Clojure/ClojureScript. Here's how they compare:
+(def router (reitit/router routes))
 
-### Similarities
-- **Model-View-Update pattern**: Both follow the same core pattern for state management
-- **Unidirectional data flow**: Both enforce a one-way data flow from state to view
-- **Message-based updates**: Both use messages to trigger state updates
-- **Pure view functions**: Both render views as pure functions of state
+;; 2. Root view dynamically renders current matched view from context
+(defn root-view [_state context]
+  (let [current-route (relm.reitit/current-route context)
+        view-fn (relm.reitit/current-view context)]
+    [:div
+     [:nav
+      [:button {:on {:click [::relm.reitit/navigate-to "/"]}} "Home"]
+      [:button {:on {:click [::relm.reitit/navigate-to "/users"]}} "Users"]
+      [:button {:on {:click [::relm.reitit/navigate-to :user {:id 42} {:tab "profile"}]}} "User 42"]]
+     (when view-fn
+       (view-fn))]))
+
+(def AppRoot
+  (relm/component {:view root-view}))
+
+;; 3. Bootstrap app
+(r/set-dispatch! relm/dispatch)
+(relm.reitit/start! router {:default-path "/"})
+(relm/render js/document.body AppRoot)
+```
+
+#### Reitit Helpers & Context Accessors
+
+- `(relm.reitit/current-route context)`: Returns the current route keyword (e.g. `:home`, `:user`).
+- `(relm.reitit/current-view context)`: Returns the view component/fn attached to the active route.
+- `(relm.reitit/current-match context)`: Returns the full Reitit `Match` record.
+- `(relm.reitit/path-for router :user {:id 42} {:tab "profile"})`: Reverses route to `"/user/42?tab=profile"`.
+- `::relm.reitit/navigate-to`: Navigation message accepting paths or route names with params.
+- `::relm.reitit/replace-to`: URL replacement message without adding a new history entry.
+
+---
+
+## Comparison
+
+### Comparison with re-frame
+
+| Feature | `relm` | `re-frame` |
+|---|---|---|
+| **DOM Renderer** | Replicant (lightweight data-driven VDOM) | React via Reagent |
+| **Component State** | Isolated local state per component instance + global context | Single global `app-db` (local state via Reagent atoms) |
+| **Reactivity Model** | Pure functional re-renders on state/context updates | Signal graph with reactive subscriptions (`reg-sub`) |
+| **Side Effects** | Multimethod `relm/fx` returning effect vectors | Effect handlers (`reg-fx`) |
+| **Dependencies** | Minimal (Replicant only for core) | React, Reagent, re-frame |
+
+### Comparison with Elm
+
+| Feature | `relm` | Elm |
+|---|---|---|
+| **Language** | Clojure / ClojureScript | Elm |
+| **Architecture** | Model-View-Update + Effects | Model-View-Update + Commands/Subscriptions |
+| **Component Support** | Hierarchical components with local state + global context | Single root model / nested update pipelines |
+| **Syntax** | Clojure Hiccup data structures | Typed Elm HTML expressions |
+
+---
+
+## Running Tests and Examples
+
+### Running Tests
+
+Run Clojure unit tests for the modules:
+
+```bash
+cd reitit && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.reitit-test]) (t/run-tests 'com.lambdaseq.relm.reitit-test)"
+```
+
+### Running Examples
+
+Run the interactive examples application with shadow-cljs:
+
+```bash
+cd examples
+npm install
+npx shadow-cljs watch examples
+```
+
+Then open `http://localhost:8080` in your browser.
+
+---
 
 ## License
 
