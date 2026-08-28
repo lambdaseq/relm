@@ -31,6 +31,11 @@
   [state context _ _]
   [(update state :count - (:step state 1)) context])
 
+;; Increments the step value for the CounterItem instance.
+(defmethod relm/update ::child-increase-step
+  [state context [_ amount] _]
+  [(update state :step (fnil + 1) (or amount 1)) context])
+
 ;; Resets CounterItem count to initial count.
 (defmethod relm/update ::child-reset
   [state context [_ initial-count] _]
@@ -50,6 +55,7 @@
    [:div {:style {:display "flex" :gap "8px"}}
     [:button {:on {:click [::child-increment]}} (str "+" step)]
     [:button {:on {:click [::child-decrement]}} (str "-" step)]
+    [:button {:on {:click [::child-increase-step]}} "Increase Step"]
     [:button {:on {:click [::child-reset 0]}} "Reset"]]])
 
 (def CounterItem
