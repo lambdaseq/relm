@@ -124,9 +124,10 @@
     ::deinit-component
     (let [[_ comp-id] message
           comp-id-str (str comp-id)]
-      (swap! !app-state update :components dissoc comp-id-str))
+      (swap! !app-state clojure.core/update :components dissoc comp-id-str))
 
-    (let [comp-id (-get-component-id node)
+    (let [comp-id (or (:component-id event)
+                      (-get-component-id node))
           component-info (when comp-id
                            (get-in @!app-state [:components comp-id]))
           state (:state component-info)
@@ -202,10 +203,18 @@
           (rh/update-attrs
             clojure.core/update :replicant/on-unmount
             (fn [on-unmount]
-              (if (vector-of-vectors? on-unmount)
-                (into [[::deinit-component comp-id]] on-unmount)
-                [[::deinit-component comp-id]
-                 on-unmount])))))))
+              (cond
+                (nil? on-unmount)
+                [::deinit-component comp-id]
+
+                (vector-of-vectors? on-unmount)
+                (conj on-unmount [::deinit-component comp-id])
+
+                (vector? on-unmount)
+                [on-unmount [::deinit-component comp-id]]
+
+                :else
+                [::deinit-component comp-id])))))))
 
 (defn component
   "Creates a new component with the specified initialization and view functions.

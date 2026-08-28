@@ -23,10 +23,7 @@
     </option>
     <option name="projectFiles">
       <set>
-        <option value="file://$PROJECT_DIR$/core/deps.edn" />
-        <option value="file://$PROJECT_DIR$/deps.edn" />
         <option value="file://$PROJECT_DIR$/examples/counter/deps.edn" />
-        <option value="file://$PROJECT_DIR$/examples/deps.edn" />
       </set>
     </option>
   </component>

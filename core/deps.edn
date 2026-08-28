@@ -1,7 +1,7 @@
 {:paths ["src"]
- :deps  {org.clojure/clojure       {:mvn/version "1.12.1"}
-         org.clojure/clojurescript {:mvn/version "1.11.60"}
-         no.cjohansen/replicant    {:mvn/version "2025.06.21"}}
+ :deps  {org.clojure/clojure       {:mvn/version "1.13.0-alpha6"}
+         org.clojure/clojurescript {:mvn/version "1.12.145"}
+         no.cjohansen/replicant    {:mvn/version "2026.07.1"}}
  :aliases
  {:dev  {:extra-deps {hashp/hashp {:mvn/version "0.2.2"}}
          :main-opts  ["-e" "(require,'hashp.core)"]}
