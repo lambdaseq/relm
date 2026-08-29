@@ -38,9 +38,9 @@
     (string? v)
     (let [s (string/trim v)]
       (when (seq s)
-        #?(:clj  (try (Double/parseDouble s) (catch Exception _ nil))
-           :cljs (let [n (js/parseFloat s)]
-                   (when-not (js/isNaN n) n)))))
+        #?(:cljs (let [n (js/parseFloat s)]
+                   (when-not (js/isNaN n) n))
+           :clj  (clojure.core/parse-double s))))
     :else nil))
 
 ;; -----------------------------------------------------------------------------
@@ -54,29 +54,45 @@
   ([val-fn value]
    (run-validator val-fn value nil))
   ([val-fn value all-values]
-   (let [res (try
-               (val-fn value all-values)
-               (catch #?(:clj clojure.lang.ArityException :cljs :default) _
-                 (val-fn value)))]
+   (let [res #?(:cljs (try
+                        (val-fn value all-values)
+                        (catch :default _
+                          (val-fn value)))
+                :clj  (try
+                        (val-fn value all-values)
+                        (catch Throwable _
+                          (val-fn value))))]
      (if (fn? res)
-       (try
-         (res value all-values)
-         (catch #?(:clj clojure.lang.ArityException :cljs :default) _
-           (res value)))
+       #?(:cljs (try
+                  (res value all-values)
+                  (catch :default _
+                    (res value)))
+          :clj  (try
+                  (res value all-values)
+                  (catch Throwable _
+                    (res value))))
        res))))
 
 (defn required
   "Validates that a field has a non-empty value.
   Rejects nil, blank strings, empty collections, and boolean false."
   [& [msg]]
-  (fn [v]
-    (let [message (or msg "This field is required")]
-      (cond
-        (nil? v) message
-        (false? v) message
-        (string? v) (if (string/blank? v) message nil)
-        (and (coll? v) (empty? v)) message
-        :else nil))))
+  (let [message (or msg "This field is required")]
+    (fn
+      ([v]
+       (cond
+         (nil? v) message
+         (false? v) message
+         (string? v) (if (string/blank? v) message nil)
+         (and (coll? v) (empty? v)) message
+         :else nil))
+      ([v _all-values]
+       (cond
+         (nil? v) message
+         (false? v) message
+         (string? v) (if (string/blank? v) message nil)
+         (and (coll? v) (empty? v)) message
+         :else nil)))))
 
 (def ^:private email-regex
   #"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$")
@@ -85,92 +101,154 @@
   "Validates that a field is a valid email address.
   Passes for nil or empty string (use `required` to mandate presence)."
   [& [msg]]
-  (fn [v]
-    (let [message (or msg "Invalid email address")]
-      (if (or (nil? v) (and (string? v) (string/blank? v)))
-        nil
-        (if (and (string? v) (re-matches email-regex (string/trim v)))
-          nil
-          message)))))
+  (let [message (or msg "Invalid email address")]
+    (fn
+      ([v]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (and (string? v) (re-matches email-regex (string/trim v)))
+           nil
+           message)))
+      ([v _all-values]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (and (string? v) (re-matches email-regex (string/trim v)))
+           nil
+           message))))))
 
 (defn min-num
   "Validates that a numeric field is at least `min-val`.
   Passes for nil or empty string. Parses string numbers automatically."
   [min-val & [msg]]
-  (fn [v]
-    (if (or (nil? v) (and (string? v) (string/blank? v)))
-      nil
-      (if-let [n (parse-num v)]
-        (if (< n min-val)
-          (or msg (str "Must be at least " min-val))
-          nil)
-        (or msg "Must be a valid number")))))
+  (let [message (or msg (str "Must be at least " min-val))]
+    (fn
+      ([v]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if-let [n (parse-num v)]
+           (if (< n min-val)
+             message
+             nil)
+           (or msg "Must be a valid number"))))
+      ([v _all-values]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if-let [n (parse-num v)]
+           (if (< n min-val)
+             message
+             nil)
+           (or msg "Must be a valid number")))))))
 
 (defn max-num
   "Validates that a numeric field is at most `max-val`.
   Passes for nil or empty string. Parses string numbers automatically."
   [max-val & [msg]]
-  (fn [v]
-    (if (or (nil? v) (and (string? v) (string/blank? v)))
-      nil
-      (if-let [n (parse-num v)]
-        (if (> n max-val)
-          (or msg (str "Must be at most " max-val))
-          nil)
-        (or msg "Must be a valid number")))))
+  (let [message (or msg (str "Must be at most " max-val))]
+    (fn
+      ([v]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if-let [n (parse-num v)]
+           (if (> n max-val)
+             message
+             nil)
+           (or msg "Must be a valid number"))))
+      ([v _all-values]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if-let [n (parse-num v)]
+           (if (> n max-val)
+             message
+             nil)
+           (or msg "Must be a valid number")))))))
 
 (defn min-length
   "Validates that a string or collection has at least `min-len` items/characters.
   Passes for nil or empty values."
   [min-len & [msg]]
-  (fn [v]
-    (if (or (nil? v) (and (string? v) (string/blank? v)))
-      nil
-      (if (< (count v) min-len)
-        (or msg (str "Must be at least " min-len " characters"))
-        nil))))
+  (let [message (or msg (str "Must be at least " min-len " characters"))]
+    (fn
+      ([v]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (< (count v) min-len)
+           message
+           nil)))
+      ([v _all-values]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (< (count v) min-len)
+           message
+           nil))))))
 
 (defn max-length
   "Validates that a string or collection has at most `max-len` items/characters.
   Passes for nil or empty values."
   [max-len & [msg]]
-  (fn [v]
-    (if (or (nil? v) (and (string? v) (string/blank? v)))
-      nil
-      (if (> (count v) max-len)
-        (or msg (str "Must be at most " max-len " characters"))
-        nil))))
+  (let [message (or msg (str "Must be at most " max-len " characters"))]
+    (fn
+      ([v]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (> (count v) max-len)
+           message
+           nil)))
+      ([v _all-values]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (> (count v) max-len)
+           message
+           nil))))))
 
 (defn pattern
   "Validates that a string matches the provided regular expression `regex` (or regex string).
   Passes for nil or empty string."
   [regex & [msg]]
-  (let [p (if (string? regex) (re-pattern regex) regex)]
-    (fn [v]
-      (if (or (nil? v) (and (string? v) (string/blank? v)))
-        nil
-        (if (re-find p (str v))
-          nil
-          (or msg "Invalid format"))))))
+  (let [p (if (string? regex) (re-pattern regex) regex)
+        message (or msg "Invalid format")]
+    (fn
+      ([v]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (re-find p (str v))
+           nil
+           message)))
+      ([v _all-values]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (re-find p (str v))
+           nil
+           message))))))
 
 (defn one-of
   "Validates that a value is contained in `allowed-coll`.
   Passes for nil or empty string."
   [allowed-coll & [msg]]
-  (let [allowed-set (set allowed-coll)]
-    (fn [v]
-      (if (or (nil? v) (and (string? v) (string/blank? v)))
-        nil
-        (if (contains? allowed-set v)
-          nil
-          (or msg "Value is not allowed"))))))
+  (let [allowed-set (set allowed-coll)
+        message (or msg (str "Must be one of " (string/join ", " allowed-coll)))]
+    (fn
+      ([v]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (contains? allowed-set v)
+           nil
+           message)))
+      ([v _all-values]
+       (if (or (nil? v) (and (string? v) (string/blank? v)))
+         nil
+         (if (contains? allowed-set v)
+           nil
+           message))))))
 
 (defn compose
   "Combines multiple validator functions in sequence.
   Returns the error message of the first failing validator, or nil if all pass."
   [& validators]
-  (fn [v]
-    (some (fn [val-fn] (run-validator val-fn v)) validators)))
+  (fn
+    ([v]
+     (some (fn [val-fn] (run-validator val-fn v)) validators))
+    ([v all-values]
+     (some (fn [val-fn] (run-validator val-fn v all-values)) validators))))
 
 ;; -----------------------------------------------------------------------------
 ;; Form Construction & Normalization
@@ -192,6 +270,15 @@
     (vector? opt) [(first opt) (second opt)]
     (map? opt) [(or (:value opt) (:val opt)) (:message opt)]
     :else [opt nil]))
+
+(defn- ->pattern-str
+  "Extracts a regex pattern string suitable for HTML5 pattern attribute."
+  [v]
+  (cond
+    (string? v) v
+    #?@(:cljs [(and (object? v) (exists? (.-source v))) (.-source v)]
+        :clj  [])
+    :else (str v)))
 
 (defn- extract-initial-val-from-opts
   [opts is-checkbox?]
@@ -766,9 +853,7 @@
         pat (when-let [p (:pattern opts)]
               (let [[v _] (extract-rule-val-and-msg p)]
                 (when v
-                  (if (instance? #?(:clj java.util.regex.Pattern :cljs js/RegExp) v)
-                    (str v)
-                    v))))
+                  (->pattern-str v))))
         base-attrs (cond-> {:on (if is-checkbox?
                                   {:change (on-change form-k norm-p)
                                    :blur   (on-blur form-k norm-p)}

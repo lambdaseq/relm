@@ -1,0 +1,5 @@
+{:paths ["src"]
+ :deps  {org.clojure/clojurescript {:mvn/version "1.12.145"}
+         com.lambdaseq/relm.core   {:local/root "../core"}}
+ :aliases
+ {:test {:extra-paths ["test"]}}}

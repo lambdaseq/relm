@@ -1,2 +1,3 @@
 {:deps {com.lambdaseq/relm.core   {:local/root "./core"}
+        com.lambdaseq/relm.form   {:local/root "./form"}
         com.lambdaseq/relm.reitit {:local/root "./reitit"}}}

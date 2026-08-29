@@ -29,6 +29,9 @@ Add the required modules to your `deps.edn`:
 {:deps {com.lambdaseq/relm.core   {:git/url "https://github.com/lambdaseq/relm"
                                    :sha     "..."
                                    :deps/root "core"}
+        com.lambdaseq/relm.form   {:git/url "https://github.com/lambdaseq/relm"
+                                   :sha     "..."
+                                   :deps/root "form"}
         com.lambdaseq/relm.reitit {:git/url "https://github.com/lambdaseq/relm"
                                    :sha     "..."
                                    :deps/root "reitit"}}}
@@ -41,7 +44,7 @@ Add the required modules to your `deps.edn`:
 | Module | Namespace | Description | Documentation |
 | :--- | :--- | :--- | :--- |
 | **Core** | `com.lambdaseq.relm.core` | Elm runtime, component lifecycle, state, `update`, and `fx`. | [Core Documentation](core/README.md) |
-| **Form** | `com.lambdaseq.relm.form` | Declarative form state, `form/register`, validators, and submission. | [Form Documentation](core/README.md#form-state-management-comlambdaseqrelmform) |
+| **Form** | `com.lambdaseq.relm.form` | Declarative form state, `form/register`, validators, and submission. | [Form Documentation](form/README.md) |
 | **HTTP** | `com.lambdaseq.relm.http` | Fetch API side effects (`::fetch`, `::abort`) and JSON decoders. | [HTTP Documentation](core/README.md#http-client-comlambdaseqrelmhttp) |
 | **Navigation** | `com.lambdaseq.relm.navigation` | Browser History API effects (`::push-state`, `::back`, etc.). | [Navigation Documentation](core/README.md#browser-navigation-comlambdaseqrelmnavigation) |
 | **Reitit** | `com.lambdaseq.relm.reitit` | Client-side routing with Reitit, context sync, and navigation messages. | [Reitit Documentation](reitit/README.md) |
@@ -131,7 +134,7 @@ Colocate validation rules and initial values directly on fields with `form/regis
    [:button {:type "submit" :disabled (form/submitting? form)} "Save"]])
 ```
 
-[Read full Form documentation ->](core/README.md#form-state-management-comlambdaseqrelmform)
+[Read full Form documentation ->](form/README.md)
 
 ---
 
@@ -221,8 +224,11 @@ Declarative client-side routing with automatic context synchronization:
 ### Running Tests
 
 ```bash
-# Run Core and Form tests
-cd core && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.core-test] '[com.lambdaseq.relm.form-test]) (t/run-tests 'com.lambdaseq.relm.core-test 'com.lambdaseq.relm.form-test)"
+# Run Core tests
+cd core && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.core-test]) (t/run-tests 'com.lambdaseq.relm.core-test)"
+
+# Run Form tests
+cd form && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.form-test]) (t/run-tests 'com.lambdaseq.relm.form-test)"
 
 # Run Reitit tests
 cd reitit && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.reitit-test]) (t/run-tests 'com.lambdaseq.relm.reitit-test)"

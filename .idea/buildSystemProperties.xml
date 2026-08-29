@@ -35,6 +35,14 @@
             </ModuleState>
           </value>
         </entry>
+        <entry key="form">
+          <value>
+            <ModuleState>
+              <option name="buildSystemId" value="CLOJURE_DEPS" />
+              <option name="displayName" value="form" />
+            </ModuleState>
+          </value>
+        </entry>
         <entry key="reitit">
           <value>
             <ModuleState>
