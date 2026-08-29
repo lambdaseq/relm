@@ -13,8 +13,8 @@
   - [Side-Effect Handlers (`relm/fx`)](#side-effect-handlers-relmfx)
   - [Nested Components](#nested-components)
 - [HTTP Client (`com.lambdaseq.relm.http`)](#http-client-comlambdaseqrelmhttp)
-  - [Fetch Effect (`::fetch`)](#fetch-effect-fetch)
-  - [Abort Effect (`::abort`)](#abort-effect-abort)
+  - [Fetch Effect (`::fetch!`)](#fetch-effect-fetch)
+  - [Abort Effect (`::abort!`)](#abort-effect-abort)
 - [Browser Navigation (`com.lambdaseq.relm.navigation`)](#browser-navigation-comlambdaseqrelmnavigation)
 
 ---
@@ -112,10 +112,10 @@ Side effects are declared as vectors `[[::effect-type arg1 arg2 ...]]` and execu
 ;; 1. Update handler emits an effect
 (defmethod relm/update ::notify-user
   [state context [_ text] _event]
-  [state context [[::log-message text]]])
+  [state context [[::log-message! text]]])
 
 ;; 2. Effect handler executes the side effect
-(defmethod relm/fx ::log-message
+(defmethod relm/fx ::log-message!
   [_event [_ text]]
   (js/console.log "Notification:" text))
 ```
@@ -124,15 +124,15 @@ Side effects are declared as vectors `[[::effect-type arg1 arg2 ...]]` and execu
 
 Relm Core provides re-frame style dispatch side-effects out of the box:
 
-- `[:dispatch [::message ...]]` or `[:dispatch [[::msg-1] [::msg-2]]]`: Dispatches one or more messages back to the runtime.
-- `[:dispatch-n [[::msg-1] [::msg-2]]]`: Dispatches a batch of message vectors.
-- `[:dispatch-later {:ms 1000 :dispatch [::message]} ...]`: Dispatches messages after a specified delay in milliseconds.
+- `[::relm/dispatch! [::message ...]]`: Dispatches a follow-up message vector back to the runtime.
+- `[::relm/dispatch-n! [[::msg-1] [::msg-2]]]`: Dispatches a batch of message vectors.
+- `[::relm/dispatch-later! {:ms 1000 :dispatch! [::message]} ...]`: Dispatches messages after a specified delay in milliseconds.
 
 ```clojure
 (defmethod relm/update ::save-and-notify
   [state context [_ item] _]
-  [state context [[:dispatch [::save-item item]]
-                  [:dispatch-later {:ms 3000 :dispatch [::clear-notification]}]]])
+  [state context [[::relm/dispatch! [::save-item item]]
+                  [::relm/dispatch-later! {:ms 3000 :dispatch! [::clear-notification]}]]])
 ```
 
 ### Nested Components
@@ -155,9 +155,9 @@ Components can be nested arbitrarily. Each instance maintains isolated local sta
 
 The `http` module provides declarative, asynchronous Fetch API requests with automatic JSON decoding and request cancellation.
 
-### Fetch Effect (`::fetch`)
+### Fetch Effect (`::fetch!`)
 
-Dispatch `::relm.http/fetch` in your update handler's effects vector:
+Dispatch `::relm.http/fetch!` in your update handler's effects vector:
 
 ```clojure
 (ns my-app.posts
@@ -168,7 +168,7 @@ Dispatch `::relm.http/fetch` in your update handler's effects vector:
   [state context _ _]
   [(assoc state :loading? true)
    context
-   [[::relm.http/fetch
+   [[::relm.http/fetch!
      {:url         "https://api.example.com/posts"
       :method      :get
       :mode        :cors
@@ -198,7 +198,7 @@ Dispatch `::relm.http/fetch` in your update handler's effects vector:
 - `:on-success`: Message vector dispatched on success `[msg-name response-map]`.
 - `:on-failure`: Message vector dispatched on error `[msg-name error-map]`.
 
-### Abort Effect (`::abort`)
+### Abort Effect (`::abort!`)
 
 Cancel an active in-flight request using its `:request-id`:
 
@@ -207,7 +207,7 @@ Cancel an active in-flight request using its `:request-id`:
   [state context _ _]
   [(assoc state :loading? false)
    context
-   [[::relm.http/abort {:request-id :posts-request}]]])
+   [[::relm.http/abort! {:request-id :posts-request}]]])
 ```
 
 ---
@@ -224,15 +224,15 @@ Cancel an active in-flight request using its `:request-id`:
 ;; Push a new history entry
 (defmethod relm/update ::go-to-profile
   [state context [_ user-id] _]
-  [state context [[::nav/push-state nil (str "/users/" user-id)]]])
+  [state context [[::nav/push-state! nil (str "/users/" user-id)]]])
 
 ;; Replace current history entry
 (defmethod relm/update ::replace-url
   [state context [_ path] _]
-  [state context [[::nav/replace-state nil path]]])
+  [state context [[::nav/replace-state! nil path]]])
 
-;; History back / forward / reload
-(defmethod relm/update ::back [state context _ _] [state context [[::nav/back]]])
-(defmethod relm/update ::forward [state context _ _] [state context [[::nav/forward]]])
-(defmethod relm/update ::reload [state context _ _] [state context [[::nav/reload]]])
+;; History back / reload / go
+(defmethod relm/update ::back [state context _ _] [state context [[::nav/back!]]])
+(defmethod relm/update ::reload [state context _ _] [state context [[::nav/reload!]]])
+(defmethod relm/update ::go-by-delta [state context [_ delta] _] [state context [[::nav/go! delta]]])
 ```

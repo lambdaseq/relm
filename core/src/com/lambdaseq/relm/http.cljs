@@ -328,8 +328,8 @@
         (fetch event with-defaults)))))
 
 ;; Effect handler for executing HTTP fetch requests.
-;; Effect format: `[::fetch request-map]` or `[::fetch [req-1 req-2 ...]]`
-(defmethod core/fx ::fetch
+;; Effect format: `[::fetch! request-map]` or `[::fetch! [req-1 req-2 ...]]`
+(defmethod core/fx ::fetch!
   [event [_ effect]]
   (fetch-fx event effect))
 
@@ -349,7 +349,7 @@
       (abort effect))))
 
 ;; Effect handler for aborting active HTTP fetch requests.
-;; Effect format: `[::abort {:request-id req-id}]`
-(defmethod core/fx ::abort
+;; Effect format: `[::abort! {:request-id req-id}]`
+(defmethod core/fx ::abort!
   [_ [_ effect]]
   (abort-fx effect))

@@ -19,6 +19,23 @@
   [:posts {:_limit 5}])
 
 ;; -----------------------------------------------------------------------------
+;; Update Handlers
+;; -----------------------------------------------------------------------------
+
+(defmethod relm/update ::add-post
+  [state context [_ values] _event]
+  (let [new-state (clojure.core/update state :form form/reset-form)]
+    [new-state
+     context
+     [[::relm/dispatch!
+       [::query/mutate [:posts]
+        {:base-url  "https://jsonplaceholder.typicode.com"
+         :data      values
+         :on-mutate [::query/set-query-data posts-query-key
+                     (fn [current-posts]
+                       (into [values] (or current-posts [])))]}]]]]))
+
+;; -----------------------------------------------------------------------------
 ;; Component Initialization
 ;; -----------------------------------------------------------------------------
 
@@ -136,14 +153,7 @@
                             :opacity          (if mutation-loading? "0.7" "1")
                             :font-weight      "500"}
                  :disabled mutation-loading?
-                 :on       {:click [[::form/submit form
-                                     {:on-submit [::query/mutate [:posts]
-                                                  {:base-url  "https://jsonplaceholder.typicode.com"
-                                                   :data      (form/values form)
-                                                   :on-mutate [::query/set-query-data posts-query-key
-                                                               (fn [current-posts]
-                                                                 (into [(form/values form)] current-posts))]}]}]
-                                    [::form/reset (form/extract-form-key form)]]}}
+                 :on       {:click [::form/submit form {:on-submit [::add-post]}]}}
         (if mutation-loading? "Submitting..." "Create Post")]]
       (when title-err
         [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}}

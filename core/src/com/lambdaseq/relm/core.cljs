@@ -59,7 +59,7 @@
 
           Example:
           ```clojure
-          (defmethod relm/fx ::alert
+          (defmethod relm/fx ::alert!
             [_event [_ message]]
             (js/alert message))
           ```"
@@ -189,33 +189,34 @@
   - Updates `!app-state` with new component state and context.
   - Executes any returned side effects."
   [{:keys [replicant/node] :as event} [message-type :as message]]
-  (case message-type
-    ::init-component
-    (let [[_ comp-id initial-state] message
-          comp-id-str (str comp-id)]
-      (when-not (contains? (:components @!app-state) comp-id-str)
-        (swap! !app-state assoc-in [:components comp-id-str :state] initial-state)))
+  (when (some? message)
+    (case message-type
+      ::init-component
+      (let [[_ comp-id initial-state] message
+            comp-id-str (str comp-id)]
+        (when-not (contains? (:components @!app-state) comp-id-str)
+          (swap! !app-state assoc-in [:components comp-id-str :state] initial-state)))
 
-    ::deinit-component
-    (let [[_ comp-id] message
-          comp-id-str (str comp-id)]
-      (swap! !app-state clojure.core/update :components dissoc comp-id-str))
+      ::deinit-component
+      (let [[_ comp-id] message
+            comp-id-str (str comp-id)]
+        (swap! !app-state clojure.core/update :components dissoc comp-id-str))
 
-    (let [comp-id (or (:component-id event)
-                      (-get-component-id node))
-          component-info (when comp-id
-                           (get-in @!app-state [:components comp-id]))
-          state (:state component-info)
-          context (:context @!app-state)
-          result (update state context message event)
-          [new-state new-context effects] (if (vector? result)
-                                            result
-                                            [result context])]
-      (swap! !app-state (fn [app]
-                          (cond-> app
-                                  comp-id (assoc-in [:components comp-id :state] new-state)
-                                  (some? new-context) (assoc :context new-context))))
-      (-dispatch-fx! event effects))))
+      (let [comp-id (or (:component-id event)
+                        (-get-component-id node))
+            component-info (when comp-id
+                             (get-in @!app-state [:components comp-id]))
+            state (:state component-info)
+            context (:context @!app-state)
+            result (update state context message event)
+            [new-state new-context effects] (if (vector? result)
+                                              result
+                                              [result context])]
+        (swap! !app-state (fn [app]
+                            (cond-> app
+                                    comp-id (assoc-in [:components comp-id :state] new-state)
+                                    (some? new-context) (assoc :context new-context))))
+        (-dispatch-fx! event effects)))))
 
 (defn dispatch!
   "Handles message dispatching for components.
@@ -349,42 +350,28 @@
 
 ;; Built-in effect handlers for dispatching follow-up messages from inside effect flows.
 ;; Formats:
-;; - `[:dispatch [::message ...]]` or `[::relm/dispatch [::message ...]]`
-;; - `[:dispatch [[::msg-1] [::msg-2]]]` or `[:dispatch-n [[::msg-1] [::msg-2]]]`
-;; - `[:dispatch-later {:ms 1000 :dispatch [::message]}]` or `[:dispatch-later [{:ms 100 :dispatch [::msg]} ...]]`
-(defmethod fx :dispatch
+;; - `[::relm/dispatch! [::message ...]]`
+;; - `[::relm/dispatch-n! [[::msg-1] [::msg-2]]]`
+;; - `[::relm/dispatch-later! [{:ms 100 :dispatch! [::msg]} ...]]`
+
+(defmethod fx ::dispatch!
   [dom-event [_ event]]
   (dispatch! dom-event event))
 
-(defmethod fx ::dispatch
-  [dom-event [_ event]]
-  (dispatch! dom-event event))
-
-(defmethod fx :dispatch-n
-  [dom-event [_ events]]
-  (dispatch! dom-event events))
-
-(defmethod fx ::dispatch-n
+(defmethod fx ::dispatch-n!
   [dom-event [_ events]]
   (dispatch! dom-event events))
 
 (defn- -handle-dispatch-later-item
   [dom-event item]
-  (let [msg (or (:dispatch item) (:message item))
+  (let [msg (or (:dispatch! item) (:dispatch item) (:message item))
         delay-ms (or (:ms item) 0)]
     (when msg
       (if (exists? js/setTimeout)
         (js/setTimeout #(dispatch! dom-event msg) delay-ms)
         (dispatch! dom-event msg)))))
 
-(defmethod fx :dispatch-later
-  [dom-event [_ items]]
-  (if (vector? items)
-    (doseq [item items]
-      (-handle-dispatch-later-item dom-event item))
-    (-handle-dispatch-later-item dom-event items)))
-
-(defmethod fx ::dispatch-later
+(defmethod fx ::dispatch-later!
   [dom-event [_ items]]
   (if (vector? items)
     (doseq [item items]
@@ -396,68 +383,61 @@
 ;; -----------------------------------------------------------------------------
 
 ;; Displays a browser alert dialog.
-;; Formats: `[:alert "message"]` or `[::relm/alert "message"]`
-(defmethod fx :alert
+;; Format: `[::relm/alert! "message"]`
+(defmethod fx ::alert!
   [_dom-event [_ message]]
   (when (exists? js/alert)
     (js/alert (str message))))
 
-(defmethod fx ::alert
-  [dom-event [_ message]]
-  (when (exists? js/alert)
-    (js/alert (str message))))
+(defn- -call-prevent-default!
+  "Extracts and invokes .preventDefault() on native DOM event or map containing event."
+  [event-or-dom]
+  (let [dom-e (cond
+                (nil? event-or-dom) nil
+                (map? event-or-dom) (or (:replicant/dom-event event-or-dom)
+                                        (:replicant/js-event event-or-dom)
+                                        (:event event-or-dom)
+                                        (:dom-event event-or-dom)
+                                        event-or-dom)
+                :else event-or-dom)]
+    (when dom-e
+      (cond
+        (and (not (map? dom-e)) (exists? (.-preventDefault dom-e)))
+        (.preventDefault dom-e)
+
+        (and (map? dom-e) (fn? (:preventDefault dom-e)))
+        ((:preventDefault dom-e))))))
 
 ;; Prevents default browser event action.
-;; Formats: `[:prevent-default]` or `[::relm/prevent-default]`
-(defmethod fx :prevent-default
-  [dom-event _]
-  (let [dom-e (cond
-                (and (object? dom-event) (fn? (.-preventDefault dom-event))) dom-event
-                (map? dom-event) (or (when-let [e (:replicant/dom-event dom-event)]
-                                       (when (or (and (object? e) (fn? (.-preventDefault e)))
-                                                 (and (map? e) (fn? (:preventDefault e))))
-                                         e))
-                                     (when-let [e (:event dom-event)]
-                                       (when (or (and (object? e) (fn? (.-preventDefault e)))
-                                                 (and (map? e) (fn? (:preventDefault e))))
-                                         e)))
-                :else nil)]
-    (when dom-e
-      (if (and (map? dom-e) (fn? (:preventDefault dom-e)))
-        ((:preventDefault dom-e))
-        (.preventDefault dom-e)))))
-
+;; Format: `[::relm/prevent-default!]` or `[::relm/prevent-default! event]`
 (defmethod fx ::prevent-default!
-  [{:replicant/keys [dom-event]} _]
-  (.preventDefault dom-event))
+  [dom-event [_ explicit-event]]
+  (-call-prevent-default! (or explicit-event dom-event)))
 
-(defmethod update ::prevent-default
-  [state context [_ & _] dom-event]
-  [state context [[::prevent-default! dom-event]]])
+(defn- -call-stop-propagation!
+  "Extracts and invokes .stopPropagation() on native DOM event or map containing event."
+  [event-or-dom]
+  (let [dom-e (cond
+                (nil? event-or-dom) nil
+                (map? event-or-dom) (or (:replicant/dom-event event-or-dom)
+                                        (:replicant/js-event event-or-dom)
+                                        (:event event-or-dom)
+                                        (:dom-event event-or-dom)
+                                        event-or-dom)
+                :else event-or-dom)]
+    (when dom-e
+      (cond
+        (and (not (map? dom-e)) (exists? (.-stopPropagation dom-e)))
+        (.stopPropagation dom-e)
+
+        (and (map? dom-e) (fn? (:stopPropagation dom-e)))
+        ((:stopPropagation dom-e))))))
 
 ;; Stops event propagation in DOM tree.
-;; Formats: `[:stop-propagation]` or `[::relm/stop-propagation]`
-(defmethod fx :stop-propagation
-  [dom-event _]
-  (let [dom-e (cond
-                (and (object? dom-event) (fn? (.-stopPropagation dom-event))) dom-event
-                (map? dom-event) (or (when-let [e (:replicant/dom-event dom-event)]
-                                       (when (or (and (object? e) (fn? (.-stopPropagation e)))
-                                                 (and (map? e) (fn? (:stopPropagation e))))
-                                         e))
-                                     (when-let [e (:event dom-event)]
-                                       (when (or (and (object? e) (fn? (.-stopPropagation e)))
-                                                 (and (map? e) (fn? (:stopPropagation e))))
-                                         e)))
-                :else nil)]
-    (when dom-e
-      (if (and (map? dom-e) (fn? (:stopPropagation dom-e)))
-        ((:stopPropagation dom-e))
-        (.stopPropagation dom-e)))))
-
-(defmethod fx ::stop-propagation
-  [dom-event effect]
-  (fx dom-event (assoc effect 0 :stop-propagation)))
+;; Format: `[::relm/stop-propagation!]` or `[::relm/stop-propagation! event]`
+(defmethod fx ::stop-propagation!
+  [dom-event [_ explicit-event]]
+  (-call-stop-propagation! (or explicit-event dom-event)))
 
 (defn- -focus-element!
   "Focuses a DOM input element by name attribute or ID selector."
@@ -469,34 +449,18 @@
         (.focus elem)))))
 
 ;; Focuses a specific field or element in the DOM.
-;; Formats: `[:focus :field-name]` or `[::relm/focus :field-name]`
-(defmethod fx :focus
+;; Format: `[::relm/focus! :field-name]`
+(defmethod fx ::focus!
   [_dom-event [_ field-name-or-id]]
   (-focus-element! field-name-or-id))
 
-(defmethod fx ::focus
-  [_dom-event [_ field-name-or-id]]
-  (-focus-element! field-name-or-id))
-
-(defmethod fx :focus-field
-  [_dom-event [_ field-name-or-id]]
-  (-focus-element! field-name-or-id))
-
-(defmethod fx ::focus-field
+(defmethod fx ::focus-field!
   [_dom-event [_ field-name-or-id]]
   (-focus-element! field-name-or-id))
 
 ;; Focuses the first field with a validation error.
-;; Formats: `[:focus-first-error errors-map]` or `[::relm/focus-first-error errors-map]`
-(defmethod fx :focus-first-error
-  [_dom-event [_ errors]]
-  (when (and (exists? js/document) (seq errors))
-    (let [first-path (first (keys errors))
-          field-name (if (vector? first-path) (last first-path) first-path)]
-      (when field-name
-        (-focus-element! field-name)))))
-
-(defmethod fx ::focus-first-error
+;; Format: `[::relm/focus-first-error! errors-map]`
+(defmethod fx ::focus-first-error!
   [_dom-event [_ errors]]
   (when (and (exists? js/document) (seq errors))
     (let [first-path (first (keys errors))
@@ -505,8 +469,8 @@
         (-focus-element! field-name)))))
 
 ;; Executes an asynchronous validator returning a Promise and dispatches result.
-;; Formats: `[:validate-async {:path ... :validator ... :on-success ... :on-error ...}]`
-(defmethod fx :validate-async
+;; Format: `[::relm/validate-async! {:path ... :validator ... :on-success ... :on-error ...}]`
+(defmethod fx ::validate-async!
   [dom-event [_ {:keys [path validator on-success on-error]}]]
   (when (fn? validator)
     (let [p (validator)]
@@ -519,7 +483,3 @@
                       (when on-error
                         (let [msg (or (.-message err) (str err))]
                           (dispatch! dom-event (if (fn? on-error) (on-error msg) [:com.lambdaseq.relm.form/set-error path msg])))))))))))
-
-(defmethod fx ::validate-async
-  [dom-event [_ opts]]
-  (fx dom-event [:validate-async opts]))

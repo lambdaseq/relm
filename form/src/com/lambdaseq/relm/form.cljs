@@ -946,6 +946,13 @@
         new-state (update-form state form-key reset-form initial)]
     [new-state context]))
 
+(defn- ->dispatch-msg
+  [target val]
+  (cond
+    (fn? target) (target val)
+    (vector? target) (conj target val)
+    :else target))
+
 ;; Message format: `[::submit form-key opts]`
 (defmethod relm/update ::submit
   [state context [_ form-or-key {:keys [on-submit on-invalid validate focus-error?]
@@ -963,13 +970,16 @@
     (if is-valid?
       (let [submitting-form (submit-start final-form)
             new-state (update-form state form-key (constantly submitting-form))
-            submitted-vals (values submitting-form)]
-        [new-state context [[::relm/prevent-default! event]
-                            [:dispatch (conj on-submit submitted-vals)]]])
+            submitted-vals (values submitting-form)
+            submit-fx (when on-submit
+                        [[::relm/dispatch! (->dispatch-msg on-submit submitted-vals)]])]
+        [new-state context (into [[::relm/prevent-default! event]] submit-fx)])
       (let [failed-form (assoc final-form :submitting? false)
             new-state (update-form state form-key (constantly failed-form))
             errors (:errors failed-form)
             focus-fx (when (and focus-error? (seq errors))
-                       [[::focus-first-error errors]])]
-        [new-state context (into (or focus-fx []) [[::relm/prevent-default! event]
-                                                   [:dispatch (conj on-invalid errors)]])]))))
+                       [[::relm/focus-first-error! errors]])
+            invalid-fx (when on-invalid
+                         [[::relm/dispatch! (->dispatch-msg on-invalid errors)]])]
+        [new-state context (into (or focus-fx [])
+                                 (into [[::relm/prevent-default! event]] invalid-fx))]))))

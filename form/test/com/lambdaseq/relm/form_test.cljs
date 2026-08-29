@@ -297,19 +297,23 @@
       (is (= 0 (form/value (:form new-state) :count)))
       (is (false? (form/dirty? (:form new-state))))))
 
-  (testing "::form/submit on valid form triggers on-submit effect"
-    (let [state {:form (form/create {:initial-values {:email "valid@example.com"}
+  (testing "::form/submit on valid form triggers on-submit effect and prevents default"
+    (let [prevented? (atom false)
+          mock-event {:replicant/dom-event #js {:preventDefault #(reset! prevented? true)}}
+          state {:form (form/create {:initial-values {:email "valid@example.com"}
                                      :validators     {:email (form/required)}})}
-          [new-state _ effects] (relm/update state {} [::form/submit :form {:on-submit [::save-data]}] nil)]
+          [new-state _ effects] (relm/update state {} [::form/submit :form {:on-submit [::save-data]}] mock-event)]
       (is (true? (form/submitting? (:form new-state))))
       (is (= 1 (form/submit-count (:form new-state))))
-      (is (= [[:dispatch [::save-data {:email "valid@example.com"}]]] effects))))
+      (is (= [[::relm/prevent-default! mock-event] [::relm/dispatch! [::save-data {:email "valid@example.com"}]]] effects))
+      (relm/fx mock-event (first effects))
+      (is (true? @prevented?))))
 
   (testing "::form/submit with custom on-submit function"
     (let [state {:form (form/create {:initial-values {:email "valid@example.com"}})}
           [new-state _ effects] (relm/update state {} [::form/submit :form {:on-submit (fn [vals] [::custom-save (:email vals)])}] nil)]
       (is (true? (form/submitting? (:form new-state))))
-      (is (= [[:dispatch [::custom-save "valid@example.com"]]] effects))))
+      (is (= [[::relm/prevent-default! nil] [::relm/dispatch! [::custom-save "valid@example.com"]]] effects))))
 
   (testing "::form/submit on invalid form prevents on-submit and invokes on-invalid"
     (let [state {:form (form/create {:initial-values {:email ""}
@@ -320,7 +324,7 @@
       (is (false? (form/submitting? (:form new-state))))
       (is (form/invalid? (:form new-state)))
       (is (form/touched? (:form new-state) :email))
-      (is (= [[:dispatch [::show-error-toast {[:email] "Email required"}]]] effects)))))
+      (is (= [[::relm/prevent-default! nil] [::relm/dispatch! [::show-error-toast {[:email] "Email required"}]]] effects)))))
 
 ;; -----------------------------------------------------------------------------
 ;; 5. Event Helpers Tests

@@ -207,7 +207,7 @@
         path (resolve-path target match query-params)]
     [state
      (set-route-context context match)
-     (when path [[::nav/push-state nil path]])]))
+     (when path [[::nav/push-state! nil path]])]))
 
 ;; Alias for `::navigate-to`.
 (defmethod relm/update ::navigate
@@ -239,7 +239,7 @@
         path (resolve-path target match query-params)]
     [state
      (set-route-context context match)
-     (when path [[::nav/replace-state nil path]])]))
+     (when path [[::nav/replace-state! nil path]])]))
 
 ;; Alias for `::replace-to`.
 (defmethod relm/update ::replace

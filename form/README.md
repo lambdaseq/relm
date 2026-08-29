@@ -211,9 +211,10 @@ All query helpers accept the form state map and a field path (keyword or vector)
 
 ### Built-in Side Effects
 
-- `[::form/focus-field selector-or-name]`
-- `[::form/focus-first-error form-errors]`
-- `[::form/validate-async {:path path :validator fn :on-success msg :on-error msg}]`
+- `[::relm/prevent-default!]` or `[::relm/prevent-default! event]`
+- `[::relm/focus-field! selector-or-name]`
+- `[::relm/focus-first-error! form-errors]`
+- `[::relm/validate-async! {:path path :validator fn :on-success msg :on-error msg}]`
 
 ---
 

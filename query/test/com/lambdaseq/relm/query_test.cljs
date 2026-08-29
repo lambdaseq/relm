@@ -166,7 +166,7 @@
       (is (query/loading? new-ctx [:todos]))
       (is (= 1 (count effects)))
       (let [[effect-type req] (first effects)]
-        (is (= ::http/fetch effect-type))
+        (is (= ::http/fetch! effect-type))
         (is (= "/todos" (:url req)))
         (is (= :get (:method req)))
         (is (= [::query/fetch-success [:todos] {}] (:on-success req))))))
@@ -190,16 +190,16 @@
       (is (= :success (query/status new-ctx [:todos])))
       (is (= [{:id 1 :title "Done"}] (query/data new-ctx [:todos])))))
 
-  (testing "::fetch-failure with retry attempts schedules :dispatch-later"
+  (testing "::fetch-failure with retry attempts schedules ::relm/dispatch-later!"
     (let [ctx (query/set-query-loading {} [:todos] {:retry 3})
           error-resp {:problem :fetch :problem-message "Network failed"}
           [_ new-ctx effects] (relm/update nil ctx [::query/fetch-failure [:todos] 0 {:retry 3} error-resp] nil)]
       (is (= 1 (get-in new-ctx [:queries [:todos] :retry-count])))
       (is (= 1 (count effects)))
       (let [[effect-type timer-payload] (first effects)]
-        (is (= :dispatch-later effect-type))
+        (is (= ::relm/dispatch-later! effect-type))
         (is (= 1000 (:ms timer-payload)))
-        (is (= [::query/retry [:todos] 1 {:retry 3}] (:dispatch timer-payload))))))
+        (is (= [::query/retry [:todos] 1 {:retry 3}] (:dispatch! timer-payload))))))
 
   (testing "::fetch-failure when retries are exhausted sets status to error"
     (let [ctx (query/set-query-loading {} [:todos] {:retry 3})
@@ -256,7 +256,7 @@
       (is (query/mutation-loading? new-ctx :create-todo))
       (is (= 1 (count effects)))
       (let [[effect-type req] (first effects)]
-        (is (= ::http/fetch effect-type))
+        (is (= ::http/fetch! effect-type))
         (is (= "/todos" (:url req)))
         (is (= :post (:method req)))
         (is (= {:title "New Todo"} (:body req))))))
@@ -285,8 +285,8 @@
                                                                                    :on-mutate opt-event}] nil)]
       (is (query/mutation-loading? new-ctx-event :add-todo))
       (is (= 2 (count effects)))
-      (is (= [:dispatch opt-event] (first effects)))
-      (is (= ::http/fetch (first (second effects))))))
+      (is (= [::relm/dispatch! opt-event] (first effects)))
+      (is (= ::http/fetch! (first (second effects))))))
 
   (testing "relm/dispatch executes optimistic mutation effects into app-state context"
     (let [event {:component-id "comp-opt"}]
@@ -309,8 +309,23 @@
       (is (= :error (get-in rolled-back-events [:mutations :add-todo :status])))
       (is (= error-resp (query/mutation-error rolled-back-events :add-todo)))
       (is (= 2 (count effects)))
-      (is (= [:dispatch [::query/set-query-data [:error-log] {:occurred? true}]] (first effects)))
-      (is (= [:dispatch [::query/set-query-data [:settled-log] {:settled? true}]] (second effects)))))
+      (is (= [::relm/dispatch! [::query/set-query-data [:error-log] {:occurred? true}]] (first effects)))
+      (is (= [::relm/dispatch! [::query/set-query-data [:settled-log] {:settled? true}]] (second effects)))))
+
+  (testing "::mutate-success and ::mutate-failure are aware of base-url during invalidation refetches"
+    (let [ctx (-> {}
+                  (query/set-query-data [:todos] [{:id 1}])
+                  (query/set-query-data [:todos 1] {:id 1}))
+          resp {:status 200 :ok? true :body {:id 2}}
+          err-resp {:problem :server :status 500}
+          [_ success-ctx success-fxs] (relm/update nil ctx [::query/mutate-success [:todos] nil {:base-url "https://api.example.com"} resp] nil)
+          [_ failure-ctx failure-fxs] (relm/update nil ctx [::query/mutate-failure [:todos] ctx {:base-url "https://api.example.com"} err-resp] nil)]
+      (is (= 2 (count success-fxs)))
+      (is (= "https://api.example.com/todos" (get-in (first success-fxs) [1 :url])))
+      (is (= "https://api.example.com/todos/1" (get-in (second success-fxs) [1 :url])))
+      (is (= 2 (count failure-fxs)))
+      (is (= "https://api.example.com/todos" (get-in (first failure-fxs) [1 :url])))
+      (is (= "https://api.example.com/todos/1" (get-in (second failure-fxs) [1 :url])))))
 
   (testing "::mutate-success invalidates matching queries automatically when key matches"
     (let [ctx (-> {}
@@ -346,10 +361,10 @@
       (is (false? (query/stale? ctx-disabled [:users] 60000)))
       (is (empty? effects-disabled))))
 
-  (testing ":dispatch effect handler executes query messages"
+  (testing "::relm/dispatch! effect handler executes query messages"
     (let [event {:component-id "comp-fx-test"}]
       (reset! relm/!app-state {:context {} :components {"comp-fx-test" {:state {}}}})
-      (relm/fx event [:dispatch [::query/mutate :fx-mutation {:url "/items" :body {:name "Item 1"}}]])
+      (relm/fx event [::relm/dispatch! [::query/mutate :fx-mutation {:url "/items" :body {:name "Item 1"}}]])
       (is (query/mutation-loading? (:context @relm/!app-state) :fx-mutation))
-      (relm/fx event [:dispatch [::query/set-query-data [:custom] [{:id 10}]]])
+      (relm/fx event [::relm/dispatch! [::query/set-query-data [:custom] [{:id 10}]]])
       (is (= [{:id 10}] (query/data (:context @relm/!app-state) [:custom]))))))

@@ -48,8 +48,8 @@ Add the required modules to your `deps.edn`:
 | :--- | :--- | :--- | :--- |
 | **Core** | `com.lambdaseq.relm.core` | Elm runtime, component lifecycle, state, `update`, and `fx`. | [Core Documentation](core/README.md) |
 | **Form** | `com.lambdaseq.relm.form` | Declarative form state, `form/register`, validators, and submission. | [Form Documentation](form/README.md) |
-| **HTTP** | `com.lambdaseq.relm.http` | Fetch API side effects (`::fetch`, `::abort`) and JSON decoders. | [HTTP Documentation](core/README.md#http-client-comlambdaseqrelmhttp) |
-| **Navigation** | `com.lambdaseq.relm.navigation` | Browser History API effects (`::push-state`, `::back`, etc.). | [Navigation Documentation](core/README.md#browser-navigation-comlambdaseqrelmnavigation) |
+| **HTTP** | `com.lambdaseq.relm.http` | Fetch API side effects (`::fetch!`, `::abort!`) and JSON decoders. | [HTTP Documentation](core/README.md#http-client-comlambdaseqrelmhttp) |
+| **Navigation** | `com.lambdaseq.relm.navigation` | Browser History API effects (`::push-state!`, `::back!`, etc.). | [Navigation Documentation](core/README.md#browser-navigation-comlambdaseqrelmnavigation) |
 | **Query** | `com.lambdaseq.relm.query` | TanStack Query-style caching, retries, optimistic mutations, and key inference. | [Query Documentation](query/README.md) |
 | **Reitit** | `com.lambdaseq.relm.reitit` | Client-side routing with Reitit, context sync, and navigation messages. | [Reitit Documentation](reitit/README.md) |
 
@@ -148,7 +148,7 @@ Declarative HTTP Fetch requests with automatic JSON parsing and cancellation:
 
 ```clojure
 (defmethod relm/update ::fetch-user [state context [_ id] _]
-  [state context [[::relm.http/fetch
+  [state context [[::relm.http/fetch!
                    {:url        (str "https://api.example.com/users/" id)
                     :on-success [::user-loaded]
                     :on-failure [::user-failed]}]]])
@@ -167,10 +167,10 @@ Browser History API side effects:
 
 ```clojure
 (defmethod relm/update ::go-profile [state context [_ id] _]
-  [state context [[::nav/push-state nil (str "/users/" id)]]])
+  [state context [[::nav/push-state! nil (str "/users/" id)]]])
 
 (defmethod relm/update ::go-back [state context _ _]
-  [state context [[::nav/back]]])
+  [state context [[::nav/back!]]])
 ```
 
 [Read full Navigation documentation ->](core/README.md#browser-navigation-comlambdaseqrelmnavigation)

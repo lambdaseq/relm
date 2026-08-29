@@ -72,7 +72,7 @@
           [new-state new-ctx effects] (relm/update {:my-state 1} ctx [::relm.reitit/navigate-to "/users"] nil)]
       (is (= {:my-state 1} new-state))
       (is (= :users (relm.reitit/current-route new-ctx)))
-      (is (= [[::nav/push-state nil "/users"]] effects))))
+      (is (= [[::nav/push-state! nil "/users"]] effects))))
 
   (testing "::navigate-to by route name and params updates context and emits parameterized push-state"
     (let [ctx {:router test-router}
@@ -80,13 +80,13 @@
       (is (= {:my-state 1} new-state))
       (is (= :user (relm.reitit/current-route new-ctx)))
       (is (= {:id "99"} (get-in new-ctx [:route :path-params])))
-      (is (= [[::nav/push-state nil "/user/99?query=abc"]] effects))))
+      (is (= [[::nav/push-state! nil "/user/99?query=abc"]] effects))))
 
   (testing "::replace-to by route name updates context and emits replace-state effect"
     (let [ctx {:router test-router}
           [new-state new-ctx effects] (relm/update nil ctx [::relm.reitit/replace-to :user {:id "5"}] nil)]
       (is (= :user (relm.reitit/current-route new-ctx)))
-      (is (= [[::nav/replace-state nil "/user/5"]] effects))))
+      (is (= [[::nav/replace-state! nil "/user/5"]] effects))))
 
   (testing "::route-changed updates context without emitting side effects"
     (let [ctx {:router test-router}

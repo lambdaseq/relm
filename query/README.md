@@ -64,8 +64,8 @@ Add `com.lambdaseq/relm.query` and `com.lambdaseq/relm.core` to your `deps.edn`:
                                    v
        +-------------------------------------------------------+
        |               HTTP Side Effects (relm/fx)             |
-       |  - ::http/fetch (GET / POST / PUT / DELETE)           |
-       |  - :dispatch-later (Exponential backoff retry)        |
+       |  - ::http/fetch! (GET / POST / PUT / DELETE)          |
+       |  - ::relm/dispatch-later! (Exponential retry)         |
        +-------------------------------------------------------+
                                    |
                   +----------------+----------------+
@@ -352,15 +352,15 @@ Below is a complete, runnable component demonstrating cache-first data fetching,
     (let [new-item {:id (rand-int 10000) :title new-title :completed false}]
       [(assoc state :new-title "")
        context
-       [[:dispatch [::query/mutate [:todos]
-                    {:data      new-item
-                     :on-mutate [::query/set-query-data todos-key
-                                 (fn [items] (into [new-item] (or items [])))]}]]]])))
+       [[::relm/dispatch! [::query/mutate [:todos]
+                           {:data      new-item
+                            :on-mutate [::query/set-query-data todos-key
+                                        (fn [items] (into [new-item] (or items [])))]}]]]])))
 
 (defn view [{:keys [new-title]} context]
-  (let [todos             (query/data context todos-key [])
-        loading?          (query/loading? context todos-key)
-        fetching?         (query/fetching? context todos-key)
+  (let [todos (query/data context todos-key [])
+        loading? (query/loading? context todos-key)
+        fetching? (query/fetching? context todos-key)
         mutation-loading? (query/mutation-loading? context [:todos])]
     [:div.todos-container
      [:h2 "Todo Manager"]
@@ -376,12 +376,12 @@ Below is a complete, runnable component demonstrating cache-first data fetching,
 
      ;; Create Form
      [:div.create-form
-      [:input {:type "text"
+      [:input {:type        "text"
                :placeholder "Enter todo title..."
-               :value new-title
-               :on {:input [::set-title :event.target/value]}}]
+               :value       new-title
+               :on          {:input [::set-title :event.target/value]}}]
       [:button {:disabled (or mutation-loading? (clojure.string/blank? new-title))
-                :on {:click [::add-todo]}}
+                :on       {:click [::add-todo]}}
        (if mutation-loading? "Adding..." "Add Todo")]]
 
      ;; Content View

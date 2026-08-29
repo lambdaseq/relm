@@ -33,10 +33,10 @@
   [state context [_ response] _event]
   [(assoc state :error (:problem response)) context])
 
-;; Emits the `::relm.http/fetch` side effect to retrieve posts from JSONPlaceholder API.
+;; Emits the `::relm.http/fetch!` side effect to retrieve posts from JSONPlaceholder API.
 (defmethod relm/update ::fetch-posts
   [state context _ _event]
-  [state context [[::relm.http/fetch
+  [state context [[::relm.http/fetch!
                    {:url        "https://jsonplaceholder.typicode.com/posts"
                     :method     :get
                     :mode       :cors
