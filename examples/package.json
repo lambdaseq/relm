@@ -7,7 +7,7 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "examples": "npx shadow-cljs watch examples"
   },
   "dependencies": {
     "shadow-cljs": "3.5.0"

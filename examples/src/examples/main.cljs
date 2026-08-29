@@ -10,6 +10,7 @@
   (:require [com.lambdaseq.relm.core :as relm]
             [com.lambdaseq.relm.reitit :as relm.reitit]
             [examples.counter :refer [Counter]]
+            [examples.form :refer [FormExample]]
             [examples.http :refer [HttpExample]]
             [examples.navigation :refer [NavigationExample]]
             [examples.nested :refer [NestedExample]]
@@ -31,6 +32,9 @@
    ["/counter" {:name :counter
                 :path "/counter"
                 :view (fn [] (Counter {:init-count 0}))}]
+   ["/form" {:name :form
+             :path "/form"
+             :view (fn [] (FormExample {}))}]
    ["/http" {:name :http
              :path "/http"
              :view (fn [] (HttpExample {}))}]
@@ -78,6 +82,15 @@
                         :cursor           "pointer"}
                 :on    {:click [::relm.reitit/navigate-to "/counter"]}}
        "Counter"]
+      [:button {:style {:padding          "8px 16px"
+                        :border-radius    "6px"
+                        :border           "1px solid #d1d5db"
+                        :background-color (if (= current-route :form) "#4f46e5" "#f3f4f6")
+                        :color            (if (= current-route :form) "#ffffff" "#111827")
+                        :font-weight      (if (= current-route :form) "600" "normal")
+                        :cursor           "pointer"}
+                :on    {:click [::relm.reitit/navigate-to "/form"]}}
+       "Form"]
       [:button {:style {:padding          "8px 16px"
                         :border-radius    "6px"
                         :border           "1px solid #d1d5db"
