@@ -65,7 +65,7 @@ Add `com.lambdaseq/relm.query` and `com.lambdaseq/relm.core` to your `deps.edn`:
        +-------------------------------------------------------+
        |               HTTP Side Effects (relm/fx)             |
        |  - ::http/fetch (GET / POST / PUT / DELETE)           |
-       |  - ::query/retry-timer (Exponential backoff)          |
+       |  - :dispatch-later (Exponential backoff retry)        |
        +-------------------------------------------------------+
                                    |
                   +----------------+----------------+
@@ -182,15 +182,16 @@ To disable retries, pass `{:retry false}` or `{:retry 0}`.
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `:url` | `string` | Inferred | Target URL. Overrides inferred path. |
+| `:base-url` | `string` | `nil` | Base URL prepended to inferred REST path (e.g. `"https://api.example.com"`). |
+| `:url` | `string` | Inferred | Target URL. Overrides inferred path / base URL. |
 | `:params` | `map` | Inferred | HTTP query parameters map. Merged with key params. |
 | `:headers` | `map` | `{}` | HTTP request headers map. |
 | `:method` | `keyword` | `:get` | HTTP method (`:get`, `:post`, etc.). |
 | `:stale-time` | `number` | `0` | Milliseconds data remains fresh before refetch is required. |
 | `:force?` | `boolean` | `false` | When true, skips cache check and forces immediate fetch. |
 | `:retry` | `number \| boolean` | `3` | Max retry attempts, or `false` to disable. |
-| `:on-success` | `fn \| vector` | `nil` | Callback `(fn [data response])` or message vector dispatched on success. |
-| `:on-error` | `fn` | `nil` | Callback `(fn [response])` invoked on final failure. |
+| `:on-success` | `vector` | `nil` | Message vector dispatched on success `[::msg ...]`. |
+| `:on-error` | `vector` | `nil` | Message vector dispatched on final error `[::msg ...]`. |
 
 ---
 
@@ -198,48 +199,66 @@ To disable retries, pass `{:retry false}` or `{:retry 0}`.
 
 ### Dispatching Mutations
 
-Mutations execute write operations (`:post`, `:put`, `:patch`, `:delete`) and track state in `context[:mutations <mutation-key>]`:
+Mutations execute write operations (`:post`, `:put`, `:patch`, `:delete`) and track state in `context[:mutations <mutation-key>]`. 
+
+Mutations can infer their REST URL directly from vector keys and automatically invalidate matching query caches on success without requiring explicit `:url` or `:invalidate` parameters:
+
+```clojure
+;; Inferred URL: "/todos" (POST), automatically invalidates queries matching [:todos]
+[::query/mutate [:todos]
+ {:data {:title "New Task"}}]
+
+;; Inferred URL: "/todos/42" (DELETE), automatically invalidates [:todos] / [:todos 42]
+[::query/mutate [:todos 42]
+ {:method :delete}]
+```
+
+Explicit `:url` and `:invalidate` options can still be provided to override or customize behavior:
 
 ```clojure
 (defmethod relm/update ::delete-todo
   [state context [_ todo-id] _event]
   [state
    context
-   [[::query/mutate :delete-todo
-     {:url (str "/todos/" todo-id)
-      :method :delete
-      :invalidate [[:todos]]}]]])
+   [[::query/mutate [:todos todo-id]
+     {:method :delete}]]])
 ```
 
 ### Optimistic Updates & Rollback
 
-Provide `:on-mutate` to immediately update the context cache before the request finishes. If the request fails, `relm.query` restores the `:rollback-context`:
+Provide `:on-mutate` with a message vector (such as `[::query/set-query-data ...]` with an updater function) to optimistically update the cache before the network request finishes. The context prior to the mutation is automatically captured as the rollback snapshot. If the mutation fails, `relm.query` automatically restores the rollback context:
 
 ```clojure
-[::query/mutate :add-todo
- {:url "/todos"
-  :method :post
-  :variables {:title "New Item" :completed false}
-  :invalidate [[:todos]]
-  :on-mutate (fn [vars ctx]
-               {:rollback-context ctx
-                :optimistic-context
-                (update-in ctx [:queries [:todos] :data]
-                           (fn [todos] (conj (or todos []) vars)))})}]
+[::query/mutate [:todos]
+ {:data      {:title "New Item" :completed false}
+  :on-mutate [::query/set-query-data [:todos]
+              (fn [todos] (conj (or todos []) {:title "New Item" :completed false}))]}]
+```
+
+You can also provide `:on-error` and `:on-settled` message vectors:
+
+```clojure
+[::query/mutate [:todos]
+ {:data       new-todo
+  :on-mutate  [::query/set-query-data [:todos] (fn [old] (conj (or old []) new-todo))]
+  :on-error   [::query/set-query-data [:todos] previous-todos]
+  :on-settled [::query/invalidate [:todos]]}]
 ```
 
 ### Mutation Options Reference
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `:url` | `string` | Inferred | Target URL for the mutation request. |
+| `:data` / `:body` | `any` | `nil` | Request payload sent to the server (`:variables` supported for backward compatibility). |
+| `:base-url` | `string` | `nil` | Base URL prepended to inferred REST path. |
+| `:url` | `string` | Inferred | Target URL for the mutation request. Overrides inferred path / base URL. |
 | `:method` | `keyword` | `:post` | HTTP method (`:post`, `:put`, `:patch`, `:delete`). |
-| `:variables` / `:body` | `any` | `nil` | Payload sent to the server. |
-| `:invalidate` | `vector` | `[]` | Vector of query key prefixes to invalidate on success. |
-| `:on-mutate` | `fn` | `nil` | `(fn [vars context])` returning `{:rollback-context ... :optimistic-context ...}`. |
-| `:on-success` | `fn \| vector` | `nil` | `(fn [data response])` or message vector to dispatch on success. |
-| `:on-error` | `fn` | `nil` | `(fn [response])` callback invoked on mutation failure. |
-| `:on-settled` | `fn` | `nil` | `(fn [response success?])` callback invoked when finished. |
+| `:invalidate` | `vector \| boolean` | `[mutation-key]` | Query key prefixes to invalidate on success. Pass `false` or `nil` to disable automatic invalidation. |
+| `:on-mutate` | `vector` | `nil` | Message vector executed optimistically before request `[::msg ...]`. |
+| `:rollback-context` | `map` | `context` | Context state to restore if mutation fails. Defaults to context before `:on-mutate`. |
+| `:on-success` | `vector` | `nil` | Message vector dispatched on success `[::msg ...]`. |
+| `:on-error` | `vector` | `nil` | Message vector dispatched on error `[::msg ...]`. |
+| `:on-settled` | `vector` | `nil` | Message vector dispatched on settled completion `[::msg ...]`. |
 
 ---
 
@@ -333,22 +352,16 @@ Below is a complete, runnable component demonstrating cache-first data fetching,
     (let [new-item {:id (rand-int 10000) :title new-title :completed false}]
       [(assoc state :new-title "")
        context
-       [[::query/mutate :create-todo
-         {:url "/todos"
-          :method :post
-          :variables new-item
-          :invalidate [[:todos]]
-          :on-mutate (fn [vars ctx]
-                       {:rollback-context ctx
-                        :optimistic-context
-                        (update-in ctx [:queries todos-key :data]
-                                   (fn [items] (into [vars] (or items []))))})}]]])))
+       [[:dispatch [::query/mutate [:todos]
+                    {:data      new-item
+                     :on-mutate [::query/set-query-data todos-key
+                                 (fn [items] (into [new-item] (or items [])))]}]]]])))
 
 (defn view [{:keys [new-title]} context]
   (let [todos             (query/data context todos-key [])
         loading?          (query/loading? context todos-key)
         fetching?         (query/fetching? context todos-key)
-        mutation-loading? (query/mutation-loading? context :create-todo)]
+        mutation-loading? (query/mutation-loading? context [:todos])]
     [:div.todos-container
      [:h2 "Todo Manager"]
 

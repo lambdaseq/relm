@@ -120,6 +120,21 @@ Side effects are declared as vectors `[[::effect-type arg1 arg2 ...]]` and execu
   (js/console.log "Notification:" text))
 ```
 
+#### Built-in Dispatch Effects
+
+Relm Core provides re-frame style dispatch side-effects out of the box:
+
+- `[:dispatch [::message ...]]` or `[:dispatch [[::msg-1] [::msg-2]]]`: Dispatches one or more messages back to the runtime.
+- `[:dispatch-n [[::msg-1] [::msg-2]]]`: Dispatches a batch of message vectors.
+- `[:dispatch-later {:ms 1000 :dispatch [::message]} ...]`: Dispatches messages after a specified delay in milliseconds.
+
+```clojure
+(defmethod relm/update ::save-and-notify
+  [state context [_ item] _]
+  [state context [[:dispatch [::save-item item]]
+                  [:dispatch-later {:ms 3000 :dispatch [::clear-notification]}]]])
+```
+
 ### Nested Components
 
 Components can be nested arbitrarily. Each instance maintains isolated local state identified by an `:id` or `:key`:
@@ -163,11 +178,11 @@ Dispatch `::relm.http/fetch` in your update handler's effects vector:
       :request-id  :posts-request}]]])
 
 (defmethod relm/update ::posts-loaded
-  [state context [_ {:keys [status body headers]}] _]
+  [state context [_ {:keys [status body headers]}]]
   [(assoc state :loading? false :posts body) context])
 
 (defmethod relm/update ::posts-failed
-  [state context [_ {:keys [problem problem-message status]}] _]
+  [state context [_ {:keys [problem problem-message status]}]]
   [(assoc state :loading? false :error problem-message) context])
 ```
 

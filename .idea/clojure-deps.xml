@@ -12,7 +12,11 @@
     <option name="dirTypeMappings">
       <set>
         <FolderState>
-          <option name="dirUrl" value="file://$PROJECT_DIR$/core/test" />
+          <option name="dirUrl" value="file://$PROJECT_DIR$/form/test" />
+          <option name="type" value="TEST_SOURCE" />
+        </FolderState>
+        <FolderState>
+          <option name="dirUrl" value="file://$PROJECT_DIR$/query/test" />
           <option name="type" value="TEST_SOURCE" />
         </FolderState>
         <FolderState>
@@ -31,6 +35,8 @@
         <option value="file://$PROJECT_DIR$/deps.edn" />
         <option value="file://$PROJECT_DIR$/examples/counter/deps.edn" />
         <option value="file://$PROJECT_DIR$/examples/deps.edn" />
+        <option value="file://$PROJECT_DIR$/form/deps.edn" />
+        <option value="file://$PROJECT_DIR$/query/deps.edn" />
         <option value="file://$PROJECT_DIR$/reitit/deps.edn" />
       </set>
     </option>

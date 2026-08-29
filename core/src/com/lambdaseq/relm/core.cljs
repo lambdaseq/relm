@@ -213,7 +213,7 @@
                                   (some? new-context) (assoc :context new-context))))
       (-dispatch-fx! event effects))))
 
-(defn dispatch
+(defn dispatch!
   "Handles message dispatching for components.
 
   This function is the central message handler for the relm system. It processes
@@ -343,8 +343,46 @@
       ([id args]
        (-render-component id init-fn view-fn args)))))
 
-;; Built-in effect handler for dispatching follow-up messages from inside effect flows.
-;; Format: `[:dispatch [::message-name ...]]`
+;; Built-in effect handlers for dispatching follow-up messages from inside effect flows.
+;; Formats:
+;; - `[:dispatch [::message ...]]` or `[::relm/dispatch [::message ...]]`
+;; - `[:dispatch [[::msg-1] [::msg-2]]]` or `[:dispatch-n [[::msg-1] [::msg-2]]]`
+;; - `[:dispatch-later {:ms 1000 :dispatch [::message]}]` or `[:dispatch-later [{:ms 100 :dispatch [::msg]} ...]]`
 (defmethod fx :dispatch
   [dom-event [_ event]]
-  (dispatch dom-event event))
+  (dispatch! dom-event event))
+
+(defmethod fx ::dispatch
+  [dom-event [_ event]]
+  (dispatch! dom-event event))
+
+(defmethod fx :dispatch-n
+  [dom-event [_ events]]
+  (dispatch! dom-event events))
+
+(defmethod fx ::dispatch-n
+  [dom-event [_ events]]
+  (dispatch! dom-event events))
+
+(defn- -handle-dispatch-later-item
+  [dom-event item]
+  (let [msg (or (:dispatch item) (:message item))
+        delay-ms (or (:ms item) 0)]
+    (when msg
+      (if (exists? js/setTimeout)
+        (js/setTimeout #(dispatch! dom-event msg) delay-ms)
+        (dispatch! dom-event msg)))))
+
+(defmethod fx :dispatch-later
+  [dom-event [_ items]]
+  (if (vector? items)
+    (doseq [item items]
+      (-handle-dispatch-later-item dom-event item))
+    (-handle-dispatch-later-item dom-event items)))
+
+(defmethod fx ::dispatch-later
+  [dom-event [_ items]]
+  (if (vector? items)
+    (doseq [item items]
+      (-handle-dispatch-later-item dom-event item))
+    (-handle-dispatch-later-item dom-event items)))

@@ -43,6 +43,14 @@
             </ModuleState>
           </value>
         </entry>
+        <entry key="query">
+          <value>
+            <ModuleState>
+              <option name="buildSystemId" value="CLOJURE_DEPS" />
+              <option name="displayName" value="query" />
+            </ModuleState>
+          </value>
+        </entry>
         <entry key="reitit">
           <value>
             <ModuleState>

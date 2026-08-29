@@ -142,7 +142,7 @@
 ;; -----------------------------------------------------------------------------
 
 ;; Register Relm's message dispatcher as the Replicant event handler
-(r/set-dispatch! relm/dispatch)
+(r/set-dispatch! relm/dispatch!)
 
 ;; Initialize router, history listener, and sync route match into Relm context
 (relm.reitit/start! router {:default-path "/nested"})

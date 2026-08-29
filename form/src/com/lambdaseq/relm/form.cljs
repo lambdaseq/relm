@@ -709,12 +709,18 @@
   (let [dom-e (cond
                 (and (object? event) (fn? (.-preventDefault event))) event
                 (map? event) (or (when-let [e (:replicant/dom-event event)]
-                                   (when (fn? (.-preventDefault e)) e))
+                                   (when (or (and (object? e) (fn? (.-preventDefault e)))
+                                             (and (map? e) (fn? (:preventDefault e))))
+                                     e))
                                  (when-let [e (:event event)]
-                                   (when (fn? (.-preventDefault e)) e)))
+                                   (when (or (and (object? e) (fn? (.-preventDefault e)))
+                                             (and (map? e) (fn? (:preventDefault e))))
+                                     e)))
                 :else nil)]
     (when dom-e
-      (.preventDefault dom-e))))
+      (if (and (map? dom-e) (fn? (:preventDefault dom-e)))
+        ((:preventDefault dom-e))
+        (.preventDefault dom-e)))))
 
 (defn extract-event-value
   "Extracts the value from a DOM event, event map, or DOM node.
@@ -726,24 +732,28 @@
                  (map? event-or-val)
                  (or (:replicant/node event-or-val)
                      (when-let [dom-e (:replicant/dom-event event-or-val)]
-                       (or (.-target dom-e) (.-currentTarget dom-e) dom-e))
+                       (or (when (and (object? dom-e) (not (map? dom-e)))
+                             (or (.-target dom-e) (.-currentTarget dom-e)))
+                           dom-e))
                      (:target event-or-val))
 
                  ;; 2. Direct DOM Event object with .target / .currentTarget
                  (and (object? event-or-val)
+                      (not (map? event-or-val))
                       (or (some? (.-target event-or-val))
                           (some? (.-currentTarget event-or-val))))
                  (or (.-target event-or-val) (.-currentTarget event-or-val))
 
                  ;; 3. Direct DOM Node object with .value or .checked
                  (and (object? event-or-val)
+                      (not (map? event-or-val))
                       (or (some? (.-value event-or-val))
                           (some? (.-checked event-or-val))))
                  event-or-val
 
                  :else nil)]
-    (if target
-      (let [input-type (when target (.-type target))]
+    (if (and target (not (map? target)))
+      (let [input-type (.-type target)]
         (cond
           (= input-type "checkbox")
           (.-checked target)
@@ -757,9 +767,10 @@
 
           :else
           target))
-      (if (map? event-or-val)
-        (get event-or-val :value event-or-val)
-        event-or-val))))
+      (if (map? (or target event-or-val))
+        (let [m (or target event-or-val)]
+          (get m :value m))
+        (or target event-or-val)))))
 
 ;; -----------------------------------------------------------------------------
 ;; Event Handler Helpers
@@ -938,11 +949,11 @@
         (-> p
             (.then (fn [res]
                      (when on-success
-                       (relm/dispatch nil (if (fn? on-success) (on-success res) on-success)))))
+                       (relm/dispatch! nil (if (fn? on-success) (on-success res) on-success)))))
             (.catch (fn [err]
                       (when on-error
                         (let [msg (or (.-message err) (str err))]
-                          (relm/dispatch nil (if (fn? on-error) (on-error msg) [::set-error path msg])))))))))))
+                          (relm/dispatch! nil (if (fn? on-error) (on-error msg) [::set-error path msg])))))))))))
 
 ;; -----------------------------------------------------------------------------
 ;; Relm Update Message Handlers
@@ -950,53 +961,53 @@
 
 ;; Message format: `[::change form-key path]` or `[::change form-key path value]`
 (defmethod relm/update ::change
-  [state context message event]
-  (let [[_ form-key path explicit-val] message
+  [state context [_ form-or-key path explicit-val] event]
+  (let [form-key (extract-form-key form-or-key)
         val (if (some? explicit-val) explicit-val (extract-event-value event))
         new-state (update-form state form-key set-value path val)]
     [new-state context]))
 
 ;; Message format: `[::blur form-key path]`
 (defmethod relm/update ::blur
-  [state context message _event]
-  (let [[_ form-key path] message
+  [state context [_ form-or-key path] _event]
+  (let [form-key (extract-form-key form-or-key)
         new-state (update-form state form-key set-touched path true)]
     [new-state context]))
 
 ;; Message format: `[::set-field form-key path value]`
 (defmethod relm/update ::set-field
-  [state context message _event]
-  (let [[_ form-key path val] message
+  [state context [_ form-or-key path val] _event]
+  (let [form-key (extract-form-key form-or-key)
         new-state (update-form state form-key set-value path val)]
     [new-state context]))
 
 ;; Message format: `[::set-values form-key new-values]`
 (defmethod relm/update ::set-values
-  [state context message _event]
-  (let [[_ form-key vals] message
+  [state context [_ form-or-key vals] _event]
+  (let [form-key (extract-form-key form-or-key)
         new-state (update-form state form-key set-values vals)]
     [new-state context]))
 
 ;; Message format: `[::set-error form-key path msg]`
 (defmethod relm/update ::set-error
-  [state context message _event]
-  (let [[_ form-key path msg] message
+  [state context [_ form-or-key path msg] _event]
+  (let [form-key (extract-form-key form-or-key)
         new-state (update-form state form-key set-error path msg)]
     [new-state context]))
 
 ;; Message format: `[::reset form-key]` or `[::reset form-key new-initial-values]`
 (defmethod relm/update ::reset
-  [state context message _event]
-  (let [[_ form-key initial] message
+  [state context [_ form-or-key initial] _event]
+  (let [form-key (extract-form-key form-or-key)
         new-state (update-form state form-key reset-form initial)]
     [new-state context]))
 
 ;; Message format: `[::submit form-key opts]`
 (defmethod relm/update ::submit
-  [state context message event]
+  [state context [_ form-or-key {:keys [on-submit on-invalid validate focus-error?]
+                     :or   {focus-error? true}}] event]
   (prevent-default! event)
-  (let [[_ form-key {:keys [on-submit on-invalid validate focus-error?]
-                     :or   {focus-error? true}}] message
+  (let [form-key (extract-form-key form-or-key)
         current-form (get-form state form-key)
         touched-form (touch-all current-form)
         validated-form (validate-form touched-form)

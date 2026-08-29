@@ -99,6 +99,15 @@
          (map (fn [[_ k]] (keyword k)))
          set)))
 
+(defn- join-base-url
+  "Prepends `base-url` to a `path`, trimming duplicate boundary slashes."
+  [base-url path]
+  (if (string/blank? base-url)
+    path
+    (let [base (string/replace base-url #"/+$" "")
+          rel-path (if (string/starts-with? (or path "") "/") path (str "/" path))]
+      (str base rel-path))))
+
 (defn infer-request-from-key
   "Infers a complete HTTP request map from a query key and options map.
 
@@ -106,7 +115,8 @@
   1. If `context` contains a Reitit router (`:router`), and the first element of `key`
      matches a registered route name, Reitit path resolution is used.
   2. Otherwise, vector elements are joined into a `/`-separated REST URL path, and any trailing map is used as query parameters.
-  3. Explicit options in `opts` (`:url`, `:params`, `:headers`, `:method`, `:body`, etc.) override or merge with inferred values."
+  3. If `:base-url` is specified in `opts` (or in `context`), it is prepended to the inferred path unless an explicit `:url` is provided.
+  4. Explicit options in `opts` (`:url`, `:params`, `:headers`, `:method`, `:data`, `:body`, etc.) override or merge with inferred values."
   [context key opts]
   (let [norm-key (normalize-key key)
         first-elem (first norm-key)
@@ -114,7 +124,7 @@
         router (:router context)
         raw-match (when (and router (keyword? first-elem))
                     (r/match-by-name router first-elem))
-        [inferred-url inferred-params]
+        [inferred-path inferred-params]
         (if raw-match
           (let [template (or (:template raw-match)
                              (get-in raw-match [:data :path])
@@ -128,14 +138,20 @@
             [(:path final-match) query-params])
           (key->path-and-params norm-key))
 
+        base-url      (or (:base-url opts) (get-in context [:query :base-url]) (:base-url context))
+        inferred-url  (if (and base-url inferred-path)
+                        (join-base-url base-url inferred-path)
+                        inferred-path)
         merged-url    (or (:url opts) inferred-url)
         merged-params (merge (or inferred-params {}) (:params opts))
-        merged-method (or (:method opts) :get)]
+        merged-method (or (:method opts) :get)
+        body-payload  (or (:data opts) (:body opts) (:variables opts))]
     (cond-> (assoc opts
               :url merged-url
               :method merged-method)
       (seq merged-params) (assoc :params merged-params)
-      (nil? (:request-content-type opts)) (assoc :request-content-type :json))))
+      (nil? (:request-content-type opts)) (assoc :request-content-type :json)
+      (some? body-payload) (assoc :body body-payload))))
 
 ;; -----------------------------------------------------------------------------
 ;; Context Cache State Reducers (Pure Functional)
@@ -164,22 +180,27 @@
                          :options      (merge (:options q) opts)})))))
 
 (defn set-query-data
-  "Pure reducer: stores fetched `data` for `key` in `context` and marks query status `:success`."
+  "Pure reducer: stores fetched `data` for `key` in `context` and marks query status `:success`.
+  `data` can be a value or an updater function `(fn [prev-data] ...)`."
   [context key data & [opts]]
   (let [norm-key (normalize-key key)]
     (update-in context [:queries norm-key]
                (fn [q]
-                 (merge (or q {})
-                        {:data         data
-                         :status       :success
-                         :is-loading?  false
-                         :is-fetching? false
-                         :stale?       false
-                         :error        nil
-                         :updated-at   (now-ms)
-                         :fetch-count  (inc (or (:fetch-count q) 0))
-                         :retry-count  0
-                         :options      (merge (:options q) opts)})))))
+                 (let [prev-data (:data q)
+                       new-data  (if (fn? data)
+                                   (data prev-data)
+                                   data)]
+                   (merge (or q {})
+                          {:data         new-data
+                           :status       :success
+                           :is-loading?  false
+                           :is-fetching? false
+                           :stale?       false
+                           :error        nil
+                           :updated-at   (now-ms)
+                           :fetch-count  (inc (or (:fetch-count q) 0))
+                           :retry-count  0
+                           :options      (merge (:options q) opts)}))))))
 
 (defn set-query-error
   "Pure reducer: records `error` for `key` in `context` and marks query status `:error`."
@@ -215,7 +236,10 @@
 (defn get-mutation
   "Retrieves the mutation entry map for `mutation-key` from `context`."
   [context mutation-key]
-  (get-in context [:mutations mutation-key]))
+  (or (get-in context [:mutations mutation-key])
+      (get-in context [:mutations (normalize-key mutation-key)])
+      (when (and (vector? mutation-key) (seq mutation-key))
+        (get-in context [:mutations (first mutation-key)]))))
 
 (defn set-mutation-state
   "Pure reducer: updates the state map for `mutation-key` under `:mutations` in `context`."
@@ -300,16 +324,6 @@
   (:data (get-mutation context mutation-key)))
 
 ;; -----------------------------------------------------------------------------
-;; Side Effects Handlers
-;; -----------------------------------------------------------------------------
-
-(defmethod relm/fx ::retry-timer
-  [event [_ {:keys [ms message]}]]
-  (if (exists? js/setTimeout)
-    (js/setTimeout #(relm/dispatch event message) (or ms 0))
-    (relm/dispatch event message)))
-
-;; -----------------------------------------------------------------------------
 ;; Relm Update Message Handlers
 ;; -----------------------------------------------------------------------------
 
@@ -348,12 +362,8 @@
   [state context [_ norm-key opts response] _event]
   (let [data (or (:body response) response)
         new-context (set-query-data context norm-key data opts)
-        on-success-cb (:on-success opts)]
-    (when (fn? on-success-cb)
-      (on-success-cb data response))
-    (if (and (vector? on-success-cb) (not-empty on-success-cb))
-      [state new-context [[::relm/dispatch on-success-cb]]]
-      [state new-context])))
+        on-success (:on-success opts)]
+    [state new-context (if (seq on-success) [[:dispatch on-success]] [])]))
 
 ;; Query fetch failure handler: [::fetch-failure norm-key attempt opts response]
 (defmethod relm/update ::fetch-failure
@@ -366,13 +376,11 @@
             retry-msg [::retry norm-key (inc attempt) opts]
             ;; Update retry count in context
             new-context (update-in context [:queries norm-key] assoc :retry-count (inc attempt))]
-        [state new-context [[::retry-timer {:ms delay-ms :message retry-msg}]]])
+        [state new-context [[:dispatch-later {:ms delay-ms :dispatch retry-msg}]]])
       ;; Exceeded max retries: record final error state
       (let [new-context (set-query-error context norm-key response opts)
-            on-error-cb (:on-error opts)]
-        (when (fn? on-error-cb)
-          (on-error-cb response))
-        [state new-context]))))
+            on-error    (:on-error opts)]
+        [state new-context (if (seq on-error) [[:dispatch on-error]] [])]))))
 
 ;; Query retry handler: [::retry norm-key attempt opts]
 (defmethod relm/update ::retry
@@ -384,10 +392,10 @@
                      :on-failure [::fetch-failure norm-key attempt opts]))]
     [state context [[::http/fetch http-req]]]))
 
-;; Manual cache data setter: [::set-query-data key data]
+;; Manual cache data setter: [::set-query-data key data opts?]
 (defmethod relm/update ::set-query-data
-  [state context [_ key data] _event]
-  [state (set-query-data context key data)])
+  [state context [_ key data opts] _event]
+  [state (set-query-data context key data opts)])
 
 ;; Query invalidation handler: [::invalidate key-prefix opts?]
 (defmethod relm/update ::invalidate
@@ -402,101 +410,117 @@
             queries-to-refetch
             (filter (fn [[k _q]] (prefix-match? norm-prefix k))
                     (:queries new-context))
+            inv-opts (dissoc opts :refetch-active? :predicate)
+            refetched-context
+            (reduce (fn [ctx [k q]]
+                      (set-query-loading ctx k (or (:options q) {})))
+                    new-context
+                    queries-to-refetch)
             refetch-effects
-            (mapv (fn [[k _q]]
-                    [::http/fetch (infer-request-from-key
-                                    new-context k
-                                    (assoc opts
-                                      :force? true
-                                      :on-success [::fetch-success k opts]
-                                      :on-failure [::fetch-failure k 0 opts]))])
+            (mapv (fn [[k q]]
+                    (let [q-opts (or (:options q) {})
+                          merged-opts (merge q-opts inv-opts {:force? true})]
+                      [::http/fetch (infer-request-from-key
+                                      refetched-context k
+                                      (assoc merged-opts
+                                        :on-success [::fetch-success k merged-opts]
+                                        :on-failure [::fetch-failure k 0 merged-opts]))]))
                   queries-to-refetch)]
-        [state new-context refetch-effects]))))
+        [state refetched-context refetch-effects]))))
 
 ;; Mutation handler: [::mutate mutation-key opts]
 (defmethod relm/update ::mutate
   [state context [_ mutation-key opts] _event]
-  (let [opts            (or opts {})
-        variables       (or (:variables opts) (:body opts))
-        on-mutate-fn    (:on-mutate opts)
-        ;; Optimistic update snapshot
-        optimistic-res  (when (fn? on-mutate-fn)
-                          (on-mutate-fn variables context))
-        rollback-context (if (map? optimistic-res)
-                           (:rollback-context optimistic-res context)
-                           context)
-        context-after-opt (if (map? optimistic-res)
-                            (or (:optimistic-context optimistic-res)
-                                (dissoc optimistic-res :rollback-context))
-                            context)
+  (let [opts              (or opts {})
+        payload           (or (:data opts) (:body opts) (:variables opts))
+        on-mutate         (:on-mutate opts)
+        ;; Default rollback context is context before optimistic updates
+        rollback-context  (or (:rollback-context opts) context)
         ;; Update mutation state to loading
-        new-context     (set-mutation-state
-                          context-after-opt
-                          mutation-key
-                          {:status       :loading
-                           :is-loading?  true
-                           :variables    variables
-                           :options      opts
-                           :updated-at   (now-ms)})
-        method          (or (:method opts) :post)
-        http-req        (infer-request-from-key
-                          new-context mutation-key
-                          (assoc opts
-                            :method method
-                            :body   (or (:body opts) variables)
-                            :on-success [::mutate-success mutation-key opts]
-                            :on-failure [::mutate-failure mutation-key rollback-context opts]))]
-    [state new-context [[::http/fetch http-req]]]))
+        new-context       (set-mutation-state
+                            context
+                            mutation-key
+                            {:status       :loading
+                             :is-loading?  true
+                             :body         payload
+                             :data         payload
+                             :variables    payload
+                             :options      opts
+                             :updated-at   (now-ms)})
+        method            (or (:method opts) :post)
+        http-req          (infer-request-from-key
+                            new-context mutation-key
+                            (assoc opts
+                              :method method
+                              :body   payload
+                              :on-success [::mutate-success mutation-key rollback-context opts]
+                              :on-failure [::mutate-failure mutation-key rollback-context opts]))
+        all-effects       (cond-> []
+                            (seq on-mutate) (conj [:dispatch on-mutate])
+                            true            (conj [::http/fetch http-req]))]
+    [state new-context all-effects]))
 
-;; Mutation success handler: [::mutate-success mutation-key opts response]
+;; Mutation success handler: [::mutate-success mutation-key rollback-context opts response]
 (defmethod relm/update ::mutate-success
-  [state context [_ mutation-key opts response] _event]
-  (let [data          (or (:body response) response)
-        new-context   (set-mutation-state
-                        context
-                        mutation-key
-                        {:status      :success
-                         :is-loading? false
-                         :data        data
-                         :options     opts
-                         :updated-at  (now-ms)})
-        invalidate-keys (let [inv (:invalidate opts)]
-                          (cond
-                            (nil? inv) []
-                            (vector? (first inv)) inv
-                            (vector? inv) [inv]
-                            :else [[inv]]))
+  [state context message _event]
+  (let [[_ mutation-key rollback-context opts response]
+        (if (= 5 (count message))
+          message
+          (let [[_ m-key m-opts resp] message]
+            [_ m-key nil m-opts resp]))
+        data            (or (:body response) response)
+        new-context     (set-mutation-state
+                          context
+                          mutation-key
+                          {:status      :success
+                           :is-loading? false
+                           :data        data
+                           :options     opts
+                           :updated-at  (now-ms)})
+        invalidate-keys (if (contains? opts :invalidate)
+                          (or (:invalidate opts) [])
+                          [mutation-key])
         ;; Invalidate query keys and prepare refetches
-        [final-context refetch-effects]
+        [invalidated-context refetch-effects]
         (reduce
           (fn [[ctx effects] key-prefix]
             (let [norm-prefix (normalize-key key-prefix)
-                  ctx' (invalidate-query-keys ctx norm-prefix)
-                  matched (filter (fn [[k _q]] (prefix-match? norm-prefix k))
-                                  (:queries ctx'))
-                  new-fxs (mapv (fn [[k _q]]
-                                  [::http/fetch
-                                   (infer-request-from-key
-                                     ctx' k
-                                     {:force? true
-                                      :on-success [::fetch-success k {}]
-                                      :on-failure [::fetch-failure k 0 {}]})])
-                                matched)]
+                  ctx'        (invalidate-query-keys ctx norm-prefix)
+                  matched     (filter (fn [[k _q]] (prefix-match? norm-prefix k))
+                                      (:queries ctx'))
+                  ctx''       (reduce (fn [c [k q]]
+                                        (set-query-loading c k (or (:options q) {})))
+                                      ctx'
+                                      matched)
+                  new-fxs     (mapv (fn [[k q]]
+                                      (let [q-opts (or (:options q) {})
+                                            merged-opts (merge q-opts {:force? true})]
+                                        [::http/fetch
+                                         (infer-request-from-key
+                                           ctx'' k
+                                           (assoc merged-opts
+                                             :on-success [::fetch-success k merged-opts]
+                                             :on-failure [::fetch-failure k 0 merged-opts]))]))
+                                    matched)]
               [ctx' (into effects new-fxs)]))
           [new-context []]
           invalidate-keys)
-        on-success-cb (:on-success opts)
-        on-settled-cb (:on-settled opts)]
-    (when (fn? on-success-cb)
-      (on-success-cb data response))
-    (when (fn? on-settled-cb)
-      (on-settled-cb data nil response))
-    [state final-context refetch-effects]))
+        on-success      (:on-success opts)
+        on-settled      (:on-settled opts)
+        all-effects     (cond-> (vec refetch-effects)
+                          (seq on-success) (conj [:dispatch on-success])
+                          (seq on-settled) (conj [:dispatch on-settled]))]
+    [state invalidated-context all-effects]))
 
 ;; Mutation failure handler: [::mutate-failure mutation-key rollback-context opts response]
 (defmethod relm/update ::mutate-failure
-  [state context [_ mutation-key rollback-context opts response] _event]
-  (let [base-context  (or rollback-context context)
+  [state context message _event]
+  (let [[_ mutation-key rollback-context opts response]
+        (if (= 5 (count message))
+          message
+          (let [[_ m-key m-rollback m-opts resp] message]
+            [_ m-key m-rollback m-opts resp]))
+        base-context  (or rollback-context context)
         new-context   (set-mutation-state
                         base-context
                         mutation-key
@@ -505,10 +529,9 @@
                          :error       response
                          :options     opts
                          :updated-at  (now-ms)})
-        on-error-cb   (:on-error opts)
-        on-settled-cb (:on-settled opts)]
-    (when (fn? on-error-cb)
-      (on-error-cb response))
-    (when (fn? on-settled-cb)
-      (on-settled-cb nil response response))
-    [state new-context]))
+        on-error      (:on-error opts)
+        on-settled    (:on-settled opts)
+        all-effects   (cond-> []
+                        (seq on-error)   (conj [:dispatch on-error])
+                        (seq on-settled) (conj [:dispatch on-settled]))]
+    [state new-context all-effects]))

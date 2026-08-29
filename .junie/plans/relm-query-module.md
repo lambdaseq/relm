@@ -5,103 +5,74 @@ sessionId: session-260829-213129-grt9
 # Requirements
 
 ### Overview & Goals
-Provide clear, comprehensive, and scannable module documentation for `com.lambdaseq/relm.query` in `query/README.md`. The documentation follows the format established in `form/README.md` and `reitit/README.md`, adhering to the reader-first principles of `artifact-style`: bottom-line up front, progressive disclosure, concrete code examples matching actual API signatures, and structured reference tables.
+Simplify input event handling in `examples/src/examples/query.cljs` by replacing manual `#(relm/dispatch % [::set-input :field (.. % -target -value)])` anonymous functions with declarative Replicant / Relm event vectors (`[::set-input :field :event.target/value]`).
 
 ### Scope
 - **In Scope:**
-  - Create `query/README.md` with:
-    - Module overview and TanStack Query-style capabilities in Relm's Elm architecture.
-    - Installation snippet (`deps.edn`).
-    - Architecture data flow diagram (view, update, context cache, HTTP side effects).
-    - Vector query keys and automatic REST URL/query-param inference (including Reitit router integration).
-    - Query lifecycle and configuration (`::query/update`, `::query/fetch`, caching, `:stale-time`, exponential backoff retries).
-    - Mutation lifecycle (`::query/mutate`, optimistic updates, rollback, `:on-mutate`, `:invalidate`).
-    - Hierarchical cache invalidation (`::query/invalidate`, prefix matching).
-    - View query helper reference table (`data`, `loading?`, `fetching?`, `error`, `status`, `stale?`, `mutation-state`, `mutation-loading?`, `mutation-error`, `mutation-data`).
-    - Pure context state reducers reference (`set-query-data`, `set-query-error`, `invalidate-query-keys`, etc.).
-    - Complete, runnable end-to-end component example.
-  - Update root `README.md`:
-    - Add `com.lambdaseq/relm.query` to the Module Catalog table and installation snippet.
+  - Update `examples/src/examples/query.cljs` input fields for `:title` and `:body` to use `[::set-input :title :event.target/value]` and `[::set-input :body :event.target/value]` in `:on {:input ...}` handlers.
+  - Ensure consistency with Replicant's data-driven event extraction and Relm's architectural idioms.
 - **Out of Scope:**
-  - Changes to the underlying implementation of `com.lambdaseq.relm.query`.
-  - Non-Markdown documentation formats.
+  - Changing query module core runtime (`query/src/com/lambdaseq/relm/query.cljs`).
+  - Modifications to other unrelated example pages.
 
 ### User Stories
-- **As a Relm developer**, I want a dedicated `query/README.md` so that I can quickly learn how to fetch, cache, mutate, and invalidate server state using vector keys.
-- **As a Relm developer**, I want concise reference tables for all view queries, message handlers, and options so that I don't have to inspect source code for API signatures.
-- **As a Relm developer**, I want a complete working component example so that I can copy a working pattern into my own application.
+- **As a developer reading Relm examples**, I want idiomatic, declarative Replicant event vectors in UI inputs so that I don't see unnecessary `relm/dispatch` function wrappers in Hiccup templates.
 
 ### Functional Requirements
-- **Scannable Structure**: Table of Contents with working anchor links, bold lead-ins for key points, and clean Markdown tables for options and functions.
-- **Accurate Code Examples**: All ClojureScript snippets must match the public API of `com.lambdaseq.relm.query` and `com.lambdaseq.relm.core`.
-- **Ecosystem Consistency**: Match the voice, style, and structure of `form/README.md` and `reitit/README.md`.
+- Remove manual `relm/dispatch` lambda calls from input elements in `examples/src/examples/query.cljs`.
+- Use declarative event vector syntax `[::set-input :title :event.target/value]` and `[::set-input :body :event.target/value]` for `:input` event bindings.
 
 # Technical Design
 
 ### Current Implementation
-- `query/src/com/lambdaseq/relm/query.cljs` implements all query, mutation, invalidation, key inference, cache reducers, and view query helpers.
-- `examples/src/examples/query.cljs` provides a complete working example.
-- Existing module READMEs (`core/README.md`, `form/README.md`, `reitit/README.md`) provide the benchmark for styling and structure.
-- Root `README.md` contains the ecosystem catalog and installation section.
+In `examples/src/examples/query.cljs`, the mutation form currently binds `:on {:input ...}` using an inline Clojure function wrapping `relm/dispatch`:
+```clojure
+[:input {:placeholder "Post Title..."
+         :value title
+         :on {:input #(relm/dispatch % [::set-input :title (.. % -target -value)])}}]
+[:input {:placeholder "Post Body..."
+         :value body
+         :on {:input #(relm/dispatch % [::set-input :body (.. % -target -value)])}}]
+```
+
+Replicant and Relm support data-driven event vectors directly in `:on` event maps, where Replicant extracts `:event.target/value` from DOM events before forwarding to the registered dispatcher (`relm/dispatch`).
 
 ### Proposed Changes
-
-#### 1. `query/README.md` Structure
-- **Title & Overview**: Identity and summary of TanStack Query on Relm.
-- **Table of Contents**: Anchor links to all major sections.
-- **Installation**: Dependency configuration for `deps.edn`.
-- **Architecture Overview**: Text and ASCII/diagram explaining the flow between views, update messages, context `:queries` / `:mutations`, and `::relm.http/fetch` effects.
-- **Vector Query Keys & Request Inference**:
-  - Explaining key structures (`[:todos]`, `[:users 1 :posts]`, `[:todos {:status "active"}]`).
-  - Automatic URL and query param inference.
-  - Reitit router name resolution when `:router` is in `context`.
-- **Queries (`::update` / `::fetch`)**:
-  - Dispatching queries.
-  - Caching, `:stale-time`, `:force?`, and background refetching.
-  - Exponential backoff retry mechanism (`:retry`, `calculate-retry-delay`).
-- **Mutations (`::mutate`)**:
-  - HTTP mutation dispatch (`:post`, `:put`, `:patch`, `:delete`).
-  - Optimistic updates via `:on-mutate` and rollback context.
-  - Mutation lifecycle callbacks (`:on-success`, `:on-error`, `:on-settled`).
-- **Hierarchical Invalidation (`::invalidate`)**:
-  - Prefix matching behavior and automatic refetching of active queries.
-- **View Query Helpers**:
-  - Summary table covering `data`, `loading?`, `fetching?`, `error`, `status`, `stale?`, `mutation`, `mutation-loading?`, `mutation-error`, `mutation-data`.
-- **Pure Context Cache Reducers**:
-  - Summary of `get-query`, `set-query-loading`, `set-query-data`, `set-query-error`, `invalidate-query-keys`, `set-mutation-state`.
-- **Complete Working Example**:
-  - Realistic component showcasing initial query loading, cached view rendering, optimistic item creation, and automatic cache invalidation.
-
-#### 2. Root `README.md` Updates
-- Add `com.lambdaseq/relm.query` to the installation snippet in `README.md`.
-- Add **Query** (`com.lambdaseq.relm.query`) to the Module Catalog table in `README.md` with link to `query/README.md`.
+Update `examples/src/examples/query.cljs` to use pure event data vectors:
+```clojure
+[:input {:style {:flex "1" :padding "8px 12px" :border "1px solid #d1d5db" :border-radius "6px"}
+         :placeholder "Post Title..."
+         :value title
+         :on {:input [::set-input :title :event.target/value]}}]
+[:input {:style {:flex "2" :padding "8px 12px" :border "1px solid #d1d5db" :border-radius "6px"}
+         :placeholder "Post Body..."
+         :value body
+         :on {:input [::set-input :body :event.target/value]}}]
+```
 
 ### File Structure
-- `query/README.md` (New: comprehensive documentation for `relm.query`)
-- `README.md` (Modified: register query module in catalog and installation examples)
+- `examples/src/examples/query.cljs` (Modified: declarative event vectors for input handlers)
 
 # Testing
 
 ### Validation Approach
-- Verify markdown syntax and ensure all internal anchor links resolve correctly.
-- Review all code snippets against the signatures in `query/src/com/lambdaseq/relm/query.cljs`.
-- Verify the root `README.md` links to `query/README.md`.
+- Verify compilation of `:examples` via shadow-cljs.
+- Ensure all test suites continue to pass cleanly.
 
 ### Key Scenarios
-1. **API Signature Parity:** Ensure every documented function and option in `query/README.md` matches the actual implementation in `com.lambdaseq.relm.query`.
-2. **Cross-Link Validity:** Ensure the root `README.md` catalog points to `query/README.md` and intra-doc anchors in `query/README.md` link properly.
+1. **Event Vector Dispatch:** Ensure `[::set-input :title :event.target/value]` correctly triggers the `relm/update ::set-input` handler with the updated string value.
+2. **Form Interaction:** Ensure typing into `:title` and `:body` fields updates component state and enables the Create Post button.
 
 # Delivery Steps
 
-### ✓ Step 1: Create query module README.md documentation
-Create comprehensive, scannable documentation in `query/README.md` covering all features, options, view queries, and usage examples.
+### ✓ Step 1: Update input event handlers in examples.query
+Refactor the input fields in `examples/src/examples/query.cljs` from anonymous dispatch functions to declarative event vectors.
 
-- Author `query/README.md` following the structure of `form/README.md`.
-- Document key inference, queries (`::update`), mutations (`::mutate`), invalidation (`::invalidate`), and exponential backoff.
-- Provide tables for view query helpers and options, along with a complete working component example.
+- Replace `#(relm/dispatch % [::set-input :title (.. % -target -value)])` with `[::set-input :title :event.target/value]`.
+- Replace `#(relm/dispatch % [::set-input :body (.. % -target -value)])` with `[::set-input :body :event.target/value]`.
 
-### ✓ Step 2: Update root README.md with Query module entry
-Register `com.lambdaseq/relm.query` in the root repository documentation.
+### ✓ Step 2: Verify examples compilation and test execution
+Verify that the ClojureScript builds compile cleanly and test suites pass without regressions.
 
-- Add `com.lambdaseq/relm.query` to the installation snippet in root `README.md`.
-- Add the **Query** row to the Module Catalog table linking to `query/README.md`.
+- Run shadow-cljs compilation for the examples build.
+- Run the unit test suite to confirm overall project integrity.

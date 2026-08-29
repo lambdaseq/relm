@@ -5,6 +5,7 @@
       <module fileurl="file://$PROJECT_DIR$/core/core.iml" filepath="$PROJECT_DIR$/core/core.iml" />
       <module fileurl="file://$PROJECT_DIR$/examples/examples.iml" filepath="$PROJECT_DIR$/examples/examples.iml" />
       <module fileurl="file://$PROJECT_DIR$/form/form.iml" filepath="$PROJECT_DIR$/form/form.iml" />
+      <module fileurl="file://$PROJECT_DIR$/query/query.iml" filepath="$PROJECT_DIR$/query/query.iml" />
       <module fileurl="file://$PROJECT_DIR$/reitit/reitit.iml" filepath="$PROJECT_DIR$/reitit/reitit.iml" />
       <module fileurl="file://$PROJECT_DIR$/relm.iml" filepath="$PROJECT_DIR$/relm.iml" />
     </modules>

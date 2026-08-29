@@ -181,7 +181,7 @@
        (let [listener (fn [_]
                         (let [curr-p (current-path)
                               curr-m (match-target r-router curr-p nil nil default-path)]
-                          (relm/dispatch nil [::route-changed curr-m])))]
+                          (relm/dispatch! nil [::route-changed curr-m])))]
          (reset! !history-listener listener)
          (.addEventListener js/window "popstate" listener)))
      (when (:dispatch-initial? options)

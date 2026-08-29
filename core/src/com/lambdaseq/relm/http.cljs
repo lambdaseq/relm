@@ -82,8 +82,8 @@
   "Builds the options configuration object (JavaScript object) passed as the second argument to `js/fetch`."
   [{:keys [method headers request-content-type body mode credentials cache redirect referrer integrity]}
    abort-signal]
-  (let [mode        (or mode "same-origin")
-        credentials (or credentials "include")
+  (let [mode        (or mode "cors")
+        credentials (or credentials "same-origin")
         redirect    (or redirect "follow")
         body'       (if (= :json request-content-type)
                       (js/JSON.stringify (clj->js body))
@@ -199,6 +199,16 @@
   "Registry atom tracking active JavaScript AbortController instances indexed by `request-id`."
   (atom {}))
 
+(defn- dispatch-event!
+  "Dispatches an event message to `core/dispatch!`, appending `payload` to the event vector."
+  [dom-event event payload]
+  (when (and (vector? event)
+             (seq event)
+             (let [first-kw (first event)]
+               (not (or (= first-kw ::fetch-no-on-success)
+                        (= first-kw ::fetch-no-on-failure)))))
+    (core/dispatch! dom-event (conj event payload))))
+
 (defn body-success-handler
   "Dispatches success event after response body has been read and processed."
   [dom-event
@@ -215,14 +225,10 @@
                    (assoc :body body
                           :reader reader-kw)
                    (not (:ok? response))
-                   (assoc :problem :server))
-        handler (if (:ok? response)
-                  on-success
-                  on-failure)
-        event (conj handler response)]
-    (when-not (or (= (first event) ::fetch-no-on-success)
-                  (= (first event) ::fetch-no-on-failure))
-      (core/dispatch dom-event event))))
+                   (assoc :problem :server))]
+    (if (:ok? response)
+      (dispatch-event! dom-event on-success response)
+      (dispatch-event! dom-event on-failure response))))
 
 (defn body-problem-handler
   "Dispatches failure event when decoding or parsing the response body fails."
@@ -237,11 +243,8 @@
         response        (assoc response
                           :problem         :body
                           :reader          reader-kw
-                          :problem-message problem-message)
-        event           (conj on-failure response)]
-    (when-not (or (= (first event) ::fetch-no-on-success)
-                  (= (first event) ::fetch-no-on-failure))
-      (core/dispatch dom-event event))))
+                          :problem-message problem-message)]
+    (dispatch-event! dom-event on-failure response)))
 
 (defn response-success-handler
   "Reads the JS `Response` stream according to the resolved reader and forwards to body handlers."
@@ -282,11 +285,8 @@
   (let [problem         (js-error->problem js-error)
         problem-message (if (= :timeout js-error) "Fetch timed out" (obj/get js-error "message"))
         response        {:problem         problem
-                         :problem-message problem-message}
-        event           (conj on-failure response)]
-    (when-not (or (= (first event) ::fetch-no-on-success)
-                  (= (first event) ::fetch-no-on-failure))
-      (core/dispatch dom-event event))))
+                         :problem-message problem-message}]
+    (dispatch-event! dom-event on-failure response)))
 
 (defn fetch
   "Initializes and executes an HTTP Fetch request.
@@ -299,17 +299,14 @@
   - `:request-content-type` Content type shortcut (e.g. `:json`)
   - `:timeout`              Request timeout in milliseconds
   - `:request-id`           Unique request ID keyword (auto-generated if omitted)
-  - `:on-request-id`        Callback message vector receiving the generated `request-id`
-  - `:on-success`           Message vector dispatched on successful response `(conj on-success response)`
-  - `:on-failure`           Message vector dispatched on error `(conj on-failure response)`"
+  - `:on-request-id`        Callback message vector receiving the generated `request-id` (`[::msg ...]`)
+  - `:on-success`           Message vector dispatched on successful response `[::msg ...]`
+  - `:on-failure`           Message vector dispatched on error `[::msg ...]`"
   [dom-event
    {:keys [url timeout params request-id on-request-id abort-signal] :as request
     :or   {request-id (keyword (gensym "fetch-fx-"))}}]
-  (when (vector? on-request-id)
-    (let [event (conj on-request-id request-id)]
-      (when-not (or (= (first event) ::fetch-no-on-success)
-                    (= (first event) ::fetch-no-on-failure))
-        (core/dispatch dom-event event))))
+  (when on-request-id
+    (dispatch-event! dom-event on-request-id request-id))
   (let [request'            (assoc request :request-id request-id)
         url'                (str url (params->str params))
         js-abort-controller (when-not abort-signal (js/AbortController.))
