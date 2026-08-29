@@ -445,3 +445,155 @@
             attrs-4 (form/register f :explicit-key :username {:type "text"})]
         (is (= [::form/change :explicit-key [:username]] (get-in attrs-3 [:on :input])))
         (is (= [::form/change :explicit-key [:username]] (get-in attrs-4 [:on :input])))))))
+
+(deftest register-validation-rules-and-lifecycle-test
+  (testing "validators and custom validate defined solely in register"
+    (let [f (form/create {:initial-values {:username         ""
+                                           :email            ""
+                                           :password         ""
+                                           :confirm-password ""
+                                           :age              ""}})]
+      ;; Register fields in the view
+      (form/register f :username {:type        "text"
+                                  :required    "Username is required"
+                                  :min-length  [3 "Username must be at least 3 characters"]})
+      (form/register f :email {:type     "email"
+                              :required "Email is required"
+                              :email    "Please enter a valid email address"})
+      (form/register f :password {:type       "password"
+                                  :required   "Password is required"
+                                  :min-length [6 "Password must be at least 6 characters"]})
+      (form/register f :confirm-password {:type     "password"
+                                          :required "Please confirm your password"
+                                          :validate (fn [val values]
+                                                      (when (and (seq (:password values))
+                                                                 (seq val)
+                                                                 (not= (:password values) val))
+                                                        "Passwords do not match"))})
+      (form/register f :age {:type "number"
+                             :min  [18 "Must be at least 18 years old"]
+                             :max  [120 "Max age is 120"]})
+
+      ;; 1. Validate empty form
+      (let [f-invalid (form/validate-form f)]
+        (is (false? (form/valid? f-invalid)))
+        (is (= "Username is required" (form/error f-invalid :username)))
+        (is (= "Email is required" (form/error f-invalid :email)))
+        (is (= "Password is required" (form/error f-invalid :password)))
+        (is (= "Please confirm your password" (form/error f-invalid :confirm-password))))
+
+      ;; 2. Update fields step by step
+      (let [f1 (form/set-value f :username "jo")
+            f2 (form/set-value f1 :username "john")
+            f3 (form/set-value f2 :email "invalid-email")
+            f4 (form/set-value f3 :email "john@example.com")
+            f5 (form/set-value f4 :password "secret123")
+            f6 (form/set-value f5 :confirm-password "different")
+            f7 (form/set-value f6 :confirm-password "secret123")
+            f8 (form/set-value f7 :age 15)
+            f9 (form/set-value f8 :age 25)]
+        ;; Short username error
+        (is (= "Username must be at least 3 characters" (form/error f1 :username)))
+        ;; Valid username
+        (is (nil? (form/error f2 :username)))
+        ;; Invalid email
+        (is (= "Please enter a valid email address" (form/error f3 :email)))
+        ;; Valid email
+        (is (nil? (form/error f4 :email)))
+        ;; Password mismatch via custom :validate
+        (is (= "Passwords do not match" (form/error f6 :confirm-password)))
+        ;; Matching passwords
+        (is (nil? (form/error f7 :confirm-password)))
+        ;; Underage error
+        (is (= "Must be at least 18 years old" (form/error f8 :age)))
+        ;; Valid age and complete valid form
+        (is (nil? (form/error f9 :age)))
+        (is (true? (form/valid? f9))))
+
+      ;; 3. Submit flow with update handlers
+      (let [initial-state {:form f :submitted nil}
+            [sub-state1] (relm/update initial-state {} [::form/submit :form {:on-submit [::success]}] nil)
+            form1 (:form sub-state1)]
+        (is (false? (form/valid? form1)))
+        (is (true? (form/touched? form1 :username)))
+        (is (true? (form/touched? form1 :email)))
+        (is (= "Username is required" (form/error form1 :username true)))
+        (is (nil? (:submitted sub-state1)))
+
+        ;; Fill valid values and submit
+        (let [valid-form (-> f
+                             (form/set-value :username "alice")
+                             (form/set-value :email "alice@example.com")
+                             (form/set-value :password "password123")
+                             (form/set-value :confirm-password "password123")
+                             (form/set-value :age 30))
+              state-with-valid {:form valid-form :submitted nil}
+              [sub-state2] (relm/update state-with-valid {} [::form/submit :form {:on-submit [::success]}] nil)
+              form2 (:form sub-state2)]
+          (is (true? (form/valid? form2)))
+          (is (true? (form/submitting? form2)))
+          (is (= 1 (form/submit-count form2))))))))
+
+(deftest register-initial-values-test
+  (testing "initial values and defaults defined solely in register with (form/create)"
+    (let [f (form/create)]
+      ;; Register fields in the view
+      (let [u-attrs  (form/register f :username {:type "text" :default "johndoe" :required "Required"})
+            e-attrs  (form/register f :email {:type "email" :initial-value "john@example.com"})
+            n-attrs  (form/register f [:preferences :newsletter] {:type "checkbox" :default true})
+            b-attrs  (form/register f [:profile :bio] {:type "text" :default "Developer"})]
+        ;; Input attributes reflect initial values
+        (is (= "johndoe" (:value u-attrs)))
+        (is (= "john@example.com" (:value e-attrs)))
+        (is (true? (:checked n-attrs)))
+        (is (= "Developer" (:value b-attrs))))
+
+      ;; Query functions reflect registered initial values
+      (is (= "johndoe" (form/value f :username)))
+      (is (= "john@example.com" (form/value f :email)))
+      (is (true? (form/value f [:preferences :newsletter])))
+      (is (= "Developer" (form/value f [:profile :bio])))
+
+      ;; form/values and form/initial-values return complete merged map
+      (is (= {:username "johndoe"
+              :email "john@example.com"
+              :preferences {:newsletter true}
+              :profile {:bio "Developer"}}
+             (form/values f)))
+      (is (= {:username "johndoe"
+              :email "john@example.com"
+              :preferences {:newsletter true}
+              :profile {:bio "Developer"}}
+             (form/initial-values f)))
+
+      ;; Pristine initially
+      (is (false? (form/dirty? f)))
+      (is (true? (form/pristine? f)))
+      (is (false? (form/dirty? f :username)))
+      (is (false? (form/dirty? f [:preferences :newsletter])))
+
+      ;; Modifying field makes form dirty
+      (let [f-mod (form/set-value f [:preferences :newsletter] false)]
+        (is (true? (form/dirty? f-mod)))
+        (is (true? (form/dirty? f-mod [:preferences :newsletter])))
+        (is (false? (form/value f-mod [:preferences :newsletter])))
+        (is (= {:username "johndoe"
+                :email "john@example.com"
+                :preferences {:newsletter false}
+                :profile {:bio "Developer"}}
+               (form/values f-mod)))
+
+        ;; Resetting restores initial registered values
+        (let [f-reset (form/reset-form f-mod)]
+          (is (false? (form/dirty? f-reset)))
+          (is (true? (form/value f-reset [:preferences :newsletter])))
+          (is (= {:username "johndoe"
+                  :email "john@example.com"
+                  :preferences {:newsletter true}
+                  :profile {:bio "Developer"}}
+                 (form/values f-reset))))
+
+        ;; ::form/reset update message restores initial registered values
+        (let [[state-after-reset] (relm/update {:form f-mod} {} [::form/reset :form] nil)]
+          (is (false? (form/dirty? (:form state-after-reset))))
+          (is (true? (form/value (:form state-after-reset) [:preferences :newsletter]))))))))

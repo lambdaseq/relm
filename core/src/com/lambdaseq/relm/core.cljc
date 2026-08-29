@@ -21,14 +21,14 @@
   - `:context`     Map of global context shared by all components (e.g. routing, themes, user session)
   - `:components`  Map of `{<comp-id-str> {:state <local-state>}}` storing isolated local states
   - `:root`        Map of `{:node <dom-node> :component <root-comp> :args <args-map>}`"}
-  !app-state
-  (atom {:context {}
-         :components {}
-         :root nil}))
+         !app-state
+         (atom {:context    {}
+                :components {}
+                :root       nil}))
 
 (defonce ^:private ^{:doc "Flag used to prevent re-entrant rendering cycles."}
-  !rendering?
-  (atom false))
+         !rendering?
+         (atom false))
 
 ;; -----------------------------------------------------------------------------
 ;; Utilities
@@ -46,25 +46,25 @@
 ;; -----------------------------------------------------------------------------
 
 (defmulti fx
-  "Multimethod for handling side effects returned by message handlers.
+          "Multimethod for handling side effects returned by message handlers.
 
-  Dispatches on the first element of the effect vector. Effect handlers perform
-  asynchronous or side-effectful operations (HTTP requests, DOM changes, navigation, timers)
-  and can dispatch follow-up messages back to the relm runtime.
+          Dispatches on the first element of the effect vector. Effect handlers perform
+          asynchronous or side-effectful operations (HTTP requests, DOM changes, navigation, timers)
+          and can dispatch follow-up messages back to the relm runtime.
 
-  Arguments:
-    event  - The triggering DOM/synthetic event map (or nil if triggered programmatically)
-    effect - Vector where the first element is the effect type keyword and remaining
-             elements are effect arguments (e.g. `[::fetch request-map]`).
+          Arguments:
+            event  - The triggering DOM/synthetic event map (or nil if triggered programmatically)
+            effect - Vector where the first element is the effect type keyword and remaining
+                     elements are effect arguments (e.g. `[::fetch request-map]`).
 
-  Example:
-  ```clojure
-  (defmethod relm/fx ::alert
-    [_event [_ message]]
-    (js/alert message))
-  ```"
-  (fn [_ event-or-effect]
-    (first event-or-effect)))
+          Example:
+          ```clojure
+          (defmethod relm/fx ::alert
+            [_event [_ message]]
+            (js/alert message))
+          ```"
+          (fn [_ event-or-effect]
+            (first event-or-effect)))
 
 (defn -dispatch-fx!
   "Executes side effects returned by an update handler.
@@ -79,31 +79,31 @@
 ;; -----------------------------------------------------------------------------
 
 (defmulti update
-  "Handles state transitions based on dispatched event messages.
+          "Handles state transitions based on dispatched event messages.
 
-  Dispatched on the first element of the message vector (the message type keyword).
-  Takes `[state context message event]` and returns a vector of:
-    `[new-state new-context effects]` or `[new-state new-context]` or `new-state`
+          Dispatched on the first element of the message vector (the message type keyword).
+          Takes `[state context message event]` and returns a vector of:
+            `[new-state new-context effects]` or `[new-state new-context]` or `new-state`
 
-  When side effects are returned, they must always be a vector of effect vectors:
-    `[[::fx-type ...]]`
+          When side effects are returned, they must always be a vector of effect vectors:
+            `[[::fx-type ...]]`
 
-  Arguments:
-  - `state`   Current local state of the component receiving the event
-  - `context` Current global application context map
-  - `message` Dispatched message vector (e.g. `[::increment 5]`)
-  - `event`   DOM/synthetic event map provided by Replicant (contains target node, etc.)
+          Arguments:
+          - `state`   Current local state of the component receiving the event
+          - `context` Current global application context map
+          - `message` Dispatched message vector (e.g. `[::increment 5]`)
+          - `event`   DOM/synthetic event map provided by Replicant (contains target node, etc.)
 
-  Example:
-  ```clojure
-  (defmethod relm/update ::increment
-    [state context [_ by] _event]
-    [(clojure.core/update state :count + (or by 1))
-     context
-     [[::log-analytics \"incremented\"]]])
-  ```"
-  (fn [_state _context message _event]
-    (first message)))
+          Example:
+          ```clojure
+          (defmethod relm/update ::increment
+            [state context [_ by] _event]
+            [(clojure.core/update state :count + (or by 1))
+             context
+             [[::log-analytics \"incremented\"]]])
+          ```"
+          (fn [_state _context message _event]
+            (first message)))
 
 ;; -----------------------------------------------------------------------------
 ;; Component Identification & Rendering Internals
@@ -151,7 +151,7 @@
     (-do-render-root!)))
 
 (defonce ^:private -init-watch
-  (add-watch !app-state :relm/root-render -on-app-state-change))
+         (add-watch !app-state :relm/root-render -on-app-state-change))
 
 ;; -----------------------------------------------------------------------------
 ;; Public Rendering API
@@ -211,8 +211,8 @@
                                             [result context])]
       (swap! !app-state (fn [app]
                           (cond-> app
-                            comp-id (assoc-in [:components comp-id :state] new-state)
-                            (some? new-context) (assoc :context new-context))))
+                                  comp-id (assoc-in [:components comp-id :state] new-state)
+                                  (some? new-context) (assoc :context new-context))))
       (-dispatch-fx! event effects))))
 
 (defn dispatch
@@ -220,7 +220,7 @@
 
   This function is the central message handler for the relm system. It processes
   messages and updates component state accordingly. It should be set as the
-  dispatch function for replicant using `(replicant.dom/set-dispatch! relm/dispatch)`.
+  dispatch function for `replicant` using `(replicant.dom/set-dispatch! relm/dispatch)`.
 
   The dispatch function can handle both single messages and collections of messages:
   - Single message: `(dispatch event [::message-type])`

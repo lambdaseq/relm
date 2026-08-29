@@ -9,43 +9,18 @@
   - Granular view query functions (`form/value`, `form/error`, `form/touched?`, `form/dirty?`, `form/submitting?`)
   - Real-time touch tracking on blur and instant feedback
   - Declarative submission with `on-submit` effect and reset with `::form/reset`"
-  (:require [clojure.string :as string]
-            [com.lambdaseq.relm.core :as relm]
+  (:require [com.lambdaseq.relm.core :as relm]
             [com.lambdaseq.relm.form :as form]))
 
 ;; -----------------------------------------------------------------------------
 ;; Form Initialization
 ;; -----------------------------------------------------------------------------
 
-(defn- password-match-validator
-  "Form-level custom validator to ensure password and confirm-password match."
-  [{:keys [password confirm-password] :as _values}]
-  (when (and (seq password) (seq confirm-password) (not= password confirm-password))
-    {:confirm-password "Passwords do not match"}))
-
 (defn init
   "Initializes the component state with a declarative form state map."
   [_context _args]
   {:submitted-data nil
-   :form (form/create
-           {:initial-values {:username         ""
-                             :email            ""
-                             :password         ""
-                             :confirm-password ""
-                             :profile          {:age ""
-                                                :bio ""}
-                             :preferences      {:newsletter true}}
-            :validators     {:username         [(form/required "Username is required")
-                                                (form/min-length 3 "Username must be at least 3 characters")]
-                             :email            [(form/required "Email is required")
-                                                (form/email "Please enter a valid email address")]
-                             :password         [(form/required "Password is required")
-                                                (form/min-length 6 "Password must be at least 6 characters")]
-                             :confirm-password [(form/required "Please confirm your password")]
-                             [:profile :age]   [(form/min-num 18 "You must be at least 18 years old")
-                                                (form/max-num 120 "Please enter a valid age")]}
-            :validate       password-match-validator
-            :validate-on    #{:change :blur :submit}})})
+   :form (form/create {:validate-on #{:change :blur :submit}})})
 
 ;; -----------------------------------------------------------------------------
 ;; Update Handlers
@@ -62,6 +37,35 @@
 (defmethod relm/update ::dismiss-success
   [state context _ _event]
   [(assoc state :submitted-data nil) context])
+
+;; -----------------------------------------------------------------------------
+;; Reusable View Components
+;; -----------------------------------------------------------------------------
+
+(defn- input-field
+  "Reusable input component that pairs a label, form/register attributes, error styling, and inline validation error."
+  [form path {:keys [label container-style] :as opts}]
+  (let [err (form/error form path true)
+        reg-opts (dissoc opts :label :container-style)]
+    [:div {:style (merge {:margin-bottom "16px"} container-style)}
+     (when label
+       [:label {:style {:display       "block"
+                        :font-size     "14px"
+                        :font-weight   "500"
+                        :color         "#374151"
+                        :margin-bottom "4px"}}
+        label])
+     [:input (merge (form/register form path reg-opts)
+                    {:style {:width         "100%"
+                             :box-sizing    "border-box"
+                             :padding       "8px 12px"
+                             :font-size     "14px"
+                             :border        (str "1px solid " (if err "#ef4444" "#d1d5db"))
+                             :border-radius "6px"
+                             :outline       "none"
+                             :background    (if err "#fef2f2" "#ffffff")}})]
+     (when err
+       [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}} err])]))
 
 ;; -----------------------------------------------------------------------------
 ;; Live State Panel
@@ -174,152 +178,50 @@
 
        [:form {:on {:submit (form/on-submit form {:on-submit [::handle-registration-success]})}}
         ;; Username Field
-        (let [path :username
-              err  (form/error form path true)]
-          [:div {:style {:margin-bottom "16px"}}
-           [:label {:style {:display       "block"
-                            :font-size     "14px"
-                            :font-weight   "500"
-                            :color         "#374151"
-                            :margin-bottom "4px"}}
-            "Username"]
-           [:input (merge (form/register form path {:type        "text"
-                                                   :placeholder "johndoe"
-                                                   :required    true
-                                                   :min-length  3})
-                          {:style {:width         "100%"
-                                   :box-sizing    "border-box"
-                                   :padding       "8px 12px"
-                                   :font-size     "14px"
-                                   :border        (str "1px solid " (if err "#ef4444" "#d1d5db"))
-                                   :border-radius "6px"
-                                   :outline       "none"
-                                   :background    (if err "#fef2f2" "#ffffff")}})]
-           (when err
-             [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}} err])])
+        (input-field form :username {:label       "Username"
+                                     :type        "text"
+                                     :placeholder "johndoe"
+                                     :required    "Username is required"
+                                     :min-length  [3 "Username must be at least 3 characters"]})
 
         ;; Email Field
-        (let [path :email
-              err  (form/error form path true)]
-          [:div {:style {:margin-bottom "16px"}}
-           [:label {:style {:display       "block"
-                            :font-size     "14px"
-                            :font-weight   "500"
-                            :color         "#374151"
-                            :margin-bottom "4px"}}
-            "Email Address"]
-           [:input (merge (form/register form path {:type        "email"
-                                                   :placeholder "john@example.com"
-                                                   :required    true})
-                          {:style {:width         "100%"
-                                   :box-sizing    "border-box"
-                                   :padding       "8px 12px"
-                                   :font-size     "14px"
-                                   :border        (str "1px solid " (if err "#ef4444" "#d1d5db"))
-                                   :border-radius "6px"
-                                   :outline       "none"
-                                   :background    (if err "#fef2f2" "#ffffff")}})]
-           (when err
-             [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}} err])])
+        (input-field form :email {:label       "Email Address"
+                                  :type        "email"
+                                  :placeholder "john@example.com"
+                                  :required    "Email is required"
+                                  :email       "Please enter a valid email address"})
 
         ;; Password and Confirm Password Row
         [:div {:style {:display "grid" :grid-template-columns "1fr 1fr" :gap "12px"}}
-         (let [path :password
-               err  (form/error form path true)]
-           [:div {:style {:margin-bottom "16px"}}
-            [:label {:style {:display       "block"
-                             :font-size     "14px"
-                             :font-weight   "500"
-                             :color         "#374151"
-                             :margin-bottom "4px"}}
-             "Password"]
-            [:input (merge (form/register form path {:type       "password"
-                                                    :required   true
-                                                    :min-length 6})
-                           {:style {:width         "100%"
-                                    :box-sizing    "border-box"
-                                    :padding       "8px 12px"
-                                    :font-size     "14px"
-                                    :border        (str "1px solid " (if err "#ef4444" "#d1d5db"))
-                                    :border-radius "6px"
-                                    :outline       "none"
-                                    :background    (if err "#fef2f2" "#ffffff")}})]
-            (when err
-              [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}} err])])
+         (input-field form :password {:label      "Password"
+                                      :type       "password"
+                                      :required   "Password is required"
+                                      :min-length [6 "Password must be at least 6 characters"]})
 
-         (let [path :confirm-password
-               err  (form/error form path true)]
-           [:div {:style {:margin-bottom "16px"}}
-            [:label {:style {:display       "block"
-                             :font-size     "14px"
-                             :font-weight   "500"
-                             :color         "#374151"
-                             :margin-bottom "4px"}}
-             "Confirm Password"]
-            [:input (merge (form/register form path {:type     "password"
-                                                    :required true})
-                           {:style {:width         "100%"
-                                    :box-sizing    "border-box"
-                                    :padding       "8px 12px"
-                                    :font-size     "14px"
-                                    :border        (str "1px solid " (if err "#ef4444" "#d1d5db"))
-                                    :border-radius "6px"
-                                    :outline       "none"
-                                    :background    (if err "#fef2f2" "#ffffff")}})]
-            (when err
-              [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}} err])])]
+         (input-field form :confirm-password {:label    "Confirm Password"
+                                              :type     "password"
+                                              :required "Please confirm your password"
+                                              :validate (fn [val values]
+                                                          (when (and (seq (:password values))
+                                                                     (seq val)
+                                                                     (not= (:password values) val))
+                                                            "Passwords do not match"))})]
 
         ;; Profile Nested Fields: Age & Bio
         [:div {:style {:display "grid" :grid-template-columns "120px 1fr" :gap "12px"}}
-         (let [path [:profile :age]
-               err  (form/error form path true)]
-           [:div {:style {:margin-bottom "16px"}}
-            [:label {:style {:display       "block"
-                             :font-size     "14px"
-                             :font-weight   "500"
-                             :color         "#374151"
-                             :margin-bottom "4px"}}
-             "Age"]
-            [:input (merge (form/register form path {:type        "number"
-                                                    :placeholder "18+"
-                                                    :min         18
-                                                    :max         120})
-                           {:style {:width         "100%"
-                                    :box-sizing    "border-box"
-                                    :padding       "8px 12px"
-                                    :font-size     "14px"
-                                    :border        (str "1px solid " (if err "#ef4444" "#d1d5db"))
-                                    :border-radius "6px"
-                                    :outline       "none"
-                                    :background    (if err "#fef2f2" "#ffffff")}})]
-            (when err
-              [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}} err])])
+         (input-field form [:profile :age] {:label       "Age"
+                                            :type        "number"
+                                            :placeholder "18+"
+                                            :min         [18 "You must be at least 18 years old"]
+                                            :max         [120 "Please enter a valid age"]})
 
-         (let [path [:profile :bio]
-               err  (form/error form path true)]
-           [:div {:style {:margin-bottom "16px"}}
-            [:label {:style {:display       "block"
-                             :font-size     "14px"
-                             :font-weight   "500"
-                             :color         "#374151"
-                             :margin-bottom "4px"}}
-             "Bio"]
-            [:input (merge (form/register form path {:type        "text"
-                                                    :placeholder "Short bio"})
-                           {:style {:width         "100%"
-                                    :box-sizing    "border-box"
-                                    :padding       "8px 12px"
-                                    :font-size     "14px"
-                                    :border        (str "1px solid " (if err "#ef4444" "#d1d5db"))
-                                    :border-radius "6px"
-                                    :outline       "none"
-                                    :background    (if err "#fef2f2" "#ffffff")}})]
-            (when err
-              [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}} err])])]
+         (input-field form [:profile :bio] {:label       "Bio"
+                                            :type        "text"
+                                            :placeholder "Short bio"})]
 
         [:div {:style {:margin-bottom "20px"}}
          [:label {:style {:display "flex" :align-items "center" :gap "8px" :font-size "14px" :color "#374151" :cursor "pointer"}}
-          [:input (form/register form [:preferences :newsletter] {:type "checkbox"})]
+          [:input (form/register form [:preferences :newsletter] {:type "checkbox" :default true})]
           "Subscribe to monthly newsletter"]]
 
         ;; Status Summary Badge Bar
