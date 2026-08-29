@@ -5,4 +5,7 @@
  {:examples {:target     :browser
             :output-dir "public/js"
             :asset-path "/js"
-            :modules    {:main {:entries [examples.main]}}}}}
+            :modules    {:main {:entries [examples.main]}}}
+  :test {:target :node-script
+         :output-to "out/test.js"
+         :main examples.test-runner/main}}}

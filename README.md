@@ -17,7 +17,7 @@ This library is a Work In Progress (WIP) and the API may change.
 - **Pure Functional Views**: Pure view functions `(fn [state context] hiccup)` that decouple rendering from state mutations.
 - **Declarative Updates & Effects**: Predictable message handlers (`relm/update`) and asynchronous side-effect handlers (`relm/fx`).
 - **Form State Management**: Declarative validation, dirty/touch tracking, field registration, and semantic HTML attribute generation.
-- **Modular Ecosystem**: Core runtime, forms, HTTP, navigation, and Reitit routing.
+- **Modular Ecosystem**: Core runtime, forms, HTTP, navigation, query caching, and Reitit routing.
 
 ---
 
@@ -32,6 +32,9 @@ Add the required modules to your `deps.edn`:
         com.lambdaseq/relm.form   {:git/url "https://github.com/lambdaseq/relm"
                                    :sha     "..."
                                    :deps/root "form"}
+        com.lambdaseq/relm.query  {:git/url "https://github.com/lambdaseq/relm"
+                                   :sha     "..."
+                                   :deps/root "query"}
         com.lambdaseq/relm.reitit {:git/url "https://github.com/lambdaseq/relm"
                                    :sha     "..."
                                    :deps/root "reitit"}}}
@@ -47,6 +50,7 @@ Add the required modules to your `deps.edn`:
 | **Form** | `com.lambdaseq.relm.form` | Declarative form state, `form/register`, validators, and submission. | [Form Documentation](form/README.md) |
 | **HTTP** | `com.lambdaseq.relm.http` | Fetch API side effects (`::fetch`, `::abort`) and JSON decoders. | [HTTP Documentation](core/README.md#http-client-comlambdaseqrelmhttp) |
 | **Navigation** | `com.lambdaseq.relm.navigation` | Browser History API effects (`::push-state`, `::back`, etc.). | [Navigation Documentation](core/README.md#browser-navigation-comlambdaseqrelmnavigation) |
+| **Query** | `com.lambdaseq.relm.query` | TanStack Query-style caching, retries, optimistic mutations, and key inference. | [Query Documentation](query/README.md) |
 | **Reitit** | `com.lambdaseq.relm.reitit` | Client-side routing with Reitit, context sync, and navigation messages. | [Reitit Documentation](reitit/README.md) |
 
 ---
@@ -194,6 +198,32 @@ Declarative client-side routing with automatic context synchronization:
 
 ---
 
+### 6. Query & Cache Management (`com.lambdaseq.relm.query`)
+
+TanStack Query-style caching, automatic URL inference, retries, and optimistic mutations:
+
+```clojure
+(ns my-app.posts
+  (:require [com.lambdaseq.relm.query :as query]))
+
+(def posts-key [:posts {:limit 10}])
+
+(defn view [_state context]
+  (let [posts     (query/data context posts-key [])
+        loading?  (query/loading? context posts-key)
+        fetching? (query/fetching? context posts-key)]
+    [:div
+     [:button {:on {:click [::query/update posts-key {:stale-time 10000}]}}
+      (if fetching? "Fetching..." "Load Posts")]
+     (when loading? [:p "Loading..."])
+     [:ul (for [{:keys [id title]} posts]
+            [:li {:key id} title])]]))
+```
+
+[Read full Query documentation ->](query/README.md)
+
+---
+
 ## Comparison
 
 ### Comparison with re-frame
@@ -232,6 +262,9 @@ cd form && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.f
 
 # Run Reitit tests
 cd reitit && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.reitit-test]) (t/run-tests 'com.lambdaseq.relm.reitit-test)"
+
+# Run Query and all module tests via Shadow-CLJS runner
+cd examples && npx shadow-cljs compile test && node out/test.js
 ```
 
 ### Running Examples

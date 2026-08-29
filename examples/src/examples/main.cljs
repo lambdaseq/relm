@@ -14,6 +14,7 @@
             [examples.http :refer [HttpExample]]
             [examples.navigation :refer [NavigationExample]]
             [examples.nested :refer [NestedExample]]
+            [examples.query :refer [QueryExample]]
             [reitit.core :as reitit]
             [replicant.dom :as r]))
 
@@ -38,6 +39,9 @@
    ["/http" {:name :http
              :path "/http"
              :view (fn [] (HttpExample {}))}]
+   ["/query" {:name :query
+              :path "/query"
+              :view (fn [] (QueryExample {}))}]
    ["/navigation" {:name :navigation
                    :path "/navigation"
                    :view (fn [] (NavigationExample {}))}]])
@@ -100,6 +104,15 @@
                         :cursor           "pointer"}
                 :on    {:click [::relm.reitit/navigate-to "/http"]}}
        "HTTP"]
+      [:button {:style {:padding          "8px 16px"
+                        :border-radius    "6px"
+                        :border           "1px solid #d1d5db"
+                        :background-color (if (= current-route :query) "#4f46e5" "#f3f4f6")
+                        :color            (if (= current-route :query) "#ffffff" "#111827")
+                        :font-weight      (if (= current-route :query) "600" "normal")
+                        :cursor           "pointer"}
+                :on    {:click [::relm.reitit/navigate-to "/query"]}}
+       "Query"]
       [:button {:style {:padding          "8px 16px"
                         :border-radius    "6px"
                         :border           "1px solid #d1d5db"

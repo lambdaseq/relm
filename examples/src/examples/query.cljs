@@ -1,0 +1,219 @@
+(ns examples.query
+  "TanStack Query showcase component for Relm.
+
+  Demonstrates:
+  - Declarative data fetching and caching with vector keys (`[::query/update [:posts {:_limit 5}]]`)
+  - Context view inspection with `query/data`, `query/loading?`, `query/fetching?`, `query/stale?`, `query/error`
+  - Optimistic mutations with automatic query invalidation and refetching
+  - Real-time cache inspector visualizing queries and mutations in the global Relm context"
+  (:require [com.lambdaseq.relm.core :as relm]
+            [com.lambdaseq.relm.query :as query]))
+
+;; -----------------------------------------------------------------------------
+;; Query Keys
+;; -----------------------------------------------------------------------------
+
+(def posts-query-key
+  [:posts {:_limit 5}])
+
+;; -----------------------------------------------------------------------------
+;; Component Initialization
+;; -----------------------------------------------------------------------------
+
+(defn init
+  "Initializes local state for form input (new post title and body)."
+  [_context _args]
+  {:title ""
+   :body ""})
+
+;; -----------------------------------------------------------------------------
+;; Update Handlers
+;; -----------------------------------------------------------------------------
+
+(defmethod relm/update ::set-input
+  [state context [_ field value] _event]
+  [(assoc state field value) context])
+
+(defmethod relm/update ::add-post
+  [{:keys [title body] :as state} context _message _event]
+  (if (clojure.string/blank? title)
+    [state context]
+    (let [new-post {:id (rand-int 100000)
+                    :title title
+                    :body (or body "Sample post body")
+                    :userId 1}]
+      [(assoc state :title "" :body "")
+       context
+       [[::query/mutate :create-post
+         {:url "https://jsonplaceholder.typicode.com/posts"
+          :method :post
+          :variables new-post
+          :invalidate [[:posts]]
+          :on-mutate (fn [vars ctx]
+                       {:rollback-context ctx
+                        :optimistic-context
+                        (update-in ctx [:queries posts-query-key :data]
+                                   (fn [current-posts]
+                                     (into [vars] (or current-posts []))))})}]]])))
+
+;; -----------------------------------------------------------------------------
+;; View
+;; -----------------------------------------------------------------------------
+
+(defn view
+  "Renders the Query showcase UI."
+  [{:keys [title body]} context]
+  (let [posts (query/data context posts-query-key [])
+        loading? (query/loading? context posts-query-key)
+        fetching? (query/fetching? context posts-query-key)
+        stale? (query/stale? context posts-query-key 5000)
+        err (query/error context posts-query-key)
+        mutation-loading? (query/mutation-loading? context :create-post)]
+    [:div {:style {:max-width "800px" :margin "0 auto"}}
+     [:div {:style {:margin-bottom "24px"}}
+      [:h1 {:style {:font-size "24px" :font-weight "700" :margin-bottom "8px"}}
+       "Relm Query (TanStack Query Port)"]
+      [:p {:style {:color "#4b5563" :font-size "14px"}}
+       "Declarative server-state caching, automatic URL inference, optimistic mutations, and hierarchical cache invalidation."]]
+
+     ;; Controls Bar
+     [:div {:style {:display "flex"
+                    :gap "12px"
+                    :align-items "center"
+                    :padding "16px"
+                    :background-color "#f9fafb"
+                    :border "1px solid #e5e7eb"
+                    :border-radius "8px"
+                    :margin-bottom "20px"}}
+      [:button {:style {:padding "8px 16px"
+                        :background-color "#4f46e5"
+                        :color "white"
+                        :border "none"
+                        :border-radius "6px"
+                        :cursor "pointer"
+                        :font-weight "500"}
+                :on {:click [::query/update posts-query-key {:url "https://jsonplaceholder.typicode.com/posts"
+                                                             :params {:_limit 5}
+                                                             :stale-time 10000}]}}
+       (if fetching? "Fetching..." "Fetch Posts (Cache-First)")]
+
+      [:button {:style {:padding "8px 16px"
+                        :background-color "#059669"
+                        :color "white"
+                        :border "none"
+                        :border-radius "6px"
+                        :cursor "pointer"
+                        :font-weight "500"}
+                :on {:click [::query/update posts-query-key {:url "https://jsonplaceholder.typicode.com/posts"
+                                                             :params {:_limit 5}
+                                                             :force? true}]}}
+       "Force Refetch"]
+
+      [:button {:style {:padding "8px 16px"
+                        :background-color "#d97706"
+                        :color "white"
+                        :border "none"
+                        :border-radius "6px"
+                        :cursor "pointer"
+                        :font-weight "500"}
+                :on {:click [::query/invalidate [:posts] {:refetch-active? true}]}}
+       "Invalidate [:posts]"]
+
+      [:div {:style {:margin-left "auto" :display "flex" :gap "8px" :align-items "center"}}
+       [:span {:style {:font-size "13px"
+                       :padding "4px 8px"
+                       :border-radius "4px"
+                       :background-color (if stale? "#fee2e2" "#dcfce7")
+                       :color (if stale? "#991b1b" "#166534")
+                       :font-weight "600"}}
+        (if stale? "STALE" "FRESH")]
+       (when fetching?
+         [:span {:style {:font-size "13px"
+                         :padding "4px 8px"
+                         :border-radius "4px"
+                         :background-color "#dbeafe"
+                         :color "#1e40af"
+                         :font-weight "600"}}
+          "FETCHING"])]]
+
+     ;; Mutation Form
+     [:div {:style {:padding "16px"
+                    :border "1px solid #e5e7eb"
+                    :border-radius "8px"
+                    :margin-bottom "20px"}}
+      [:h2 {:style {:font-size "16px" :font-weight "600" :margin-bottom "12px"}}
+       "Optimistic Mutation: Add Post"]
+      [:div {:style {:display "flex" :gap "12px" :margin-bottom "8px"}}
+       [:input {:style {:flex "1" :padding "8px 12px" :border "1px solid #d1d5db" :border-radius "6px"}
+                :placeholder "Post Title..."
+                :value title
+                :on {:input #(relm/dispatch % [::set-input :title (.. % -target -value)])}}]
+       [:input {:style {:flex "2" :padding "8px 12px" :border "1px solid #d1d5db" :border-radius "6px"}
+                :placeholder "Post Body..."
+                :value body
+                :on {:input #(relm/dispatch % [::set-input :body (.. % -target -value)])}}]
+       [:button {:style {:padding "8px 20px"
+                         :background-color "#2563eb"
+                         :color "white"
+                         :border "none"
+                         :border-radius "6px"
+                         :cursor (if mutation-loading? "not-allowed" "pointer")
+                         :opacity (if mutation-loading? "0.7" "1")
+                         :font-weight "500"}
+                 :disabled mutation-loading?
+                 :on {:click [::add-post]}}
+        (if mutation-loading? "Submitting..." "Create Post")]]]
+
+     ;; Data & Loading States
+     [:div {:style {:margin-bottom "24px"}}
+      [:h2 {:style {:font-size "18px" :font-weight "600" :margin-bottom "12px"}}
+       "Posts List"]
+      (cond
+        loading?
+        [:div {:style {:padding "32px" :text-align "center" :color "#6b7280"}}
+         "Loading posts..."]
+
+        err
+        [:div {:style {:padding "16px" :background-color "#fef2f2" :border "1px solid #f87171" :border-radius "6px" :color "#991b1b"}}
+         (str "Error: " (or (:problem-message err) (str err)))]
+
+        (seq posts)
+        [:div {:style {:display "flex" :flex-direction "column" :gap "12px"}}
+         (for [p posts]
+           [:div {:key (or (:id p) (str (rand)))
+                  :style {:padding "12px 16px"
+                          :border "1px solid #e5e7eb"
+                          :border-radius "6px"
+                          :background-color "white"}}
+            [:h3 {:style {:font-size "15px" :font-weight "600" :color "#111827" :margin-bottom "4px"}}
+             (:title p)]
+            [:p {:style {:font-size "13px" :color "#4b5563" :margin 0}}
+             (:body p)]])]
+
+        :else
+        [:div {:style {:padding "32px" :text-align "center" :color "#6b7280" :background-color "#f9fafb" :border-radius "6px"}}
+         "No posts loaded. Click 'Fetch Posts' above to query API."])]
+
+     ;; Context Cache Inspector
+     [:div {:style {:padding "16px"
+                    :background-color "#111827"
+                    :color "#f3f4f6"
+                    :border-radius "8px"
+                    :font-family "monospace"
+                    :font-size "12px"}}
+      [:div {:style {:font-weight "700" :color "#93c5fd" :margin-bottom "8px"}}
+       "Relm Context Cache Inspector (:queries & :mutations)"]
+      [:pre {:style {:margin 0 :overflow-x "auto"}}
+       (let [cache-state {:queries (into {} (map (fn [[k v]] [k (dissoc v :options)]) (:queries context)))
+                          :mutations (:mutations context)}]
+         (pr-str cache-state))]]]))
+
+;; -----------------------------------------------------------------------------
+;; Component Export
+;; -----------------------------------------------------------------------------
+
+(def QueryExample
+  "Query example component."
+  (relm/component
+    {:init init
+     :view view}))
