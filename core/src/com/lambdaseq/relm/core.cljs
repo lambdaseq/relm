@@ -173,6 +173,10 @@
    (swap! !app-state assoc :root {:node node :component root-component :args (or args {})})
    (-do-render-root!)))
 
+(def render!
+  "Alias for `render` with exclamation mark denoting DOM mutation."
+  render)
+
 ;; -----------------------------------------------------------------------------
 ;; Dispatch and Message Handling
 ;; -----------------------------------------------------------------------------
@@ -386,3 +390,136 @@
     (doseq [item items]
       (-handle-dispatch-later-item dom-event item))
     (-handle-dispatch-later-item dom-event items)))
+
+;; -----------------------------------------------------------------------------
+;; Built-in Browser & DOM Side Effects (Handled in Core)
+;; -----------------------------------------------------------------------------
+
+;; Displays a browser alert dialog.
+;; Formats: `[:alert "message"]` or `[::relm/alert "message"]`
+(defmethod fx :alert
+  [_dom-event [_ message]]
+  (when (exists? js/alert)
+    (js/alert (str message))))
+
+(defmethod fx ::alert
+  [dom-event [_ message]]
+  (when (exists? js/alert)
+    (js/alert (str message))))
+
+;; Prevents default browser event action.
+;; Formats: `[:prevent-default]` or `[::relm/prevent-default]`
+(defmethod fx :prevent-default
+  [dom-event _]
+  (let [dom-e (cond
+                (and (object? dom-event) (fn? (.-preventDefault dom-event))) dom-event
+                (map? dom-event) (or (when-let [e (:replicant/dom-event dom-event)]
+                                       (when (or (and (object? e) (fn? (.-preventDefault e)))
+                                                 (and (map? e) (fn? (:preventDefault e))))
+                                         e))
+                                     (when-let [e (:event dom-event)]
+                                       (when (or (and (object? e) (fn? (.-preventDefault e)))
+                                                 (and (map? e) (fn? (:preventDefault e))))
+                                         e)))
+                :else nil)]
+    (when dom-e
+      (if (and (map? dom-e) (fn? (:preventDefault dom-e)))
+        ((:preventDefault dom-e))
+        (.preventDefault dom-e)))))
+
+(defmethod fx ::prevent-default!
+  [{:replicant/keys [dom-event]} _]
+  (.preventDefault dom-event))
+
+(defmethod update ::prevent-default
+  [state context [_ & _] dom-event]
+  [state context [[::prevent-default! dom-event]]])
+
+;; Stops event propagation in DOM tree.
+;; Formats: `[:stop-propagation]` or `[::relm/stop-propagation]`
+(defmethod fx :stop-propagation
+  [dom-event _]
+  (let [dom-e (cond
+                (and (object? dom-event) (fn? (.-stopPropagation dom-event))) dom-event
+                (map? dom-event) (or (when-let [e (:replicant/dom-event dom-event)]
+                                       (when (or (and (object? e) (fn? (.-stopPropagation e)))
+                                                 (and (map? e) (fn? (:stopPropagation e))))
+                                         e))
+                                     (when-let [e (:event dom-event)]
+                                       (when (or (and (object? e) (fn? (.-stopPropagation e)))
+                                                 (and (map? e) (fn? (:stopPropagation e))))
+                                         e)))
+                :else nil)]
+    (when dom-e
+      (if (and (map? dom-e) (fn? (:stopPropagation dom-e)))
+        ((:stopPropagation dom-e))
+        (.stopPropagation dom-e)))))
+
+(defmethod fx ::stop-propagation
+  [dom-event effect]
+  (fx dom-event (assoc effect 0 :stop-propagation)))
+
+(defn- -focus-element!
+  "Focuses a DOM input element by name attribute or ID selector."
+  [field-name-or-id]
+  (when (and (exists? js/document) field-name-or-id)
+    (let [selector (str "[name='" (name field-name-or-id) "'], #" (name field-name-or-id))
+          elem (.querySelector js/document selector)]
+      (when elem
+        (.focus elem)))))
+
+;; Focuses a specific field or element in the DOM.
+;; Formats: `[:focus :field-name]` or `[::relm/focus :field-name]`
+(defmethod fx :focus
+  [_dom-event [_ field-name-or-id]]
+  (-focus-element! field-name-or-id))
+
+(defmethod fx ::focus
+  [_dom-event [_ field-name-or-id]]
+  (-focus-element! field-name-or-id))
+
+(defmethod fx :focus-field
+  [_dom-event [_ field-name-or-id]]
+  (-focus-element! field-name-or-id))
+
+(defmethod fx ::focus-field
+  [_dom-event [_ field-name-or-id]]
+  (-focus-element! field-name-or-id))
+
+;; Focuses the first field with a validation error.
+;; Formats: `[:focus-first-error errors-map]` or `[::relm/focus-first-error errors-map]`
+(defmethod fx :focus-first-error
+  [_dom-event [_ errors]]
+  (when (and (exists? js/document) (seq errors))
+    (let [first-path (first (keys errors))
+          field-name (if (vector? first-path) (last first-path) first-path)]
+      (when field-name
+        (-focus-element! field-name)))))
+
+(defmethod fx ::focus-first-error
+  [_dom-event [_ errors]]
+  (when (and (exists? js/document) (seq errors))
+    (let [first-path (first (keys errors))
+          field-name (if (vector? first-path) (last first-path) first-path)]
+      (when field-name
+        (-focus-element! field-name)))))
+
+;; Executes an asynchronous validator returning a Promise and dispatches result.
+;; Formats: `[:validate-async {:path ... :validator ... :on-success ... :on-error ...}]`
+(defmethod fx :validate-async
+  [dom-event [_ {:keys [path validator on-success on-error]}]]
+  (when (fn? validator)
+    (let [p (validator)]
+      (when (and p (exists? (.-then p)))
+        (-> p
+            (.then (fn [res]
+                     (when on-success
+                       (dispatch! dom-event (if (fn? on-success) (on-success res) on-success)))))
+            (.catch (fn [err]
+                      (when on-error
+                        (let [msg (or (.-message err) (str err))]
+                          (dispatch! dom-event (if (fn? on-error) (on-error msg) [:com.lambdaseq.relm.form/set-error path msg])))))))))))
+
+(defmethod fx ::validate-async
+  [dom-event [_ opts]]
+  (fx dom-event [:validate-async opts]))

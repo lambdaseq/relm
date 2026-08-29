@@ -246,7 +246,7 @@
 ;; -----------------------------------------------------------------------------
 
 (defonce ^:private !registered-field-configs
-  (atom {}))
+         (atom {}))
 
 (defn- deep-merge
   "Recursively merges maps. If both values are maps, merges them; otherwise returns the second."
@@ -274,14 +274,14 @@
   [opts is-checkbox?]
   (cond
     (contains? opts :initial-value) (:initial-value opts)
-    (contains? opts :initial)       (:initial opts)
+    (contains? opts :initial) (:initial opts)
     (contains? opts :default-value) (:default-value opts)
-    (contains? opts :defaultValue)  (:defaultValue opts)
-    (contains? opts :default)       (:default opts)
-    (contains? opts :value)         (:value opts)
+    (contains? opts :defaultValue) (:defaultValue opts)
+    (contains? opts :default) (:default opts)
+    (contains? opts :value) (:value opts)
     (and is-checkbox? (contains? opts :checked)) (:checked opts)
-    is-checkbox?                   false
-    :else                          ""))
+    is-checkbox? false
+    :else ""))
 
 (defn- extract-validators-from-opts
   [opts]
@@ -377,9 +377,9 @@
   - `:validate-on`    (set of #{:change :blur :submit}, default `#{:change :blur :submit}`): When validation triggers."
   ([] (create {}))
   ([{:keys [key form-key initial-values validators validate validate-on]
-     :or {initial-values {}
-          validators {}
-          validate-on #{:change :blur :submit}}}]
+     :or   {initial-values {}
+            validators     {}
+            validate-on    #{:change :blur :submit}}}]
    (let [k (or key form-key :form)
          _ (swap! !registered-field-configs assoc k {})
          normalized-validators (reduce-kv
@@ -512,9 +512,9 @@
   ([form-state path is-touched?]
    (let [norm-p (normalize-path path)
          updated (clojure.core/update form-state :touched (if is-touched?
-                                                           (fnil conj #{})
-                                                           (fnil disj #{}))
-                                     norm-p)]
+                                                            (fnil conj #{})
+                                                            (fnil disj #{}))
+                                      norm-p)]
      (if (and is-touched? (contains? (:validate-on updated) :blur))
        (validate-form updated)
        updated))))
@@ -575,13 +575,13 @@
   ([form-state new-initial-values]
    (let [initial (or new-initial-values (initial-values form-state) {})]
      (assoc form-state
-            :values initial
-            :initial-values initial
-            :touched #{}
-            :errors {}
-            :submitting? false
-            :submit-count 0
-            :status nil))))
+       :values initial
+       :initial-values initial
+       :touched #{}
+       :errors {}
+       :submitting? false
+       :submit-count 0
+       :status nil))))
 
 (defn submit-start
   "Marks the form as actively submitting and increments `:submit-count`."
@@ -596,8 +596,8 @@
    (submit-end form-state nil))
   ([form-state status]
    (assoc form-state
-          :submitting? false
-          :status status)))
+     :submitting? false
+     :status status)))
 
 ;; -----------------------------------------------------------------------------
 ;; Granular View Queries
@@ -700,27 +700,8 @@
   (or (:submit-count form-state) 0))
 
 ;; -----------------------------------------------------------------------------
-;; DOM Event Extraction & Handling
+;; DOM Event Extraction
 ;; -----------------------------------------------------------------------------
-
-(defn- prevent-default!
-  "Calls preventDefault on the DOM event if present."
-  [event]
-  (let [dom-e (cond
-                (and (object? event) (fn? (.-preventDefault event))) event
-                (map? event) (or (when-let [e (:replicant/dom-event event)]
-                                   (when (or (and (object? e) (fn? (.-preventDefault e)))
-                                             (and (map? e) (fn? (:preventDefault e))))
-                                     e))
-                                 (when-let [e (:event event)]
-                                   (when (or (and (object? e) (fn? (.-preventDefault e)))
-                                             (and (map? e) (fn? (:preventDefault e))))
-                                     e)))
-                :else nil)]
-    (when dom-e
-      (if (and (map? dom-e) (fn? (:preventDefault dom-e)))
-        ((:preventDefault dom-e))
-        (.preventDefault dom-e)))))
 
 (defn extract-event-value
   "Extracts the value from a DOM event, event map, or DOM node.
@@ -844,15 +825,15 @@
                                   {:input  (on-change form-k norm-p)
                                    :change (on-change form-k norm-p)
                                    :blur   (on-blur form-k norm-p)})}
-                     is-checkbox? (assoc :checked (boolean val))
-                     (not is-checkbox?) (assoc :value (if (nil? val) "" val))
-                     (:type opts) (assoc :type (:type opts))
-                     (:required opts) (assoc :required true)
-                     (some? min-val) (assoc :min min-val)
-                     (some? max-val) (assoc :max max-val)
-                     (some? min-len) (assoc :minlength min-len)
-                     (some? max-len) (assoc :maxlength max-len)
-                     (some? pat) (assoc :pattern pat))
+                           is-checkbox? (assoc :checked (boolean val))
+                           (not is-checkbox?) (assoc :value (if (nil? val) "" val))
+                           (:type opts) (assoc :type (:type opts))
+                           (:required opts) (assoc :required true)
+                           (some? min-val) (assoc :min min-val)
+                           (some? max-val) (assoc :max max-val)
+                           (some? min-len) (assoc :minlength min-len)
+                           (some? max-len) (assoc :maxlength max-len)
+                           (some? pat) (assoc :pattern pat))
         extra-attrs (dissoc opts
                             :default :initial :initial-value :default-value :defaultValue :checked :value
                             :required :email
@@ -919,43 +900,6 @@
     (clojure.core/update state form-key #(apply f % args))))
 
 ;; -----------------------------------------------------------------------------
-;; Side Effects (relm/fx)
-;; -----------------------------------------------------------------------------
-
-(defmethod relm/fx ::focus-field
-  [_ [_ field-name-or-id]]
-  (when (and (exists? js/document) field-name-or-id)
-    (let [selector (str "[name='" (name field-name-or-id) "'], #" (name field-name-or-id))
-          elem (.querySelector js/document selector)]
-      (when elem
-        (.focus elem)))))
-
-(defmethod relm/fx ::focus-first-error
-  [_ [_ errors]]
-  (when (and (exists? js/document) (seq errors))
-    (let [first-path (first (keys errors))
-          field-name (if (vector? first-path) (last first-path) first-path)]
-      (when field-name
-        (let [selector (str "[name='" (name field-name) "'], #" (name field-name))
-              elem (.querySelector js/document selector)]
-          (when elem
-            (.focus elem)))))))
-
-(defmethod relm/fx ::validate-async
-  [_ [_ {:keys [path validator on-success on-error]}]]
-  (when (fn? validator)
-    (let [p (validator)]
-      (when (and p (exists? (.-then p)))
-        (-> p
-            (.then (fn [res]
-                     (when on-success
-                       (relm/dispatch! nil (if (fn? on-success) (on-success res) on-success)))))
-            (.catch (fn [err]
-                      (when on-error
-                        (let [msg (or (.-message err) (str err))]
-                          (relm/dispatch! nil (if (fn? on-error) (on-error msg) [::set-error path msg])))))))))))
-
-;; -----------------------------------------------------------------------------
 ;; Relm Update Message Handlers
 ;; -----------------------------------------------------------------------------
 
@@ -1005,8 +949,7 @@
 ;; Message format: `[::submit form-key opts]`
 (defmethod relm/update ::submit
   [state context [_ form-or-key {:keys [on-submit on-invalid validate focus-error?]
-                     :or   {focus-error? true}}] event]
-  (prevent-default! event)
+                                 :or   {focus-error? true}}] event]
   (let [form-key (extract-form-key form-or-key)
         current-form (get-form state form-key)
         touched-form (touch-all current-form)
@@ -1020,31 +963,13 @@
     (if is-valid?
       (let [submitting-form (submit-start final-form)
             new-state (update-form state form-key (constantly submitting-form))
-            submitted-vals (values submitting-form)
-            effects (cond
-                      (nil? on-submit) []
-                      (fn? on-submit)
-                      (let [res (on-submit submitted-vals)]
-                        (if (relm/vector-of-vectors? res) res [[:dispatch res]]))
-                      (relm/vector-of-vectors? on-submit)
-                      on-submit
-                      (vector? on-submit)
-                      [[:dispatch (conj on-submit submitted-vals)]]
-                      :else [])]
-        [new-state context effects])
+            submitted-vals (values submitting-form)]
+        [new-state context [[::relm/prevent-default! event]
+                            [:dispatch (conj on-submit submitted-vals)]]])
       (let [failed-form (assoc final-form :submitting? false)
             new-state (update-form state form-key (constantly failed-form))
             errors (:errors failed-form)
-            invalid-effects (cond
-                              (nil? on-invalid) []
-                              (fn? on-invalid)
-                              (let [res (on-invalid errors)]
-                                (if (relm/vector-of-vectors? res) res [[:dispatch res]]))
-                              (relm/vector-of-vectors? on-invalid)
-                              on-invalid
-                              (vector? on-invalid)
-                              [[:dispatch (conj on-invalid errors)]]
-                              :else [])
             focus-fx (when (and focus-error? (seq errors))
                        [[::focus-first-error errors]])]
-        [new-state context (into (or focus-fx []) invalid-effects)]))))
+        [new-state context (into (or focus-fx []) [[::relm/prevent-default! event]
+                                                   [:dispatch (conj on-invalid errors)]])]))))

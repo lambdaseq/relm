@@ -35,23 +35,13 @@
    [:button {:on {:click [::show-count]}} "Show Count"]])
 
 ;; -----------------------------------------------------------------------------
-;; Side Effects
-;; -----------------------------------------------------------------------------
-
-;; Effect handler that displays a browser alert dialog.
-;; Effect format: `[::alert message-string]`
-(defmethod relm/fx ::alert
-  [_event [_ message]]
-  (js/alert message))
-
-;; -----------------------------------------------------------------------------
 ;; Update Handlers
 ;; -----------------------------------------------------------------------------
 
 ;; Emits a side effect to show the current count in an alert dialog without modifying state.
 (defmethod relm/update ::show-count
   [{:keys [count] :as state} context _message _event]
-  [state context [[::alert (str "Count: " count)]]])
+  [state context [[:alert (str "Count: " count)]]])
 
 ;; Increments the local counter by 1.
 (defmethod relm/update ::increment

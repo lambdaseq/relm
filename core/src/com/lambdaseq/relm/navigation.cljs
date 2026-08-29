@@ -47,13 +47,13 @@
 ;; Effect format: `[::push-state state-obj url]` or `[::push-state nil url]`
 (defmethod core/fx ::push-state
   [_ [_ state url]]
-  (.pushState js/history state nil url))
+  (.pushState js/history (if (and state (not (object? state))) (clj->js state) state) nil url))
 
 ;; Updates current history entry with new state object and URL via `window.history.replaceState(state, nil, url)`.
 ;; Effect format: `[::replace-state state-obj url]` or `[::replace-state nil url]`
 (defmethod core/fx ::replace-state
   [_ [_ state url]]
-  (.replaceState js/history state nil url))
+  (.replaceState js/history (if (and state (not (object? state))) (clj->js state) state) nil url))
 
 ;; Moves forward or backward through history by relative delta integer `n` via `window.history.go(n)`.
 ;; Effect format: `[::go delta-int]`

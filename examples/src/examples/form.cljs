@@ -176,7 +176,8 @@
           [:pre {:style {:margin-top "8px" :font-size "12px" :overflow-x "auto"}}
            (pr-str submitted-data)]])
 
-       [:form {:on {:submit (form/on-submit form {:on-submit [::handle-registration-success]})}}
+       [:form {:on {:submit [
+                             [::form/submit (form/extract-form-key form) {:on-submit [::handle-registration-success]}]]}}
         ;; Username Field
         (input-field form :username {:label       "Username"
                                      :type        "text"

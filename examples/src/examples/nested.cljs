@@ -139,7 +139,7 @@
   [state context _ _]
   (let [next-id (inc (count (:cards state)))
         new-card {:id next-id
-                  :title (str "Card " (.fromCharCode js/String (+ 64 next-id)))
+                  :title (str "Card " (char (+ 64 next-id)))
                   :subtitle "Dynamically added section"
                   :count 0}]
     [(update state :cards conj new-card) context]))

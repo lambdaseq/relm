@@ -142,3 +142,38 @@
       (relm/dispatch! event [[::test-no-fx "first"]
                             [::test-no-fx "second"]])
       (is (= "second" (get-in @relm/!app-state [:components "comp-batch" :state :val]))))))
+
+(deftest built-in-fx-test
+  (testing ":prevent-default effect calls preventDefault on event"
+    (let [prevented? (atom false)
+          mock-event {:replicant/dom-event {:preventDefault #(reset! prevented? true)}}]
+      (relm/fx mock-event [:prevent-default])
+      (is (true? @prevented?)))
+    (let [prevented? (atom false)
+          mock-event {:event {:preventDefault #(reset! prevented? true)}}]
+      (relm/fx mock-event [::relm/prevent-default])
+      (is (true? @prevented?))))
+
+  (testing ":stop-propagation effect calls stopPropagation on event"
+    (let [stopped? (atom false)
+          mock-event {:replicant/dom-event {:stopPropagation #(reset! stopped? true)}}]
+      (relm/fx mock-event [:stop-propagation])
+      (is (true? @stopped?)))
+    (let [stopped? (atom false)
+          mock-event {:event {:stopPropagation #(reset! stopped? true)}}]
+      (relm/fx mock-event [::relm/stop-propagation])
+      (is (true? @stopped?))))
+
+  (testing ":validate-async effect executes promise and dispatches result"
+    (async done
+      (let [event {:component-id "comp-async"}]
+        (swap! relm/!app-state assoc-in [:components "comp-async" :state] {})
+        (relm/fx event [:validate-async
+                        {:path :test-field
+                         :validator (fn [] (js/Promise.resolve "resolved-value"))
+                         :on-success (fn [res] [::test-no-fx res])}])
+        (js/setTimeout
+          (fn []
+            (is (= "resolved-value" (get-in @relm/!app-state [:components "comp-async" :state :val])))
+            (done))
+          20)))))

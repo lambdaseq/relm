@@ -51,12 +51,12 @@
 ;; Dispatches a push-state effect to push a new entry onto the HTML5 history stack.
 (defmethod relm/update ::push-state
   [state context [_ url] _]
-  [state context [[::nav/push-state (js-obj "page" url) url]]])
+  [state context [[::nav/push-state {:page url} url]]])
 
 ;; Dispatches a replace-state effect to update current history entry.
 (defmethod relm/update ::replace-state
   [state context [_ url] _]
-  [state context [[::nav/replace-state (js-obj "page" url) url]]])
+  [state context [[::nav/replace-state {:page url} url]]])
 
 ;; Dispatches a history.go effect with relative step integer `n`.
 (defmethod relm/update ::go-to-position

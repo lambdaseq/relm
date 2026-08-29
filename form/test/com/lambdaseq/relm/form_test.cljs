@@ -297,13 +297,10 @@
       (is (= 0 (form/value (:form new-state) :count)))
       (is (false? (form/dirty? (:form new-state))))))
 
-  (testing "::form/submit on valid form triggers on-submit effect and prevents default"
-    (let [prevented? (atom false)
-          mock-event {:replicant/dom-event {:preventDefault #(reset! prevented? true)}}
-          state {:form (form/create {:initial-values {:email "valid@example.com"}
+  (testing "::form/submit on valid form triggers on-submit effect"
+    (let [state {:form (form/create {:initial-values {:email "valid@example.com"}
                                      :validators     {:email (form/required)}})}
-          [new-state _ effects] (relm/update state {} [::form/submit :form {:on-submit [::save-data]}] mock-event)]
-      (is (true? @prevented?))
+          [new-state _ effects] (relm/update state {} [::form/submit :form {:on-submit [::save-data]}] nil)]
       (is (true? (form/submitting? (:form new-state))))
       (is (= 1 (form/submit-count (:form new-state))))
       (is (= [[:dispatch [::save-data {:email "valid@example.com"}]]] effects))))
