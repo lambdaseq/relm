@@ -112,13 +112,11 @@
 (defn- -get-component-id
   "Traverses up the DOM tree from `node` to locate the enclosing `data-relm-component-id` attribute."
   [node]
-  #?(:cljs
-     (loop [curr node]
-       (when curr
-         (if (and (.-getAttribute curr) (.getAttribute curr "data-relm-component-id"))
-           (.getAttribute curr "data-relm-component-id")
-           (recur (.-parentNode curr)))))
-     :clj nil))
+  (loop [curr node]
+    (when curr
+      (if (and (.-getAttribute curr) (.getAttribute curr "data-relm-component-id"))
+        (.getAttribute curr "data-relm-component-id")
+        (recur (.-parentNode curr))))))
 
 (defn- -eval-root
   "Evaluates the root component function with optional arguments to obtain Hiccup data."

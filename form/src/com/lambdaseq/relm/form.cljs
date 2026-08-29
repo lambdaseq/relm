@@ -38,9 +38,8 @@
     (string? v)
     (let [s (string/trim v)]
       (when (seq s)
-        #?(:cljs (let [n (js/parseFloat s)]
-                   (when-not (js/isNaN n) n))
-           :clj  (clojure.core/parse-double s))))
+        (let [n (js/parseFloat s)]
+          (when-not (js/isNaN n) n))))
     :else nil))
 
 ;; -----------------------------------------------------------------------------
@@ -54,23 +53,15 @@
   ([val-fn value]
    (run-validator val-fn value nil))
   ([val-fn value all-values]
-   (let [res #?(:cljs (try
-                        (val-fn value all-values)
-                        (catch :default _
-                          (val-fn value)))
-                :clj  (try
-                        (val-fn value all-values)
-                        (catch Throwable _
-                          (val-fn value))))]
+   (let [res (try
+               (val-fn value all-values)
+               (catch :default _
+                 (val-fn value)))]
      (if (fn? res)
-       #?(:cljs (try
-                  (res value all-values)
-                  (catch :default _
-                    (res value)))
-          :clj  (try
-                  (res value all-values)
-                  (catch Throwable _
-                    (res value))))
+       (try
+         (res value all-values)
+         (catch :default _
+           (res value)))
        res))))
 
 (defn required
@@ -276,8 +267,7 @@
   [v]
   (cond
     (string? v) v
-    #?@(:cljs [(and (object? v) (exists? (.-source v))) (.-source v)]
-        :clj  [])
+    (and (object? v) (exists? (.-source v))) (.-source v)
     :else (str v)))
 
 (defn- extract-initial-val-from-opts
@@ -716,77 +706,60 @@
 (defn- prevent-default!
   "Calls preventDefault on the DOM event if present."
   [event]
-  #?(:cljs
-     (let [dom-e (cond
-                   (and (object? event) (fn? (.-preventDefault event))) event
-                   (map? event) (or (when-let [e (:replicant/dom-event event)]
-                                      (when (fn? (.-preventDefault e)) e))
-                                    (when-let [e (:event event)]
-                                      (when (fn? (.-preventDefault e)) e)))
-                   :else nil)]
-       (when dom-e
-         (.preventDefault dom-e)))
-     :clj
-     (when (map? event)
-       (let [dom-e (or (:replicant/dom-event event)
-                       (:event event))]
-         (when (and (map? dom-e) (fn? (:preventDefault dom-e)))
-           ((:preventDefault dom-e)))))))
+  (let [dom-e (cond
+                (and (object? event) (fn? (.-preventDefault event))) event
+                (map? event) (or (when-let [e (:replicant/dom-event event)]
+                                   (when (fn? (.-preventDefault e)) e))
+                                 (when-let [e (:event event)]
+                                   (when (fn? (.-preventDefault e)) e)))
+                :else nil)]
+    (when dom-e
+      (.preventDefault dom-e))))
 
 (defn extract-event-value
   "Extracts the value from a DOM event, event map, or DOM node.
   Handles checkboxes (checked boolean), radio buttons, select dropdowns, numbers, and standard text inputs.
   If passed a primitive value directly, returns it."
   [event-or-val]
-  #?(:cljs
-     (let [target (cond
-                    ;; 1. Replicant event map with :replicant/node or :replicant/dom-event
-                    (map? event-or-val)
-                    (or (:replicant/node event-or-val)
-                        (when-let [dom-e (:replicant/dom-event event-or-val)]
-                          (or (.-target dom-e) (.-currentTarget dom-e) dom-e))
-                        (:target event-or-val))
+  (let [target (cond
+                 ;; 1. Replicant event map with :replicant/node or :replicant/dom-event
+                 (map? event-or-val)
+                 (or (:replicant/node event-or-val)
+                     (when-let [dom-e (:replicant/dom-event event-or-val)]
+                       (or (.-target dom-e) (.-currentTarget dom-e) dom-e))
+                     (:target event-or-val))
 
-                    ;; 2. Direct DOM Event object with .target / .currentTarget
-                    (and (object? event-or-val)
-                         (or (some? (.-target event-or-val))
-                             (some? (.-currentTarget event-or-val))))
-                    (or (.-target event-or-val) (.-currentTarget event-or-val))
+                 ;; 2. Direct DOM Event object with .target / .currentTarget
+                 (and (object? event-or-val)
+                      (or (some? (.-target event-or-val))
+                          (some? (.-currentTarget event-or-val))))
+                 (or (.-target event-or-val) (.-currentTarget event-or-val))
 
-                    ;; 3. Direct DOM Node object with .value or .checked
-                    (and (object? event-or-val)
-                         (or (some? (.-value event-or-val))
-                             (some? (.-checked event-or-val))))
-                    event-or-val
+                 ;; 3. Direct DOM Node object with .value or .checked
+                 (and (object? event-or-val)
+                      (or (some? (.-value event-or-val))
+                          (some? (.-checked event-or-val))))
+                 event-or-val
 
-                    :else nil)]
-       (if target
-         (let [input-type (when target (.-type target))]
-           (cond
-             (= input-type "checkbox")
-             (.-checked target)
+                 :else nil)]
+    (if target
+      (let [input-type (when target (.-type target))]
+        (cond
+          (= input-type "checkbox")
+          (.-checked target)
 
-             (= input-type "number")
-             (let [v (.-value target)]
-               (if (or (nil? v) (empty? v)) nil (js/parseFloat v)))
+          (= input-type "number")
+          (let [v (.-value target)]
+            (if (or (nil? v) (empty? v)) nil (js/parseFloat v)))
 
-             (some? (.-value target))
-             (.-value target)
+          (some? (.-value target))
+          (.-value target)
 
-             :else
-             target))
-         (if (map? event-or-val)
-           (get event-or-val :value event-or-val)
-           event-or-val)))
-     :clj
-     (if (map? event-or-val)
-       (let [dom-e (or (:replicant/dom-event event-or-val)
-                       (:event event-or-val)
-                       (:target event-or-val))]
-         (if dom-e
-           (extract-event-value dom-e)
-           (get event-or-val :value event-or-val)))
-       event-or-val)))
+          :else
+          target))
+      (if (map? event-or-val)
+        (get event-or-val :value event-or-val)
+        event-or-val))))
 
 ;; -----------------------------------------------------------------------------
 ;; Event Handler Helpers
@@ -940,42 +913,36 @@
 
 (defmethod relm/fx ::focus-field
   [_ [_ field-name-or-id]]
-  #?(:cljs
-     (when (and (exists? js/document) field-name-or-id)
-       (let [selector (str "[name='" (name field-name-or-id) "'], #" (name field-name-or-id))
-             elem (.querySelector js/document selector)]
-         (when elem
-           (.focus elem))))
-     :clj nil))
+  (when (and (exists? js/document) field-name-or-id)
+    (let [selector (str "[name='" (name field-name-or-id) "'], #" (name field-name-or-id))
+          elem (.querySelector js/document selector)]
+      (when elem
+        (.focus elem)))))
 
 (defmethod relm/fx ::focus-first-error
   [_ [_ errors]]
-  #?(:cljs
-     (when (and (exists? js/document) (seq errors))
-       (let [first-path (first (keys errors))
-             field-name (if (vector? first-path) (last first-path) first-path)]
-         (when field-name
-           (let [selector (str "[name='" (name field-name) "'], #" (name field-name))
-                 elem (.querySelector js/document selector)]
-             (when elem
-               (.focus elem))))))
-     :clj nil))
+  (when (and (exists? js/document) (seq errors))
+    (let [first-path (first (keys errors))
+          field-name (if (vector? first-path) (last first-path) first-path)]
+      (when field-name
+        (let [selector (str "[name='" (name field-name) "'], #" (name field-name))
+              elem (.querySelector js/document selector)]
+          (when elem
+            (.focus elem)))))))
 
 (defmethod relm/fx ::validate-async
   [_ [_ {:keys [path validator on-success on-error]}]]
-  #?(:cljs
-     (when (fn? validator)
-       (let [p (validator)]
-         (when (and p (exists? (.-then p)))
-           (-> p
-               (.then (fn [res]
-                        (when on-success
-                          (relm/dispatch nil (if (fn? on-success) (on-success res) on-success)))))
-               (.catch (fn [err]
-                         (when on-error
-                           (let [msg (or (.-message err) (str err))]
-                             (relm/dispatch nil (if (fn? on-error) (on-error msg) [::set-error path msg]))))))))))
-     :clj nil))
+  (when (fn? validator)
+    (let [p (validator)]
+      (when (and p (exists? (.-then p)))
+        (-> p
+            (.then (fn [res]
+                     (when on-success
+                       (relm/dispatch nil (if (fn? on-success) (on-success res) on-success)))))
+            (.catch (fn [err]
+                      (when on-error
+                        (let [msg (or (.-message err) (str err))]
+                          (relm/dispatch nil (if (fn? on-error) (on-error msg) [::set-error path msg])))))))))))
 
 ;; -----------------------------------------------------------------------------
 ;; Relm Update Message Handlers

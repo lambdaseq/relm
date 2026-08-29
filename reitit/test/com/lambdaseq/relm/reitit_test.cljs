@@ -1,7 +1,6 @@
 (ns com.lambdaseq.relm.reitit-test
   "Unit tests for Reitit routing integration with Relm."
-  (:require #?(:clj [clojure.test :refer [deftest is testing]]
-               :cljs [cljs.test :refer-macros [deftest is testing]])
+  (:require [cljs.test :refer-macros [deftest is testing]]
             [com.lambdaseq.relm.core :as relm]
             [com.lambdaseq.relm.navigation :as nav]
             [com.lambdaseq.relm.reitit :as relm.reitit]

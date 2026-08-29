@@ -37,12 +37,11 @@
   (or (:router context) @!router))
 
 (defn current-path
-  "Returns the current window pathname in browser environments, or \"/\" in non-browser/JVM environments."
+  "Returns the current window pathname in browser environments, or \"/\" if window is not available."
   []
-  #?(:cljs (if (exists? js/window)
-             (.. js/window -location -pathname)
-             "/")
-     :clj "/"))
+  (if (exists? js/window)
+    (.. js/window -location -pathname)
+    "/"))
 
 (defn match-by-path
   "Matches a URL path string against the provided Reitit router instance `r-router`.
@@ -156,11 +155,10 @@
 (defn stop!
   "Stops listening for browser `popstate` events and clears the registered history listener."
   []
-  #?(:cljs
-     (when (exists? js/window)
-       (when-let [listener @!history-listener]
-         (.removeEventListener js/window "popstate" listener)
-         (reset! !history-listener nil)))))
+  (when (exists? js/window)
+    (when-let [listener @!history-listener]
+      (.removeEventListener js/window "popstate" listener)
+      (reset! !history-listener nil))))
 
 (defn start!
   "Initializes the Reitit router, stores it and initial route match in Relm's context,
@@ -179,14 +177,13 @@
      (reset! !router r-router)
      (reset! !options options)
      (stop!)
-     #?(:cljs
-        (when (exists? js/window)
-          (let [listener (fn [_]
-                           (let [curr-p (current-path)
-                                 curr-m (match-target r-router curr-p nil nil default-path)]
-                             (relm/dispatch nil [::route-changed curr-m])))]
-            (reset! !history-listener listener)
-            (.addEventListener js/window "popstate" listener))))
+     (when (exists? js/window)
+       (let [listener (fn [_]
+                        (let [curr-p (current-path)
+                              curr-m (match-target r-router curr-p nil nil default-path)]
+                          (relm/dispatch nil [::route-changed curr-m])))]
+         (reset! !history-listener listener)
+         (.addEventListener js/window "popstate" listener)))
      (when (:dispatch-initial? options)
        (swap! relm/!app-state (fn [app]
                                 (clojure.core/update app :context (fn [ctx]

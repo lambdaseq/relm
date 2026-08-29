@@ -1,7 +1,6 @@
 (ns com.lambdaseq.relm.core-test
   "Unit tests for Relm core runtime, state management, and side effects."
-  (:require #?(:clj [clojure.test :refer [deftest is testing]]
-               :cljs [cljs.test :refer-macros [deftest is testing]])
+  (:require [cljs.test :refer-macros [deftest is testing]]
             [com.lambdaseq.relm.core :as relm]))
 
 ;; -----------------------------------------------------------------------------

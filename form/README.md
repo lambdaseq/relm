@@ -66,7 +66,7 @@ Add `com.lambdaseq/relm.form` and `com.lambdaseq/relm.core` to your `deps.edn`:
 - **Automatic Semantic HTML Attributes**: Emits semantic attributes (`:required`, `:min`, `:max`, `:minlength`, `:maxlength`, `:pattern`, `:type`) for mobile keyboards and browser accessibility.
 - **Granular View Queries**: Pure query functions (`form/value`, `form/error`, `form/touched?`, `form/dirty?`, `form/valid?`) give full control over layout, styling, and conditional rendering.
 - **Nested Field Path Support**: Supports flat keywords (`:email`) as well as nested paths (`[:user :address :city]`).
-- **Zero Heavy Dependencies**: Pure `.cljc` Clojure/ClojureScript implementation compatible with JVM and JS.
+- **Zero Heavy Dependencies**: Pure ClojureScript implementation.
 
 ---
 

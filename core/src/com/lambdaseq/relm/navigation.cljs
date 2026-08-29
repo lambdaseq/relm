@@ -19,22 +19,19 @@
 ;; Effect format: `[::navigate-to url]`
 (defmethod core/fx ::navigate-to
   [_ [_ url]]
-  #?(:cljs (.assign js/location url)
-     :clj nil))
+  (.assign js/location url))
 
 ;; Reloads the current page using `window.location.reload()`.
 ;; Effect format: `[::reload]`
 (defmethod core/fx ::reload
   [_ _]
-  #?(:cljs (.reload js/location)
-     :clj nil))
+  (.reload js/location))
 
 ;; Replaces current URL using `window.location.replace(url)` without adding to session history.
 ;; Effect format: `[::replace url]`
 (defmethod core/fx ::replace
   [_ [_ url]]
-  #?(:cljs (.replace js/location url)
-     :clj nil))
+  (.replace js/location url))
 
 ;; -----------------------------------------------------------------------------
 ;; HTML5 History API Effects
@@ -44,26 +41,22 @@
 ;; Effect format: `[::back]`
 (defmethod core/fx ::back
   [_ _]
-  #?(:cljs (.back js/history)
-     :clj nil))
+  (.back js/history))
 
 ;; Pushes a new state object and URL onto the browser history stack via `window.history.pushState(state, nil, url)`.
 ;; Effect format: `[::push-state state-obj url]` or `[::push-state nil url]`
 (defmethod core/fx ::push-state
   [_ [_ state url]]
-  #?(:cljs (.pushState js/history state nil url)
-     :clj nil))
+  (.pushState js/history state nil url))
 
 ;; Updates current history entry with new state object and URL via `window.history.replaceState(state, nil, url)`.
 ;; Effect format: `[::replace-state state-obj url]` or `[::replace-state nil url]`
 (defmethod core/fx ::replace-state
   [_ [_ state url]]
-  #?(:cljs (.replaceState js/history state nil url)
-     :clj nil))
+  (.replaceState js/history state nil url))
 
 ;; Moves forward or backward through history by relative delta integer `n` via `window.history.go(n)`.
 ;; Effect format: `[::go delta-int]`
 (defmethod core/fx ::go
   [_ [_ n]]
-  #?(:cljs (.go js/history n)
-     :clj nil))
+  (.go js/history n))
