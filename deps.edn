@@ -3,10 +3,10 @@
         com.lambdaseq/relm.query  {:local/root "./query"}
         com.lambdaseq/relm.reitit {:local/root "./reitit"}}
  :aliases
- {:build      {:deps {io.github.clojure/tools.build {:mvn/version "0.10.6"}
-                      slipset/deps-deploy           {:mvn/version "0.2.2"}}
+ {:build      {:deps {io.github.clojure/tools.build {:mvn/version "0.10.14"}
+                      slipset/deps-deploy           {:mvn/version "0.2.5"}}
                :ns-default build}
-  :clj-kondo  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2026.08.04"}}
+  :clj-kondo  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2026.08.05"}}
                :main-opts    ["-m" "clj-kondo.main"]}
   :cljfmt     {:replace-deps {dev.weavejester/cljfmt {:mvn/version "0.16.5"}}
                :main-opts    ["-m" "cljfmt.main"]}
