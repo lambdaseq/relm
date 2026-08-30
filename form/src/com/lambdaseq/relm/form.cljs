@@ -246,7 +246,7 @@
 ;; -----------------------------------------------------------------------------
 
 (defonce ^:private !registered-field-configs
-         (atom {}))
+  (atom {}))
 
 (defn- deep-merge
   "Recursively merges maps. If both values are maps, merges them; otherwise returns the second."
@@ -359,23 +359,23 @@
   [form-id-or-k]
   (let [fid (form-id form-id-or-k)]
     (reduce-kv
-      (fn [m p cfg]
-        (if (seq (:validators cfg))
-          (assoc m p (:validators cfg))
-          m))
-      {}
-      (get @!registered-field-configs fid))))
+     (fn [m p cfg]
+       (if (seq (:validators cfg))
+         (assoc m p (:validators cfg))
+         m))
+     {}
+     (get @!registered-field-configs fid))))
 
 (defn- get-registered-initial-values-map
   [form-id-or-k]
   (let [fid (form-id form-id-or-k)]
     (reduce-kv
-      (fn [m p cfg]
-        (if (some? (:initial-value cfg))
-          (assoc-in m p (:initial-value cfg))
-          m))
-      {}
-      (get @!registered-field-configs fid))))
+     (fn [m p cfg]
+       (if (some? (:initial-value cfg))
+         (assoc-in m p (:initial-value cfg))
+         m))
+     {}
+     (get @!registered-field-configs fid))))
 
 (defn create
   "Creates a normalized form state map.
@@ -396,12 +396,12 @@
          fid (or id (str (random-uuid)))
          _ (swap! !registered-field-configs assoc fid {})
          normalized-validators (reduce-kv
-                                 (fn [m k-path v]
-                                   (let [norm-k (normalize-path k-path)
-                                         norm-v (if (sequential? v) (vec v) [v])]
-                                     (assoc m norm-k norm-v)))
-                                 {}
-                                 validators)]
+                                (fn [m k-path v]
+                                  (let [norm-k (normalize-path k-path)
+                                        norm-v (if (sequential? v) (vec v) [v])]
+                                    (assoc m norm-k norm-v)))
+                                {}
+                                validators)]
      {:id             fid
       :key            k
       :values         (or initial-values {})
@@ -451,14 +451,14 @@
         ;; 1. Field-level validators
         field-errors
         (reduce-kv
-          (fn [errs path val-fns]
-            (let [val (get-in current-values path)
-                  err (some (fn [val-fn] (run-validator val-fn val current-values)) val-fns)]
-              (if err
-                (assoc errs path err)
-                errs)))
-          {}
-          all-validators)
+         (fn [errs path val-fns]
+           (let [val (get-in current-values path)
+                 err (some (fn [val-fn] (run-validator val-fn val current-values)) val-fns)]
+             (if err
+               (assoc errs path err)
+               errs)))
+         {}
+         all-validators)
 
         ;; 2. Form-level validator function
         custom-errors
@@ -466,12 +466,12 @@
           (let [res (v-fn current-values)]
             (when (map? res)
               (reduce-kv
-                (fn [errs k-path msg]
-                  (if msg
-                    (assoc errs (normalize-path k-path) msg)
-                    errs))
-                {}
-                res))))
+               (fn [errs k-path msg]
+                 (if msg
+                   (assoc errs (normalize-path k-path) msg)
+                   errs))
+               {}
+               res))))
 
         all-errors (merge field-errors custom-errors)]
     (assoc form-state :errors (or all-errors {}))))
@@ -538,13 +538,13 @@
   ([m] (collect-all-paths m []))
   ([m prefix]
    (reduce-kv
-     (fn [paths k v]
-       (let [current-path (conj prefix k)]
-         (if (map? v)
-           (into (conj paths current-path) (collect-all-paths v current-path))
-           (conj paths current-path))))
-     []
-     m)))
+    (fn [paths k v]
+      (let [current-path (conj prefix k)]
+        (if (map? v)
+          (into (conj paths current-path) (collect-all-paths v current-path))
+          (conj paths current-path))))
+    []
+    m)))
 
 (defn touch-all
   "Marks all fields (all configured validator paths and value paths) as touched."
@@ -569,12 +569,12 @@
   "Replaces the entire `:errors` map with `errors-map`, normalizing all keys into vector paths."
   [form-state errors-map]
   (let [normalized (reduce-kv
-                     (fn [m k v]
-                       (if v
-                         (assoc m (normalize-path k) v)
-                         m))
-                     {}
-                     errors-map)]
+                    (fn [m k v]
+                      (if v
+                        (assoc m (normalize-path k) v)
+                        m))
+                    {}
+                    errors-map)]
     (assoc form-state :errors (or normalized {}))))
 
 (defn clear-errors
@@ -589,13 +589,13 @@
   ([form-state new-initial-values]
    (let [initial (or new-initial-values (initial-values form-state) {})]
      (assoc form-state
-       :values initial
-       :initial-values initial
-       :touched #{}
-       :errors {}
-       :submitting? false
-       :submit-count 0
-       :status nil))))
+            :values initial
+            :initial-values initial
+            :touched #{}
+            :errors {}
+            :submitting? false
+            :submit-count 0
+            :status nil))))
 
 (defn submit-start
   "Marks the form as actively submitting and increments `:submit-count`."
@@ -610,8 +610,8 @@
    (submit-end form-state nil))
   ([form-state status]
    (assoc form-state
-     :submitting? false
-     :status status)))
+          :submitting? false
+          :status status)))
 
 ;; -----------------------------------------------------------------------------
 ;; Granular View Queries
@@ -871,15 +871,15 @@
                                   {:input  (on-change form-k norm-p)
                                    :change (on-change form-k norm-p)
                                    :blur   (on-blur form-k norm-p)})}
-                           is-checkbox? (assoc :checked (boolean val))
-                           (not is-checkbox?) (assoc :value (if (nil? val) "" val))
-                           (:type opts) (assoc :type (:type opts))
-                           (:required opts) (assoc :required true)
-                           (some? min-val) (assoc :min min-val)
-                           (some? max-val) (assoc :max max-val)
-                           (some? min-len) (assoc :minlength min-len)
-                           (some? max-len) (assoc :maxlength max-len)
-                           (some? pat) (assoc :pattern pat))
+                     is-checkbox? (assoc :checked (boolean val))
+                     (not is-checkbox?) (assoc :value (if (nil? val) "" val))
+                     (:type opts) (assoc :type (:type opts))
+                     (:required opts) (assoc :required true)
+                     (some? min-val) (assoc :min min-val)
+                     (some? max-val) (assoc :max max-val)
+                     (some? min-len) (assoc :minlength min-len)
+                     (some? max-len) (assoc :maxlength max-len)
+                     (some? pat) (assoc :pattern pat))
         extra-attrs (dissoc opts
                             :default :initial :initial-value :default-value :defaultValue :checked :value
                             :required :email

@@ -151,10 +151,10 @@
 (def Examples
   "Root Relm component wrapping the example application shell."
   (relm/component
-    {:init      init
-     :on-init   on-init
-     :on-deinit on-deinit
-     :view      view}))
+   {:init      init
+    :on-init   on-init
+    :on-deinit on-deinit
+    :view      view}))
 
 ;; -----------------------------------------------------------------------------
 ;; Bootstrap

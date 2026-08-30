@@ -7,6 +7,14 @@
         <option value="test" />
       </set>
     </option>
+    <option name="toolAliases">
+      <set>
+        <option value="build" />
+        <option value="clj-kondo" />
+        <option value="clj-watson" />
+        <option value="cljfmt" />
+      </set>
+    </option>
   </component>
   <component name="DepsProjectsManager">
     <option name="dirTypeMappings">

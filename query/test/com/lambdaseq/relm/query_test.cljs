@@ -85,8 +85,8 @@
     (let [req-1 (query/infer-request-from-key {} [:posts {:_limit 5}] {:base-url "https://jsonplaceholder.typicode.com"})
           req-2 (query/infer-request-from-key {} [:posts 42] {:base-url "https://jsonplaceholder.typicode.com/"})
           req-3 (query/infer-request-from-key {} [:posts {:_limit 5}] {:base-url "https://jsonplaceholder.typicode.com"
-                                                                        :url "https://custom.api.com/posts"
-                                                                        :params {:_limit 10}})]
+                                                                       :url "https://custom.api.com/posts"
+                                                                       :params {:_limit 10}})]
       (is (= "https://jsonplaceholder.typicode.com/posts" (:url req-1)))
       (is (= {:_limit 5} (:params req-1)))
       (is (= "https://jsonplaceholder.typicode.com/posts/42" (:url req-2)))
@@ -265,7 +265,7 @@
     (let [ctx {}
           [_ new-ctx-1 effects-1] (relm/update nil ctx [::query/mutate [:todos] {:data {:title "New Todo"}}] nil)
           [_ new-ctx-2 effects-2] (relm/update nil ctx [::query/mutate [:todos 123] {:method :put
-                                                                                      :body {:title "Updated Todo"}}] nil)]
+                                                                                     :body {:title "Updated Todo"}}] nil)]
       (is (query/mutation-loading? new-ctx-1 [:todos]))
       (is (query/mutation-loading? new-ctx-1 :todos))
       (is (= "/todos" (get-in (first effects-1) [1 :url])))
@@ -281,8 +281,8 @@
     (let [ctx (query/set-query-data {} [:todos] [{:id 1 :title "Existing"}])
           opt-event [::query/set-query-data [:todos] (fn [old] (conj old {:id 2 :title "Optimistic Event"}))]
           [_ new-ctx-event effects] (relm/update nil ctx [::query/mutate :add-todo {:url "/todos"
-                                                                                   :data {:id 2 :title "Optimistic Event"}
-                                                                                   :on-mutate opt-event}] nil)]
+                                                                                    :data {:id 2 :title "Optimistic Event"}
+                                                                                    :on-mutate opt-event}] nil)]
       (is (query/mutation-loading? new-ctx-event :add-todo))
       (is (= 2 (count effects)))
       (is (= [::relm/dispatch! opt-event] (first effects)))
@@ -293,8 +293,8 @@
       (reset! relm/!app-state {:context (query/set-query-data {} [:todos] [{:id 1 :title "Existing"}])
                                :components {"comp-opt" {:state {}}}})
       (relm/dispatch! event [::query/mutate :add-todo {:url      "/todos"
-                                                      :data      {:id 2 :title "Optimistic Item"}
-                                                      :on-mutate [::query/set-query-data [:todos] (fn [old] (conj old {:id 2 :title "Optimistic Item"}))]}])
+                                                       :data      {:id 2 :title "Optimistic Item"}
+                                                       :on-mutate [::query/set-query-data [:todos] (fn [old] (conj old {:id 2 :title "Optimistic Item"}))]}])
       (is (query/mutation-loading? (:context @relm/!app-state) :add-todo))
       (is (= [{:id 1 :title "Existing"} {:id 2 :title "Optimistic Item"}]
              (query/data (:context @relm/!app-state) [:todos])))))

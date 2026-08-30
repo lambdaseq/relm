@@ -58,40 +58,40 @@
         (str "Isolated Local State • Step: " step)]]
       [:span {:class (ui/cx "text-xl font-bold font-mono px-3 py-1 rounded border"
                             (if dark? "bg-slate-800 text-indigo-300 border-slate-700"
-                                      "bg-white text-indigo-600 border-slate-200 shadow-xs"))}
+                                "bg-white text-indigo-600 border-slate-200 shadow-xs"))}
        count]]
 
      [:div {:class "flex flex-wrap items-center gap-2 pt-1"}
       (ui/button
-        {:variant :default
-         :size    :sm
-         :class   (if dark? "bg-indigo-600 hover:bg-indigo-500 text-white" "bg-slate-900 hover:bg-slate-800 text-white")
-         :on      {:click [::child-increment]}}
-        (str "+" step))
+       {:variant :default
+        :size    :sm
+        :class   (if dark? "bg-indigo-600 hover:bg-indigo-500 text-white" "bg-slate-900 hover:bg-slate-800 text-white")
+        :on      {:click [::child-increment]}}
+       (str "+" step))
       (ui/button
-        {:variant :outline
-         :size    :sm
-         :class   (if dark? "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700" "border-slate-300 bg-white")
-         :on      {:click [::child-decrement]}}
-        (str "−" step))
+       {:variant :outline
+        :size    :sm
+        :class   (if dark? "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700" "border-slate-300 bg-white")
+        :on      {:click [::child-decrement]}}
+       (str "−" step))
       (ui/button
-        {:variant :secondary
-         :size    :sm
-         :class   (if dark? "bg-slate-800 text-slate-300 hover:bg-slate-700 border-slate-700" "bg-slate-200/80")
-         :on      {:click [::child-increase-step 1]}}
-        "Step +1")
+       {:variant :secondary
+        :size    :sm
+        :class   (if dark? "bg-slate-800 text-slate-300 hover:bg-slate-700 border-slate-700" "bg-slate-200/80")
+        :on      {:click [::child-increase-step 1]}}
+       "Step +1")
       (ui/button
-        {:variant :ghost
-         :size    :sm
-         :class   (if dark? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" "text-slate-500 hover:bg-slate-200")
-         :on      {:click [::child-reset 0]}}
-        "Reset")]]))
+       {:variant :ghost
+        :size    :sm
+        :class   (if dark? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" "text-slate-500 hover:bg-slate-200")
+        :on      {:click [::child-reset 0]}}
+       "Reset")]]))
 
 (def CounterItem
   "Leaf counter component instance used within CardComponent."
   (relm/component
-    {:init counter-init
-     :view counter-view}))
+   {:init counter-init
+    :view counter-view}))
 
 ;; -----------------------------------------------------------------------------
 ;; Level 1: Nested Child Component (CardComponent)
@@ -125,18 +125,18 @@
       [:div {:class "flex items-center gap-3"}
        [:span {:class (ui/cx "flex h-7 w-7 items-center justify-center rounded-md font-mono text-xs font-bold"
                              (if dark? "bg-indigo-900/60 text-indigo-300 border border-indigo-700"
-                                       "bg-indigo-50 text-indigo-700 border border-indigo-200"))}
+                                 "bg-indigo-50 text-indigo-700 border border-indigo-200"))}
         (str "#" card-id)]
        [:div
         [:h3 {:class "font-semibold text-base leading-snug"} title]
         (when subtitle
           [:p {:class (if dark? "text-xs text-slate-400" "text-xs text-slate-500")} subtitle])]]
       (ui/button
-        {:variant :ghost
-         :size    :sm
-         :class   (if dark? "text-slate-300 hover:bg-slate-800" "text-slate-600 hover:bg-slate-200/60")
-         :on      {:click [::toggle-card]}}
-        (if collapsed? "Expand ↓" "Collapse ↑"))]
+       {:variant :ghost
+        :size    :sm
+        :class   (if dark? "text-slate-300 hover:bg-slate-800" "text-slate-600 hover:bg-slate-200/60")
+        :on      {:click [::toggle-card]}}
+       (if collapsed? "Expand ↓" "Collapse ↑"))]
 
      (when-not collapsed?
        [:div {:class "p-5"}
@@ -150,8 +150,8 @@
 (def CardComponent
   "Card container component embedding nested CounterItem."
   (relm/component
-    {:init card-init
-     :view card-view}))
+   {:init card-init
+    :view card-view}))
 
 ;; -----------------------------------------------------------------------------
 ;; Root / Parent Component: NestedExample (Dashboard)
@@ -187,39 +187,39 @@
   (let [dark? (= (:theme context) :dark)]
     [:div {:class "max-w-4xl mx-auto"}
      (ui/example-header
-       {:step        "4"
-        :title       "Nested Components"
-        :difficulty  "Intermediate"
-        :description "Demonstrates multi-level component trees with automatic state isolation per instance ID, coupled with global context reactivity for theme distribution."
-        :tags        ["Component Tree" "Local State Isolation" "Context Reactivity" "Dynamic Collections"]})
+      {:step        "4"
+       :title       "Nested Components"
+       :difficulty  "Intermediate"
+       :description "Demonstrates multi-level component trees with automatic state isolation per instance ID, coupled with global context reactivity for theme distribution."
+       :tags        ["Component Tree" "Local State Isolation" "Context Reactivity" "Dynamic Collections"]})
 
      ;; Dashboard Context Controls Box
      (ui/card
-       {:class (ui/cx "mb-6 border-slate-200 transition-colors"
-                      (if dark? "bg-slate-900 border-slate-800 text-white" "bg-white text-slate-900"))}
-       [:div
-        (ui/card-header
-          [:div {:class "flex flex-wrap items-center justify-between gap-4"}
-           [:div
-            (ui/card-title (if dark? {:class "text-white"} {}) "Global Context & Dynamic Hierarchy")
-            (ui/card-description (if dark? {:class "text-slate-400"} {})
-                                 "Manage global context properties and spawn new component subtrees dynamically.")]
-           [:div {:class "flex items-center gap-2"}
-            (ui/badge {:variant (if dark? :purple :indigo)} (str "Theme: " (name (get context :theme :light))))
-            (ui/badge {:variant :secondary} (str (count cards) " Active Cards"))]])
+      {:class (ui/cx "mb-6 border-slate-200 transition-colors"
+                     (if dark? "bg-slate-900 border-slate-800 text-white" "bg-white text-slate-900"))}
+      [:div
+       (ui/card-header
+        [:div {:class "flex flex-wrap items-center justify-between gap-4"}
+         [:div
+          (ui/card-title (if dark? {:class "text-white"} {}) "Global Context & Dynamic Hierarchy")
+          (ui/card-description (if dark? {:class "text-slate-400"} {})
+                               "Manage global context properties and spawn new component subtrees dynamically.")]
+         [:div {:class "flex items-center gap-2"}
+          (ui/badge {:variant (if dark? :purple :indigo)} (str "Theme: " (name (get context :theme :light))))
+          (ui/badge {:variant :secondary} (str (count cards) " Active Cards"))]])
 
-        (ui/card-footer
-          [:div {:class "flex flex-wrap items-center gap-3 w-full"}
-           (ui/button
-             {:variant :default
-              :class   (if dark? "bg-indigo-600 hover:bg-indigo-500" "bg-slate-900 hover:bg-slate-800")
-              :on      {:click [::toggle-global-theme]}}
-             (str (if dark? "☀️ Switch to Light Theme" "🌙 Switch to Dark Theme")))
-           (ui/button
-             {:variant :outline
-              :class   (if dark? "border-slate-700 text-slate-200 hover:bg-slate-800" "")
-              :on      {:click [::add-card]}}
-             "+ Add New Component Section")])])
+       (ui/card-footer
+        [:div {:class "flex flex-wrap items-center gap-3 w-full"}
+         (ui/button
+          {:variant :default
+           :class   (if dark? "bg-indigo-600 hover:bg-indigo-500" "bg-slate-900 hover:bg-slate-800")
+           :on      {:click [::toggle-global-theme]}}
+          (str (if dark? "☀️ Switch to Light Theme" "🌙 Switch to Dark Theme")))
+         (ui/button
+          {:variant :outline
+           :class   (if dark? "border-slate-700 text-slate-200 hover:bg-slate-800" "")
+           :on      {:click [::add-card]}}
+          "+ Add New Component Section")])])
 
      ;; List of Child Cards
      [:div {:class "space-y-4 mb-6"}
@@ -233,22 +233,22 @@
 
      ;; Explanatory Callout
      (ui/alert
-       {:variant :info}
-       [:div {:class "flex items-start gap-3"}
-        [:span {:class "text-base"} "💡"]
-        [:div
-         [:h4 {:class "font-semibold text-sm mb-0.5"} "State Isolation Mechanism"]
-         [:p {:class "text-xs text-slate-600 leading-relaxed"}
-          "Each nested component instance automatically maintains its own isolated state tree identified by its unique component ID. Modifying one counter never affects adjacent siblings, while context updates propagate seamlessly to all branches."]]])
+      {:variant :info}
+      [:div {:class "flex items-start gap-3"}
+       [:span {:class "text-base"} "💡"]
+       [:div
+        [:h4 {:class "font-semibold text-sm mb-0.5"} "State Isolation Mechanism"]
+        [:p {:class "text-xs text-slate-600 leading-relaxed"}
+         "Each nested component instance automatically maintains its own isolated state tree identified by its unique component ID. Modifying one counter never affects adjacent siblings, while context updates propagate seamlessly to all branches."]]])
 
      ;; Expandable Source Code Panel
      (ui/code-panel
-       {:title    "Nested Components Example Source Code"
-        :filename "nested.cljs"
-        :code     snippets/nested-code})]))
+      {:title    "Nested Components Example Source Code"
+       :filename "nested.cljs"
+       :code     snippets/nested-code})]))
 
 (def NestedExample
   "Root nested component container for the example dashboard."
   (relm/component
-    {:init init
-     :view view}))
+   {:init init
+    :view view}))

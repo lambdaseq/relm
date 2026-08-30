@@ -70,63 +70,63 @@
   [{:keys [posts loading? error]} _context]
   [:div {:class "max-w-4xl mx-auto"}
    (ui/example-header
-     {:step        "2"
-      :title       "HTTP Requests"
-      :difficulty  "Beginner"
-      :description "Demonstrates asynchronous, side-effect-driven network requests using `com.lambdaseq.relm.http` to communicate with external JSON REST APIs without coupling views to IO."
-      :tags        ["relm.http/fetch!" "async" "REST API" "JSON decoding" "Error Handling"]})
+    {:step        "2"
+     :title       "HTTP Requests"
+     :difficulty  "Beginner"
+     :description "Demonstrates asynchronous, side-effect-driven network requests using `com.lambdaseq.relm.http` to communicate with external JSON REST APIs without coupling views to IO."
+     :tags        ["relm.http/fetch!" "async" "REST API" "JSON decoding" "Error Handling"]})
 
    ;; Controls Bar Card
    (ui/card
-     {:class "mb-6 border-slate-200"}
-     [:div
-      (ui/card-header
-        [:div {:class "flex flex-wrap items-center justify-between gap-4"}
-         [:div
-          (ui/card-title "JSONPlaceholder API Fetcher")
-          (ui/card-description "Dispatches `::relm.http/fetch!` to fetch sample posts over CORS.")]
-         [:div {:class "flex items-center gap-2"}
-          (cond
-            loading?
-            (ui/badge {:variant :indigo} "Fetching API...")
+    {:class "mb-6 border-slate-200"}
+    [:div
+     (ui/card-header
+      [:div {:class "flex flex-wrap items-center justify-between gap-4"}
+       [:div
+        (ui/card-title "JSONPlaceholder API Fetcher")
+        (ui/card-description "Dispatches `::relm.http/fetch!` to fetch sample posts over CORS.")]
+       [:div {:class "flex items-center gap-2"}
+        (cond
+          loading?
+          (ui/badge {:variant :indigo} "Fetching API...")
 
-            (seq posts)
-            (ui/badge {:variant :success} (str (count posts) " Posts Loaded"))
+          (seq posts)
+          (ui/badge {:variant :success} (str (count posts) " Posts Loaded"))
 
-            error
-            (ui/badge {:variant :destructive} "Network Error")
+          error
+          (ui/badge {:variant :destructive} "Network Error")
 
-            :else
-            (ui/badge {:variant :secondary} "Idle"))]])
+          :else
+          (ui/badge {:variant :secondary} "Idle"))]])
 
-      (ui/card-footer
-        [:div {:class "flex items-center gap-3 w-full"}
-         (ui/button
-           {:variant  :default
-            :disabled loading?
-            :on       {:click [::fetch-posts]}}
-           (if loading? "Requesting JSON..." "Fetch Posts from API"))
-         (ui/button
-           {:variant   :outline
-            :disabled? (and (empty? posts) (nil? error))
-            :on        {:click [::clear-posts]}}
-           "Clear")])])
+     (ui/card-footer
+      [:div {:class "flex items-center gap-3 w-full"}
+       (ui/button
+        {:variant  :default
+         :disabled loading?
+         :on       {:click [::fetch-posts]}}
+        (if loading? "Requesting JSON..." "Fetch Posts from API"))
+       (ui/button
+        {:variant   :outline
+         :disabled? (and (empty? posts) (nil? error))
+         :on        {:click [::clear-posts]}}
+        "Clear")])])
 
    ;; Error Banner
    (when error
      [:div {:class "mb-6"}
       (ui/alert
-        {:variant :destructive}
-        [:div {:class "flex items-center justify-between"}
-         [:div
-          [:h4 {:class "font-semibold mb-1"} "Request Failed"]
-          [:p {:class "text-sm"} (str error)]]
-         (ui/button
-           {:variant :outline
-            :size    :sm
-            :class   "border-red-300 text-red-900 hover:bg-red-100"
-            :on      {:click [::fetch-posts]}}
-           "Retry")])])
+       {:variant :destructive}
+       [:div {:class "flex items-center justify-between"}
+        [:div
+         [:h4 {:class "font-semibold mb-1"} "Request Failed"]
+         [:p {:class "text-sm"} (str error)]]
+        (ui/button
+         {:variant :outline
+          :size    :sm
+          :class   "border-red-300 text-red-900 hover:bg-red-100"
+          :on      {:click [::fetch-posts]}}
+         "Retry")])])
 
    ;; Posts Content / Skeletons / Empty State
    (cond
@@ -135,11 +135,11 @@
       (for [i (range 4)]
         ^{:key i}
         (ui/card
-          {:class "border-slate-200 animate-pulse bg-white p-6"}
-          [:div {:class "space-y-3"}
-           [:div {:class "h-4 bg-slate-200 rounded w-1/4"}]
-           [:div {:class "h-5 bg-slate-200 rounded w-3/4"}]
-           [:div {:class "h-12 bg-slate-100 rounded w-full"}]]))]
+         {:class "border-slate-200 animate-pulse bg-white p-6"}
+         [:div {:class "space-y-3"}
+          [:div {:class "h-4 bg-slate-200 rounded w-1/4"}]
+          [:div {:class "h-5 bg-slate-200 rounded w-3/4"}]
+          [:div {:class "h-12 bg-slate-100 rounded w-full"}]]))]
 
      (seq posts)
      [:div {:class "space-y-4"}
@@ -150,36 +150,36 @@
        (for [post posts]
          ^{:key (:id post)}
          (ui/card
-           {:class "hover:shadow-md hover:border-slate-300 transition-all border-slate-200"}
-           [:div
-            (ui/card-header
-              [:div {:class "flex items-center justify-between mb-2"}
-               (ui/badge {:variant :secondary :class "font-mono"} (str "POST #" (:id post)))
-               [:span {:class "text-xs text-slate-400 font-mono"} (str "User " (:userId post))]]
-              (ui/card-title {:class "text-base capitalize line-clamp-1"} (:title post)))
-            (ui/card-content
-              [:p {:class "text-sm text-slate-600 line-clamp-3 leading-relaxed"}
-               (:body post)])]))]]
+          {:class "hover:shadow-md hover:border-slate-300 transition-all border-slate-200"}
+          [:div
+           (ui/card-header
+            [:div {:class "flex items-center justify-between mb-2"}
+             (ui/badge {:variant :secondary :class "font-mono"} (str "POST #" (:id post)))
+             [:span {:class "text-xs text-slate-400 font-mono"} (str "User " (:userId post))]]
+            (ui/card-title {:class "text-base capitalize line-clamp-1"} (:title post)))
+           (ui/card-content
+            [:p {:class "text-sm text-slate-600 line-clamp-3 leading-relaxed"}
+             (:body post)])]))]]
 
      :else
      (ui/card
-       {:class "border-dashed border-2 border-slate-300 bg-slate-50/50"}
-       [:div {:class "flex flex-col items-center justify-center p-12 text-center"}
-        [:div {:class "h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3 text-xl"}
-         "🌐"]
-        [:h3 {:class "text-base font-semibold text-slate-800 mb-1"} "No Posts in Local State"]
-        [:p {:class "text-sm text-slate-500 max-w-sm mb-4"}
-         "Click the 'Fetch Posts from API' button to dispatch an asynchronous HTTP effect to JSONPlaceholder."]
-        (ui/button
-          {:variant :outline
-           :on      {:click [::fetch-posts]}}
-          "Fetch Posts Now")]))
+      {:class "border-dashed border-2 border-slate-300 bg-slate-50/50"}
+      [:div {:class "flex flex-col items-center justify-center p-12 text-center"}
+       [:div {:class "h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3 text-xl"}
+        "🌐"]
+       [:h3 {:class "text-base font-semibold text-slate-800 mb-1"} "No Posts in Local State"]
+       [:p {:class "text-sm text-slate-500 max-w-sm mb-4"}
+        "Click the 'Fetch Posts from API' button to dispatch an asynchronous HTTP effect to JSONPlaceholder."]
+       (ui/button
+        {:variant :outline
+         :on      {:click [::fetch-posts]}}
+        "Fetch Posts Now")]))
 
    ;; Expandable Source Code Panel
    (ui/code-panel
-     {:title    "HTTP Fetch Example Source Code"
-      :filename "http.cljs"
-      :code     snippets/http-code})])
+    {:title    "HTTP Fetch Example Source Code"
+     :filename "http.cljs"
+     :code     snippets/http-code})])
 
 ;; -----------------------------------------------------------------------------
 ;; Component Definition
@@ -188,5 +188,5 @@
 (def HttpExample
   "HTTP Example component ready to be mounted."
   (relm/component
-    {:init init
-     :view view}))
+   {:init init
+    :view view}))

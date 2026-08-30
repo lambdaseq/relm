@@ -23,7 +23,7 @@
 
   (testing "initializes with provided initial values and validators"
     (let [f (form/create {:initial-values {:email "user@test.com"
-                                          :profile {:age 25}}
+                                           :profile {:age 25}}
                           :validators     {:email [(form/required) (form/email)]
                                            [:profile :age] (form/min-num 18)}})]
       (is (= "user@test.com" (form/value f :email)))
@@ -317,10 +317,10 @@
 
   (testing "::form/submit on invalid form prevents on-submit and invokes on-invalid"
     (let [state {:form (form/create {:initial-values {:email ""}
-                                    :validators     {:email (form/required "Email required")}})}
+                                     :validators     {:email (form/required "Email required")}})}
           [new-state _ effects] (relm/update state {} [::form/submit :form {:on-submit  [::save-data]
-                                                                           :on-invalid [::show-error-toast]
-                                                                           :focus-error? false}] nil)]
+                                                                            :on-invalid [::show-error-toast]
+                                                                            :focus-error? false}] nil)]
       (is (false? (form/submitting? (:form new-state))))
       (is (form/invalid? (:form new-state)))
       (is (form/touched? (:form new-state) :email))
@@ -458,8 +458,8 @@
                                   :required    "Username is required"
                                   :min-length  [3 "Username must be at least 3 characters"]})
       (form/register f :email {:type     "email"
-                              :required "Email is required"
-                              :email    "Please enter a valid email address"})
+                               :required "Email is required"
+                               :email    "Please enter a valid email address"})
       (form/register f :password {:type       "password"
                                   :required   "Password is required"
                                   :min-length [6 "Password must be at least 6 characters"]})

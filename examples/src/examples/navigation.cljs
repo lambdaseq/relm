@@ -76,128 +76,128 @@
   [{:keys [current-url]} _context]
   [:div {:class "max-w-4xl mx-auto"}
    (ui/example-header
-     {:step        "3"
-      :title       "Navigation & History FX"
-      :difficulty  "Beginner"
-      :description "Declarative browser window location and HTML5 History API side effects using `com.lambdaseq.relm.navigation`."
-      :tags        ["relm.navigation" "push-state!" "replace-state!" "History API" "Location FX"]})
+    {:step        "3"
+     :title       "Navigation & History FX"
+     :difficulty  "Beginner"
+     :description "Declarative browser window location and HTML5 History API side effects using `com.lambdaseq.relm.navigation`."
+     :tags        ["relm.navigation" "push-state!" "replace-state!" "History API" "Location FX"]})
 
    ;; Current Browser URL Inspector
    (ui/card
-     {:class "mb-6 border-slate-200 bg-slate-900 text-white"}
-     [:div
-      (ui/card-header
-        [:div {:class "flex items-center justify-between"}
-         [:div {:class "flex items-center gap-2"}
-          [:span {:class "h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"}]
-          (ui/card-title {:class "text-white text-base font-mono"} "Browser Location State")]
-         (ui/button
-           {:variant :ghost
-            :size    :sm
-            :class   "text-slate-300 hover:text-white hover:bg-slate-800"
-            :on      {:click [::update-current-url]}}
-           "↻ Sync URL")])
-      (ui/card-content
-        [:div {:class "bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs text-emerald-400 break-all select-all"}
-         current-url])])
+    {:class "mb-6 border-slate-200 bg-slate-900 text-white"}
+    [:div
+     (ui/card-header
+      [:div {:class "flex items-center justify-between"}
+       [:div {:class "flex items-center gap-2"}
+        [:span {:class "h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"}]
+        (ui/card-title {:class "text-white text-base font-mono"} "Browser Location State")]
+       (ui/button
+        {:variant :ghost
+         :size    :sm
+         :class   "text-slate-300 hover:text-white hover:bg-slate-800"
+         :on      {:click [::update-current-url]}}
+        "↻ Sync URL")])
+     (ui/card-content
+      [:div {:class "bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs text-emerald-400 break-all select-all"}
+       current-url])])
 
    [:div {:class "grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"}
     ;; Basic Page Navigation Card
     (ui/card
-      {:class "border-slate-200"}
-      [:div
-       (ui/card-header
-         (ui/card-title "Location Actions")
-         (ui/card-description "Effects modifying `window.location` directly."))
-       (ui/card-content
-         [:div {:class "space-y-3"}
-          [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
-           [:div
-            [:div {:class "text-sm font-medium text-slate-800"} "GitHub Repository"]
-            [:div {:class "text-xs text-slate-500"} "navigate-to! location.assign"]]
-           (ui/button
-             {:variant :outline
-              :size    :sm
-              :on      {:click [::navigate-to "https://github.com/lambdaseq/relm"]}}
-             "Open ↗")]
+     {:class "border-slate-200"}
+     [:div
+      (ui/card-header
+       (ui/card-title "Location Actions")
+       (ui/card-description "Effects modifying `window.location` directly."))
+      (ui/card-content
+       [:div {:class "space-y-3"}
+        [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
+         [:div
+          [:div {:class "text-sm font-medium text-slate-800"} "GitHub Repository"]
+          [:div {:class "text-xs text-slate-500"} "navigate-to! location.assign"]]
+         (ui/button
+          {:variant :outline
+           :size    :sm
+           :on      {:click [::navigate-to "https://github.com/lambdaseq/relm"]}}
+          "Open ↗")]
 
-          [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
-           [:div
-            [:div {:class "text-sm font-medium text-slate-800"} "Reload Current Window"]
-            [:div {:class "text-xs text-slate-500"} "reload! location.reload"]]
-           (ui/button
-             {:variant :outline
-              :size    :sm
-              :on      {:click [::reload-page]}}
-             "Reload")]
+        [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
+         [:div
+          [:div {:class "text-sm font-medium text-slate-800"} "Reload Current Window"]
+          [:div {:class "text-xs text-slate-500"} "reload! location.reload"]]
+         (ui/button
+          {:variant :outline
+           :size    :sm
+           :on      {:click [::reload-page]}}
+          "Reload")]
 
-          [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
-           [:div
-            [:div {:class "text-sm font-medium text-slate-800"} "Replace URL"]
-            [:div {:class "text-xs text-slate-500"} "replace! location.replace"]]
-           (ui/button
-             {:variant :outline
-              :size    :sm
-              :on      {:click [::replace-url "https://github.com/lambdaseq/relm"]}}
-             "Replace")]])])
+        [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
+         [:div
+          [:div {:class "text-sm font-medium text-slate-800"} "Replace URL"]
+          [:div {:class "text-xs text-slate-500"} "replace! location.replace"]]
+         (ui/button
+          {:variant :outline
+           :size    :sm
+           :on      {:click [::replace-url "https://github.com/lambdaseq/relm"]}}
+          "Replace")]])])
 
     ;; History Navigation Card
     (ui/card
-      {:class "border-slate-200"}
-      [:div
-       (ui/card-header
-         (ui/card-title "History Stack Actions")
-         (ui/card-description "Manipulate HTML5 history without full reload."))
-       (ui/card-content
-         [:div {:class "space-y-3"}
-          [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
-           [:div
-            [:div {:class "text-sm font-medium text-slate-800"} "Push Route State"]
-            [:div {:class "text-xs text-slate-500"} "push-state! /pushed-demo"]]
-           (ui/button
-             {:variant :default
-              :size    :sm
-              :class   "bg-indigo-600 hover:bg-indigo-700"
-              :on      {:click [::push-state "/pushed-demo"]}}
-             "Push Entry")]
+     {:class "border-slate-200"}
+     [:div
+      (ui/card-header
+       (ui/card-title "History Stack Actions")
+       (ui/card-description "Manipulate HTML5 history without full reload."))
+      (ui/card-content
+       [:div {:class "space-y-3"}
+        [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
+         [:div
+          [:div {:class "text-sm font-medium text-slate-800"} "Push Route State"]
+          [:div {:class "text-xs text-slate-500"} "push-state! /pushed-demo"]]
+         (ui/button
+          {:variant :default
+           :size    :sm
+           :class   "bg-indigo-600 hover:bg-indigo-700"
+           :on      {:click [::push-state "/pushed-demo"]}}
+          "Push Entry")]
 
-          [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
-           [:div
-            [:div {:class "text-sm font-medium text-slate-800"} "Replace Route State"]
-            [:div {:class "text-xs text-slate-500"} "replace-state! /replaced-demo"]]
-           (ui/button
-             {:variant :outline
-              :size    :sm
-              :on      {:click [::replace-state "/replaced-demo"]}}
-             "Replace Entry")]
+        [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
+         [:div
+          [:div {:class "text-sm font-medium text-slate-800"} "Replace Route State"]
+          [:div {:class "text-xs text-slate-500"} "replace-state! /replaced-demo"]]
+         (ui/button
+          {:variant :outline
+           :size    :sm
+           :on      {:click [::replace-state "/replaced-demo"]}}
+          "Replace Entry")]
 
-          [:div {:class "grid grid-cols-2 gap-2 pt-1"}
-           (ui/button
-             {:variant :secondary
-              :size    :sm
-              :on      {:click [::go-back]}}
-             "← Back (back!)")
-           (ui/button
-             {:variant :secondary
-              :size    :sm
-              :on      {:click [::go-to-position 1]}}
-             "Forward (go! 1) →")]])])]
+        [:div {:class "grid grid-cols-2 gap-2 pt-1"}
+         (ui/button
+          {:variant :secondary
+           :size    :sm
+           :on      {:click [::go-back]}}
+          "← Back (back!)")
+         (ui/button
+          {:variant :secondary
+           :size    :sm
+           :on      {:click [::go-to-position 1]}}
+          "Forward (go! 1) →")]])])]
 
    ;; Note Box
    (ui/alert
-     {:variant :info}
-     [:div {:class "flex items-start gap-3"}
-      [:span {:class "text-base"} "ℹ️"]
-      [:div
-       [:h4 {:class "font-semibold text-sm mb-0.5"} "Browser Integration Note"]
-       [:p {:class "text-xs text-slate-600 leading-relaxed"}
-        "Navigation effects operate directly on standard browser APIs (`window.location` & `window.history`). When combined with Reitit routing (`com.lambdaseq.relm.reitit`), route changes automatically synchronise with component state."]]])
+    {:variant :info}
+    [:div {:class "flex items-start gap-3"}
+     [:span {:class "text-base"} "ℹ️"]
+     [:div
+      [:h4 {:class "font-semibold text-sm mb-0.5"} "Browser Integration Note"]
+      [:p {:class "text-xs text-slate-600 leading-relaxed"}
+       "Navigation effects operate directly on standard browser APIs (`window.location` & `window.history`). When combined with Reitit routing (`com.lambdaseq.relm.reitit`), route changes automatically synchronise with component state."]]])
 
    ;; Expandable Source Code Panel
    (ui/code-panel
-     {:title    "Navigation Example Source Code"
-      :filename "navigation.cljs"
-      :code     snippets/navigation-code})])
+    {:title    "Navigation Example Source Code"
+     :filename "navigation.cljs"
+     :code     snippets/navigation-code})])
 
 ;; -----------------------------------------------------------------------------
 ;; Component Definition
@@ -206,5 +206,5 @@
 (def NavigationExample
   "Navigation Example component."
   (relm/component
-    {:init init
-     :view view}))
+   {:init init
+    :view view}))

@@ -71,12 +71,12 @@
   "Converts a ClojureScript map of headers into a JavaScript `Headers` instance."
   [headers]
   (reduce-kv
-    (fn [js-headers header-name header-value]
-      (doto js-headers
-        (.append (->str header-name)
-                 (->str header-value))))
-    (js/Headers.)
-    headers))
+   (fn [js-headers header-name header-value]
+     (doto js-headers
+       (.append (->str header-name)
+                (->str header-value))))
+   (js/Headers.)
+   headers))
 
 (defn request->js-init
   "Builds the options configuration object (JavaScript object) passed as the second argument to `js/fetch`."
@@ -93,20 +93,20 @@
                              headers)
                       headers)]
     (doto
-      #js {;; AbortSignal provided either externally or by our internal AbortController
-           :signal      abort-signal
+     #js {;; AbortSignal provided either externally or by our internal AbortController
+          :signal      abort-signal
 
            ;; HTTP method (GET, POST, PUT, DELETE, etc.)
-           :method      (->str method)
+          :method      (->str method)
 
            ;; Request mode: cors, no-cors, same-origin, navigate
-           :mode        (->str mode)
+          :mode        (->str mode)
 
            ;; Request credentials: omit, same-origin, include
-           :credentials (->str credentials)
+          :credentials (->str credentials)
 
            ;; Redirect handling: follow, error, manual
-           :redirect    (->str redirect)}
+          :redirect    (->str redirect)}
 
       ;; Headers
       (cond-> headers' (obj/set "headers" (headers->js headers')))
@@ -127,10 +127,10 @@
   "Converts a JavaScript `Headers` object into a ClojureScript map with keywordized keys."
   [js-headers]
   (reduce
-    (fn [headers [header-name header-value]]
-      (assoc headers (keyword header-name) header-value))
-    {}
-    (es6-iterator-seq (.entries js-headers))))
+   (fn [headers [header-name header-value]]
+     (assoc headers (keyword header-name) header-value))
+   {}
+   (es6-iterator-seq (.entries js-headers))))
 
 (defn js-response->clj
   "Converts a JavaScript `Response` object into a ClojureScript map containing response metadata."
@@ -168,16 +168,16 @@
     (->reader response-content-type)
     (let [content-type (get-in response [:headers :content-type] "text/plain")
           reader (reduce-kv
-                   (fn [ret pattern reader]
-                     (if (or (and (string? pattern)
-                                  (or (= content-type pattern)
-                                      (string/starts-with? content-type pattern)))
-                             (and (regexp? pattern)
-                                  (re-find pattern content-type)))
-                       (reduced reader)
-                       ret))
-                   default-text-reader
-                   (merge default-response-content-types response-content-types))]
+                  (fn [ret pattern reader]
+                    (if (or (and (string? pattern)
+                                 (or (= content-type pattern)
+                                     (string/starts-with? content-type pattern)))
+                            (and (regexp? pattern)
+                                 (re-find pattern content-type)))
+                      (reduced reader)
+                      ret))
+                  default-text-reader
+                  (merge default-response-content-types response-content-types))]
       (->reader reader))))
 
 (defn timeout-race
@@ -187,8 +187,8 @@
     (.race js/Promise
            #js [js-promise
                 (js/Promise.
-                  (fn [_ reject]
-                    (js/setTimeout #(reject :timeout) timeout)))])
+                 (fn [_ reject]
+                   (js/setTimeout #(reject :timeout) timeout)))])
     js-promise))
 
 ;; -----------------------------------------------------------------------------
@@ -241,9 +241,9 @@
   (swap! request-id->js-abort-controller dissoc request-id)
   (let [problem-message (obj/get js-error "message")
         response        (assoc response
-                          :problem         :body
-                          :reader          reader-kw
-                          :problem-message problem-message)]
+                               :problem         :body
+                               :reader          reader-kw
+                               :problem-message problem-message)]
     (dispatch-event! dom-event on-failure response)))
 
 (defn response-success-handler

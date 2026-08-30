@@ -21,14 +21,14 @@
   - `:context`     Map of global context shared by all components (e.g. routing, themes, user session)
   - `:components`  Map of `{<comp-id-str> {:state <local-state>}}` storing isolated local states
   - `:root`        Map of `{:node <dom-node> :component <root-comp> :args <args-map>}`"}
-         !app-state
-         (atom {:context    {}
-                :components {}
-                :root       nil}))
+  !app-state
+  (atom {:context    {}
+         :components {}
+         :root       nil}))
 
 (defonce ^:private ^{:doc "Flag used to prevent re-entrant rendering cycles."}
-         !rendering?
-         (atom false))
+  !rendering?
+  (atom false))
 
 ;; -----------------------------------------------------------------------------
 ;; Utilities
@@ -46,7 +46,7 @@
 ;; -----------------------------------------------------------------------------
 
 (defmulti fx
-          "Multimethod for handling side effects returned by message handlers.
+  "Multimethod for handling side effects returned by message handlers.
 
           Dispatches on the first element of the effect vector. Effect handlers perform
           asynchronous or side-effectful operations (HTTP requests, DOM changes, navigation, timers)
@@ -63,8 +63,8 @@
             [_event [_ message]]
             (js/alert message))
           ```"
-          (fn [_ event-or-effect]
-            (first event-or-effect)))
+  (fn [_ event-or-effect]
+    (first event-or-effect)))
 
 (defn -dispatch-fx!
   "Executes side effects returned by an update handler.
@@ -79,7 +79,7 @@
 ;; -----------------------------------------------------------------------------
 
 (defmulti update
-          "Handles state transitions based on dispatched event messages.
+  "Handles state transitions based on dispatched event messages.
 
           Dispatched on the first element of the message vector (the message type keyword).
           Takes `[state context message event]` and returns a vector of:
@@ -102,8 +102,8 @@
              context
              [[::log-analytics \"incremented\"]]])
           ```"
-          (fn [_state _context message _event]
-            (first message)))
+  (fn [_state _context message _event]
+    (first message)))
 
 ;; -----------------------------------------------------------------------------
 ;; Component Identification & Rendering Internals
@@ -149,7 +149,7 @@
     (-do-render-root!)))
 
 (defonce ^:private -init-watch
-         (add-watch !app-state :relm/root-render -on-app-state-change))
+  (add-watch !app-state :relm/root-render -on-app-state-change))
 
 ;; -----------------------------------------------------------------------------
 ;; Public Rendering API
@@ -269,8 +269,8 @@
                                               [result context])]
         (swap! !app-state (fn [app]
                             (cond-> app
-                                    comp-id (assoc-in [:components comp-id :state] new-state)
-                                    (some? new-context) (assoc :context new-context))))
+                              comp-id (assoc-in [:components comp-id :state] new-state)
+                              (some? new-context) (assoc :context new-context))))
         (-dispatch-fx! event effects)))))
 
 (defn dispatch!
@@ -363,25 +363,25 @@
     (when hiccup
       (-> hiccup
           (rh/update-attrs
-            (fn [attrs]
-              (cond-> (assoc (or attrs {}) :data-relm-component-id comp-id)
-                (not (or (contains? attrs :replicant/key) (contains? attrs :key)))
-                (assoc :replicant/key comp-id))))
+           (fn [attrs]
+             (cond-> (assoc (or attrs {}) :data-relm-component-id comp-id)
+               (not (or (contains? attrs :replicant/key) (contains? attrs :key)))
+               (assoc :replicant/key comp-id))))
           (rh/update-attrs
-            clojure.core/update :replicant/on-unmount
-            (fn [on-unmount]
-              (cond
-                (nil? on-unmount)
-                [::deinit-component comp-id]
+           clojure.core/update :replicant/on-unmount
+           (fn [on-unmount]
+             (cond
+               (nil? on-unmount)
+               [::deinit-component comp-id]
 
-                (vector-of-vectors? on-unmount)
-                (conj on-unmount [::deinit-component comp-id])
+               (vector-of-vectors? on-unmount)
+               (conj on-unmount [::deinit-component comp-id])
 
-                (vector? on-unmount)
-                [on-unmount [::deinit-component comp-id]]
+               (vector? on-unmount)
+               [on-unmount [::deinit-component comp-id]]
 
-                :else
-                [::deinit-component comp-id])))))))
+               :else
+               [::deinit-component comp-id])))))))
 
 (defn component
   "Creates a new Elm-style component with initialization, lifecycle hooks, and view functions.
