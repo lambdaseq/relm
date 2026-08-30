@@ -6,10 +6,10 @@
             [deps-deploy.deps-deploy :as dd]))
 
 (def lib-modules
-  {:core   {:lib 'io.github.conjurernix/relm.core   :dir "core"}
-   :form   {:lib 'io.github.conjurernix/relm.form   :dir "form"}
-   :query  {:lib 'io.github.conjurernix/relm.query  :dir "query"}
-   :reitit {:lib 'io.github.conjurernix/relm.reitit :dir "reitit"}})
+  {:core   {:lib 'io.github.conjurernix/relm.core   :dir "core"   :description "Declarative state management for ClojureScript"}
+   :form   {:lib 'io.github.conjurernix/relm.form   :dir "form"   :description "Form state management extension for relm"}
+   :query  {:lib 'io.github.conjurernix/relm.query  :dir "query"  :description "Async query and data fetching extension for relm"}
+   :reitit {:lib 'io.github.conjurernix/relm.reitit :dir "reitit" :description "Reitit router integration for relm"}})
 
 (def default-all-modules
   ["core" "form" "query" "reitit" "examples"])
@@ -23,7 +23,7 @@
   [opts]
   (or (:version opts)
       (try
-        (let [tag (b/git-process {:git-args ["describe" "--tags" "--always"]})]
+        (let [tag (b/git-process {:git-args ["describe" "--tags" "--abbrev=0"]})]
           (when (and tag (seq (str/trim tag)))
             (let [v (str/replace (str/trim tag) #"^v" "")]
               (if (re-find #"^\d+\.\d+" v)
@@ -32,7 +32,17 @@
         (catch Exception _ nil))
       "0.1.0-SNAPSHOT"))
 
-(def version (compute-version {}))
+(defn version
+  "Prints and returns the current derived or overridden version.
+   Options:
+     :version - optional version override"
+  [opts]
+  (let [ver (compute-version opts)]
+    (println ver)
+    ver))
+
+(def current-version version)
+(def show-version version)
 
 (defn- resolve-lib-modules
   [opts]
@@ -60,7 +70,7 @@
     (mapv #(str dir "/" %) (if (seq existing) existing ["src"]))))
 
 (defn- jar-opts-for-module
-  [{:keys [lib dir]} ver opts]
+  [{:keys [lib dir description]} ver opts]
   (let [class-dir (str "target/" dir "/classes")
         jar-file  (format "target/%s-%s.jar" (name lib) ver)
         basis     (module-basis dir ver)
@@ -72,6 +82,13 @@
             :scm       (merge {:url "https://github.com/conjurernix/relm"
                                :tag (str "v" ver)}
                               (:scm opts))
+            :pom-data  [[:description (or description "Declarative state management for ClojureScript")]
+                        [:url "https://github.com/conjurernix/relm"]
+                        [:licenses
+                         [:license
+                          [:name "Eclipse Public License 1.0"]
+                          [:url "https://opensource.org/license/epl-1-0"]
+                          [:distribution "repo"]]]]
             :basis     basis
             :class-dir class-dir
             :target    (str "target/" dir)
@@ -167,6 +184,139 @@
   (jar opts)
   (test opts)
   opts)
+
+;; ----------------------------------------------------------------------------
+;; Version Bumping
+;; ----------------------------------------------------------------------------
+
+(defn parse-version
+  "Parses version string into structured map {:major :minor :patch :qualifier :qualifier-num}"
+  [v-str]
+  (let [clean-v (str/replace (str/trim (or v-str "")) #"^v" "")
+        pattern #"^(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z]+)(?:\.?(\d+))?)?$"
+        [_ major minor patch qualifier q-num] (re-matches pattern clean-v)]
+    (when major
+      {:major         (parse-long major)
+       :minor         (parse-long minor)
+       :patch         (parse-long patch)
+       :qualifier     qualifier
+       :qualifier-num (when q-num (parse-long q-num))})))
+
+(defn format-version
+  [{:keys [major minor patch qualifier qualifier-num]}]
+  (if qualifier
+    (if qualifier-num
+      (format "%d.%d.%d-%s%d" major minor patch qualifier qualifier-num)
+      (format "%d.%d.%d-%s" major minor patch qualifier))
+    (format "%d.%d.%d" major minor patch)))
+
+(defn next-version
+  "Calculates the next version based on bump type: :major, :minor, :patch, :alpha, :beta, :rc, :release, :snapshot."
+  [current-v bump-type]
+  (let [parsed (or (parse-version current-v)
+                   {:major 0 :minor 1 :patch 0 :qualifier "alpha" :qualifier-num 1})
+        {:keys [major minor patch qualifier qualifier-num]} parsed
+        type-key (keyword (name bump-type))]
+    (format-version
+     (case type-key
+       :major
+       {:major (inc major) :minor 0 :patch 0}
+
+       :minor
+       {:major major :minor (inc minor) :patch 0}
+
+       :patch
+       (if (and qualifier (nil? qualifier-num))
+         {:major major :minor minor :patch patch}
+         {:major major :minor minor :patch (inc patch)})
+
+       :alpha
+       (if (= (some-> qualifier str/lower-case) "alpha")
+         {:major major :minor minor :patch patch :qualifier "alpha" :qualifier-num (inc (or qualifier-num 0))}
+         (if qualifier
+           {:major major :minor minor :patch patch :qualifier "alpha" :qualifier-num 1}
+           {:major major :minor minor :patch (inc patch) :qualifier "alpha" :qualifier-num 1}))
+
+       :beta
+       (if (= (some-> qualifier str/lower-case) "beta")
+         {:major major :minor minor :patch patch :qualifier "beta" :qualifier-num (inc (or qualifier-num 0))}
+         {:major major :minor minor :patch (if qualifier patch (inc patch)) :qualifier "beta" :qualifier-num 1})
+
+       :rc
+       (if (= (some-> qualifier str/lower-case) "rc")
+         {:major major :minor minor :patch patch :qualifier "rc" :qualifier-num (inc (or qualifier-num 0))}
+         {:major major :minor minor :patch (if qualifier patch (inc patch)) :qualifier "rc" :qualifier-num 1})
+
+       :release
+       {:major major :minor minor :patch patch}
+
+       :snapshot
+       (if (= (some-> qualifier str/lower-case) "snapshot")
+         {:major major :minor minor :patch patch :qualifier "SNAPSHOT"}
+         (if qualifier
+           {:major major :minor minor :patch patch :qualifier "SNAPSHOT"}
+           {:major major :minor minor :patch (inc patch) :qualifier "SNAPSHOT"}))
+
+       (throw (ex-info (str "Unknown bump type: " bump-type ". Expected one of: :major, :minor, :patch, :alpha, :beta, :rc, :release, :snapshot")
+                       {:bump-type bump-type}))))))
+
+(defn- update-submodule-deps-version!
+  [new-version]
+  (let [files ["form/deps.edn" "query/deps.edn" "reitit/deps.edn" "examples/deps.edn"]]
+    (doseq [f-path files]
+      (let [f (io/file f-path)]
+        (when (.exists f)
+          (let [content (slurp f)
+                updated (str/replace content
+                                     #"(io\.github\.conjurernix/relm\.[a-z]+)(\s+\{:mvn/version\s+\")[^\"]+(\"\})"
+                                     (str "$1$2" new-version "$3"))]
+            (if (not= content updated)
+              (do
+                (spit f updated)
+                (println (str "Updated " f-path " to version " new-version)))
+              (println (str f-path " already at version " new-version)))))))))
+
+(defn- create-git-tag!
+  [new-version]
+  (println (str "Creating git tag: " new-version "..."))
+  (let [res (b/process {:command-args ["git" "tag" "-a" new-version "-m" (str "Release " new-version)]})]
+    (if (zero? (:exit res))
+      (println (str "Git tag " new-version " created successfully."))
+      (println (str "Note: git tag command exited with status " (:exit res) " (tag might already exist).")))))
+
+(defn bump
+  "Bumps version across the repository (git tag and submodule deps.edn).
+   Options:
+     :type        - bump type (:major, :minor, :patch, :alpha, :beta, :rc, :release, :snapshot) [default: :patch]
+     :to/:version - explicit target version (overrides computed next-version)
+     :tag         - whether to create git tag (default: true)
+     :update-deps - whether to update submodule deps.edn files (default: true)
+     :dry-run     - boolean flag to preview bump without making changes"
+  [opts]
+  (let [cur-ver   (compute-version opts)
+        bump-type (or (:type opts) :patch)
+        new-ver   (or (:to opts) (:version opts) (next-version cur-ver bump-type))
+        tag?      (get opts :tag true)
+        deps?     (get opts :update-deps true)
+        dry-run?  (:dry-run opts)]
+    (println (str "\nBumping version: " cur-ver " -> " new-ver " (type: " bump-type ")"))
+    (if dry-run?
+      (println "[dry-run] No changes applied.")
+      (do
+        (when deps?
+          (update-submodule-deps-version! new-ver))
+        (when tag?
+          (create-git-tag! new-ver))))
+    (assoc opts :version new-ver :previous-version cur-ver)))
+
+(defn bump-major    [opts] (bump (assoc opts :type :major)))
+(defn bump-minor    [opts] (bump (assoc opts :type :minor)))
+(defn bump-patch    [opts] (bump (assoc opts :type :patch)))
+(defn bump-alpha    [opts] (bump (assoc opts :type :alpha)))
+(defn bump-beta     [opts] (bump (assoc opts :type :beta)))
+(defn bump-rc       [opts] (bump (assoc opts :type :rc)))
+(defn bump-release  [opts] (bump (assoc opts :type :release)))
+(defn bump-snapshot [opts] (bump (assoc opts :type :snapshot)))
 
 ;; ----------------------------------------------------------------------------
 ;; Linting, Formatting, and Vulnerability Scanning
