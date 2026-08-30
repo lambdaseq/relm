@@ -193,6 +193,8 @@ All query helpers accept the form state map and a field path (keyword or vector)
   - If invalid: focuses first error and dispatches `:on-invalid` with errors map.
 - **Reset**: `(form/on-reset form)`
   - Resets values back to initial state, clearing touched paths and errors.
+- **Unmount & Cleanup**: `(form/on-clear form)` or `(form/form-attrs form)`
+  - Clears registered field configurations and validators, and cleans up form state when unmounted.
 - **Change & Blur**: `(form/on-change form path)` and `(form/on-blur form path)`
 
 ---
@@ -207,6 +209,7 @@ All query helpers accept the form state map and a field path (keyword or vector)
 - `[::form/set-values form-key values-map]`
 - `[::form/set-error form-key path error-msg]`
 - `[::form/reset form-key]`
+- `[::form/clear form-key]`
 - `[::form/submit form-key opts]`
 
 ### Built-in Side Effects

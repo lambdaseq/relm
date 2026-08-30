@@ -127,7 +127,8 @@
      [:div {:style {:padding       "16px"
                     :border        "1px solid #e5e7eb"
                     :border-radius "8px"
-                    :margin-bottom "20px"}}
+                    :margin-bottom "20px"}
+            :replicant/on-unmount (form/on-clear form)}
       [:h2 {:style {:font-size "16px" :font-weight "600" :margin-bottom "12px"}}
        "Optimistic Mutation: Add Post"]
       [:div {:style {:display "flex" :gap "12px" :margin-bottom "8px"}}
@@ -207,8 +208,14 @@
 ;; Component Export
 ;; -----------------------------------------------------------------------------
 
+(defn on-deinit
+  "Lifecycle hook that clears form state when QueryExample unmounts."
+  [state context _args _event]
+  [state context [[::relm/dispatch! (form/on-clear :form)]]])
+
 (def QueryExample
   "Query example component."
   (relm/component
-    {:init init
-     :view view}))
+    {:init      init
+     :on-deinit on-deinit
+     :view      view}))

@@ -176,7 +176,8 @@
           [:pre {:style {:margin-top "8px" :font-size "12px" :overflow-x "auto"}}
            (pr-str submitted-data)]])
 
-       [:form {:on {:submit [
+       [:form {:replicant/on-unmount (form/on-clear form)
+               :on {:submit [
                              [::form/submit (form/extract-form-key form) {:on-submit [::handle-registration-success]}]]}}
         ;; Username Field
         (input-field form :username {:label       "Username"
@@ -273,8 +274,14 @@
 ;; Component Definition
 ;; -----------------------------------------------------------------------------
 
+(defn on-deinit
+  "Lifecycle hook that clears form state when FormExample unmounts."
+  [state context _args _event]
+  [state context [[::relm/dispatch! (form/on-clear :form)]]])
+
 (def FormExample
   "Form Example component ready to be mounted."
   (relm/component
-    {:init init
-     :view view}))
+    {:init      init
+     :on-deinit on-deinit
+     :view      view}))

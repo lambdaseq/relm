@@ -597,3 +597,33 @@
         (let [[state-after-reset] (relm/update {:form f-mod} {} [::form/reset :form] nil)]
           (is (false? (form/dirty? (:form state-after-reset))))
           (is (true? (form/value (:form state-after-reset) [:preferences :newsletter]))))))))
+
+(deftest unmount-form-cleanup-test
+  (testing "on-clear and ::form/clear clears registered field configs and state"
+    ;; 1. Register a form with a required title validator
+    (let [f1 (form/create)
+          _ (form/register f1 :title {:required "Title is required"})
+          state1 {:form f1}
+          [invalid-state] (relm/update state1 {} [::form/submit :form {:on-submit [::ok]}] nil)]
+      (is (= "Title is required" (form/error (:form invalid-state) :title)))
+      (is (= [::form/clear :form] (form/on-clear f1)))
+      (is (= [::form/clear :form] (form/on-clear :form)))
+
+      ;; 2. Unmount / clear form
+      (let [[cleaned-state] (relm/update invalid-state {} (form/on-clear f1) nil)]
+        (is (nil? (:form cleaned-state)))
+
+        ;; 3. Create a new form reusing the same form key :form with different fields
+        (let [f2 (form/create)
+              _ (form/register f2 :username {:required "Username is required"})
+              state2 {:form f2}
+              [invalid-state2] (relm/update state2 {} [::form/submit :form {:on-submit [::ok]}] nil)]
+          ;; The old :title validator must no longer exist or leak into f2
+          (is (nil? (form/error (:form invalid-state2) :title)))
+          (is (= "Username is required" (form/error (:form invalid-state2) :username)))))))
+
+  (testing "form-attrs attaches :replicant/on-unmount hook"
+    (let [f (form/create)
+          attrs (form/form-attrs f {:class "my-form"})]
+      (is (= "my-form" (:class attrs)))
+      (is (= [::form/clear :form] (:replicant/on-unmount attrs))))))
