@@ -33,9 +33,10 @@ Add the dependency to your `deps.edn`:
 
 `com.lambdaseq.relm.reitit` synchronizes Reitit routes with Relm's Elm-architecture runtime:
 
-- **Automatic Context Sync**: Matches the current URL on navigation and synchronizes the active route and view component in Relm's global `context`.
-- **HTML5 History Integration**: Listens to browser `popstate` events to update route context on back/forward buttons.
-- **Declarative Navigation**: Dispatches pure update messages (`::navigate-to`, `::replace-to`) that update context and trigger History API side effects.
+- **Automatic Context Sync**: Matches the current URL on navigation and synchronizes the active router, options, route, and view component in Relm's global `context`.
+- **Pure MVU State Transitions**: Pure `update` message handlers (`::start`, `::stop`, `::set-router`, `::navigate-to`, `::replace-to`, `::route-changed`) without hidden top-level atoms or side effects during state transitions.
+- **Dedicated Side Effects**: HTML5 History API interactions and `popstate` event listeners are cleanly managed via `relm/fx` side effects (`::listen-history!`, `::unlisten-history!`, `::nav/push-state!`, `::nav/replace-state!`).
+- **Declarative Navigation**: Dispatches pure update messages that update context and trigger History API side effects.
 - **Bi-directional Routing**: Reverse URL generation from route names, route parameters, and query parameters.
 
 ---
@@ -145,27 +146,47 @@ Updates route context directly without triggering browser history side effects (
 [::relm.reitit/route-changed match-or-target params query-params]
 ```
 
+### Router Management Messages (`::start`, `::stop`, `::set-router`)
+
+Initialize, update, or stop router integration declaratively:
+
+```clojure
+;; Start router and attach popstate listener
+[::relm.reitit/start router {:default-path "/"}]
+
+;; Update active router in context and refresh popstate listener
+[::relm.reitit/set-router new-router {:default-path "/home"}]
+
+;; Stop popstate listener and clear router context
+[::relm.reitit/stop]
+```
+
 ---
 
 ## HTML5 History & Popstate
 
-### Starting the Router (`start!`)
+All side effects (attaching/removing `popstate` event listeners and pushing/replacing browser history) are handled through Relm's `fx` multimethod:
+- `::relm.reitit/listen-history!` - Attaches popstate event listener for the active router and default fallback path.
+- `::relm.reitit/unlisten-history!` - Cleans up active popstate event listener from `window`.
 
-`(relm.reitit/start! router opts)` initializes routing, registers `popstate` listeners in the browser, and populates `!app-state` context with the initial match:
+### Lifecycle Functions
+
+Convenience bootstrap functions dispatch the corresponding MVU messages:
+
+#### `(relm.reitit/start! router opts)`
+Dispatches `[::relm.reitit/start router opts]`, registers `popstate` listeners in the browser, and populates `!app-state` context with the initial match:
 
 ```clojure
 (relm.reitit/start! router {:default-path       "/"
                             :dispatch-initial? true})
 ```
 
-#### Options
-
+##### Options
 - `:default-path`: Fallback path string if the current URL does not match any route.
 - `:dispatch-initial?`: Whether to immediately update `!app-state` context with current matched route (default: `true`).
 
-### Stopping the Router (`stop!`)
-
-`(relm.reitit/stop!)` removes the browser `popstate` event listener during application teardown or testing.
+#### `(relm.reitit/stop!)`
+Dispatches `[::relm.reitit/stop]` to remove the browser `popstate` event listener and clear router data from context during application teardown or testing.
 
 ---
 

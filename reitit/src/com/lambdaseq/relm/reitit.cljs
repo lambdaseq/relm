@@ -3,38 +3,21 @@
 
   Provides seamless integration between Metosin's Reitit library and Relm:
   - Automatic synchronization of the current route match inside Relm's global `:context`
-  - Browser HTML5 history integration via `popstate` listeners
+  - Browser HTML5 history integration via `popstate` listeners managed through Relm side effects
   - Helper functions for querying routes and views from the context (`current-route`, `current-view`, `current-match`, `path-for`)
-  - Declarative Relm `update` message handlers for navigation (`::navigate-to`, `::replace-to`, `::route-changed`, etc.)"
+  - Declarative Relm `update` message handlers for navigation (`::navigate-to`, `::replace-to`, `::route-changed`, `::start`, `::stop`, etc.)"
   (:require [com.lambdaseq.relm.core :as relm]
             [com.lambdaseq.relm.navigation :as nav]
             [reitit.core :as r]))
-
-;; -----------------------------------------------------------------------------
-;; Module State
-;; -----------------------------------------------------------------------------
-
-(defonce ^:private ^{:doc "Holds the active Reitit router instance registered via `start!`."}
-  !router
-  (atom nil))
-
-(defonce ^:private ^{:doc "Holds router configuration options (such as `:default-path` and `:dispatch-initial?`)."}
-  !options
-  (atom {}))
-
-(defonce ^:private ^{:doc "Stores the active browser `popstate` event listener function for cleanup on `stop!`."}
-  !history-listener
-  (atom nil))
 
 ;; -----------------------------------------------------------------------------
 ;; Router Lookup and Matching Helpers
 ;; -----------------------------------------------------------------------------
 
 (defn router
-  "Returns the Reitit router instance from the `context` map (under `:router`),
-  falling back to the globally configured router atom if not present in context."
+  "Returns the Reitit router instance from the `context` map (under `:router`)."
   [context]
-  (or (:router context) @!router))
+  (:router context))
 
 (defn current-path
   "Returns the current window pathname in browser environments, or \"/\" if window is not available."
@@ -143,66 +126,88 @@
   ([r-router route-name params]
    (path-for r-router route-name params nil))
   ([r-router route-name params query-params]
-  (when-let [m (match-by-name r-router route-name params)]
+   (when-let [m (match-by-name r-router route-name params)]
      (if (seq query-params)
        (r/match->path m query-params)
        (:path m)))))
 
 ;; -----------------------------------------------------------------------------
-;; Lifecycle & History Management
+;; Side Effects (relm/fx)
 ;; -----------------------------------------------------------------------------
 
-(defn stop!
-  "Stops listening for browser `popstate` events and clears the registered history listener."
+(defn- remove-popstate-listener!
+  "Removes active popstate event listener from `js/window` if attached."
   []
   (when (exists? js/window)
-    (when-let [listener @!history-listener]
+    (when-let [listener (.-_relmPopstateListener js/window)]
       (.removeEventListener js/window "popstate" listener)
-      (reset! !history-listener nil))))
+      (set! (.-_relmPopstateListener js/window) nil))))
 
-(defn start!
-  "Initializes the Reitit router, stores it and initial route match in Relm's context,
-  and attaches a browser `popstate` listener for history navigation.
+;; Attaches a browser `popstate` event listener for the configured router.
+;; Effect format: `[::listen-history! {:router r-router :default-path default-path}]`
+(defmethod relm/fx ::listen-history!
+  [_ [_ {:keys [router default-path]}]]
+  (when (exists? js/window)
+    (remove-popstate-listener!)
+    (let [listener (fn [_]
+                     (let [curr-p (current-path)
+                           curr-m (match-target router curr-p nil nil default-path)]
+                       (relm/dispatch! nil [::route-changed curr-m])))]
+      (set! (.-_relmPopstateListener js/window) listener)
+      (.addEventListener js/window "popstate" listener))))
 
-  Options map:
-  - `:default-path`: Fallback path string when a route is not matched (e.g. `\"/\"`)
-  - `:dispatch-initial?`: Whether to immediately update `!app-state` context with current route (default: `true`)"
-  ([r-router]
-   (start! r-router {}))
-  ([r-router opts]
-   (let [options (merge {:dispatch-initial? true} opts)
-         default-path (:default-path options)
-         path (current-path)
-         match (match-target r-router path nil nil default-path)]
-     (reset! !router r-router)
-     (reset! !options options)
-     (stop!)
-     (when (exists? js/window)
-       (let [listener (fn [_]
-                        (let [curr-p (current-path)
-                              curr-m (match-target r-router curr-p nil nil default-path)]
-                          (relm/dispatch! nil [::route-changed curr-m])))]
-         (reset! !history-listener listener)
-         (.addEventListener js/window "popstate" listener)))
-     (when (:dispatch-initial? options)
-       (swap! relm/!app-state (fn [app]
-                                (clojure.core/update app :context (fn [ctx]
-                                                                    (-> (or ctx {})
-                                                                        (assoc :router r-router)
-                                                                        (set-route-context match)))))))
-     match)))
+;; Removes browser `popstate` event listener.
+;; Effect format: `[::unlisten-history!]`
+(defmethod relm/fx ::unlisten-history!
+  [_ _]
+  (remove-popstate-listener!))
 
 ;; -----------------------------------------------------------------------------
 ;; Relm Update Message Handlers
 ;; -----------------------------------------------------------------------------
 
+;; Initializes the Reitit router and context, emitting side-effects to attach the popstate listener.
+;; Message format: `[::start r-router opts?]`
+(defmethod relm/update ::start
+  [state context [_ r-router opts] _event]
+  (let [options (merge {:dispatch-initial? true} opts)
+        default-path (:default-path options)
+        path (current-path)
+        match (match-target r-router path nil nil default-path)]
+    [state
+     (-> context
+         (assoc :router r-router
+                :router-options options)
+         (cond-> default-path (assoc :default-path default-path))
+         (cond-> (:dispatch-initial? options) (set-route-context match)))
+     [[::listen-history! {:router r-router :default-path default-path}]]]))
+
+;; Alias for `::start`.
+(defmethod relm/update ::start!
+  [state context message event]
+  (let [[_ r-router opts] message]
+    (relm/update state context [::start r-router opts] event)))
+
+;; Stops listening for browser popstate events and clears router context.
+;; Message format: `[::stop]`
+(defmethod relm/update ::stop
+  [state context _message _event]
+  [state
+   (dissoc context :router :router-options :default-path :route :current-route)
+   [[::unlisten-history!]]])
+
+;; Alias for `::stop`.
+(defmethod relm/update ::stop!
+  [state context message event]
+  (relm/update state context [::stop] event))
+
 ;; Navigates to a target route (by path string or route name keyword), updates context with the new match,
-;; and emits a `::nav/push-state` side effect.
+;; and emits a `::nav/push-state!` side effect.
 ;; Message format: `[::navigate-to target params? query-params?]`
 (defmethod relm/update ::navigate-to
   [state context [_ target params query-params] _event]
   (let [r-router (router context)
-        default-path (or (:default-path context) (:default-path @!options))
+        default-path (or (:default-path context) (get-in context [:router-options :default-path]))
         match (match-target r-router target params query-params default-path)
         path (resolve-path target match query-params)]
     [state
@@ -229,12 +234,12 @@
   (let [[_ route-name params query-params] message]
     (relm/update state context [::navigate-to route-name params query-params] event)))
 
-;; Replaces current route (by path string or route name keyword) in context and emits a `::nav/replace-state` effect.
+;; Replaces current route (by path string or route name keyword) in context and emits a `::nav/replace-state!` effect.
 ;; Message format: `[::replace-to target params? query-params?]`
 (defmethod relm/update ::replace-to
   [state context [_ target params query-params] _event]
   (let [r-router (router context)
-        default-path (or (:default-path context) (:default-path @!options))
+        default-path (or (:default-path context) (get-in context [:router-options :default-path]))
         match (match-target r-router target params query-params default-path)
         path (resolve-path target match query-params)]
     [state
@@ -267,7 +272,7 @@
 (defmethod relm/update ::route-changed
   [state context [_ match-or-target params query-params] _event]
   (let [r-router (router context)
-        default-path (or (:default-path context) (:default-path @!options))
+        default-path (or (:default-path context) (get-in context [:router-options :default-path]))
         match (if (and (map? match-or-target) (contains? match-or-target :data))
                 match-or-target
                 (match-target r-router match-or-target params query-params default-path))]
@@ -283,12 +288,36 @@
 ;; Message format: `[::set-router new-router opts?]`
 (defmethod relm/update ::set-router
   [state context [_ new-router opts] _event]
-  (let [options (merge @!options opts)
-        default-path (:default-path options)
+  (let [options (merge (or (:router-options context) {}) opts)
+        default-path (or (:default-path options) (:default-path context))
         path (current-path)
         match (match-target new-router path nil nil default-path)]
-    (reset! !router new-router)
-    (reset! !options options)
-    [state (-> context
-               (assoc :router new-router)
-               (set-route-context match))]))
+    [state
+     (-> context
+         (assoc :router new-router
+                :router-options options)
+         (cond-> default-path (assoc :default-path default-path))
+         (set-route-context match))
+     [[::listen-history! {:router new-router :default-path default-path}]]]))
+
+;; -----------------------------------------------------------------------------
+;; Lifecycle & History Management Convenience Functions
+;; -----------------------------------------------------------------------------
+
+(defn start!
+  "Initializes the Reitit router, stores it and initial route match in Relm's context,
+  and attaches a browser `popstate` listener for history navigation via Relm message dispatch.
+
+  Options map:
+  - `:default-path`: Fallback path string when a route is not matched (e.g. `\"/\"`)
+  - `:dispatch-initial?`: Whether to immediately update `!app-state` context with current route (default: `true`)"
+  ([r-router]
+   (start! r-router {}))
+  ([r-router opts]
+   (relm/dispatch! nil [::start r-router opts])
+   (current-match (:context @relm/!app-state))))
+
+(defn stop!
+  "Stops listening for browser `popstate` events and clears the registered router from context."
+  []
+  (relm/dispatch! nil [::stop]))
