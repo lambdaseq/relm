@@ -327,7 +327,30 @@
 ;; Relm Update Message Handlers
 ;; -----------------------------------------------------------------------------
 
-;; Query fetching handler: [::update key opts?] or [::update key]
+;; Query fetching handler: [::update key opts?]
+;;
+;; Message Signature:
+;;   `[::update query-key opts?]`
+;;
+;; Parameters:
+;;   - `query-key`: Vector, keyword, or value identifying the query (e.g. `[:posts {:_limit 5}]`).
+;;   - `opts`: (Optional) Map of query options:
+;;       - `:stale-time` Duration (ms) before cached data is considered stale (default: 0).
+;;       - `:force?`     When true, bypasses fresh cache and forces a network fetch.
+;;       - `:base-url`   Root URL prepended to inferred REST path.
+;;       - `:url`        Explicit URL override (skips inference).
+;;       - `:params`     Explicit query parameters map (merged with inferred params).
+;;       - `:headers`    HTTP request headers map.
+;;       - `:retry`      Max retry attempts on failure (default: 3, false to disable).
+;;       - `:on-success` Message vector dispatched upon successful fetch (e.g. `[::on-posts-loaded]`).
+;;       - `:on-failure` Message vector dispatched upon final fetch failure.
+;;
+;; Behavior & Lifecycle:
+;;   1. Normalizes `query-key` and checks context cache (`[:queries norm-key]`).
+;;   2. If cache is fresh (`:status :success`, data present, not stale, not `:force?`),
+;;      returns `[state context]` immediately with zero HTTP effects.
+;;   3. Otherwise, marks query as loading in context via `set-query-loading` and emits
+;;      `[::http/fetch! http-req]` with success/failure callback handlers.
 (defmethod relm/update ::update
   [state context [_ key opts] _event]
   (let [norm-key (normalize-key key)
@@ -352,12 +375,30 @@
         [state new-context [[::http/fetch! http-req]]]))))
 
 ;; Alias `::fetch` to `::update`
+;;
+;; Message Signature:
+;;   `[::fetch query-key opts?]`
+;;
+;; Delegates directly to `::update` for semantic readability in fetching queries.
 (defmethod relm/update ::fetch
   [state context message event]
   (let [[_ key opts] message]
     (relm/update state context [::update key opts] event)))
 
 ;; Query fetch success handler: [::fetch-success norm-key opts response]
+;;
+;; Message Signature:
+;;   `[::fetch-success norm-key opts response]`
+;;
+;; Parameters:
+;;   - `norm-key`: Normalized query key vector.
+;;   - `opts`: Query configuration map passed to the original fetch.
+;;   - `response`: HTTP response map containing `:body`, `:status`, etc.
+;;
+;; State Transitions & Effects:
+;;   - Updates `context[:queries norm-key]` via `set-query-data` with response body data,
+;;     `:status :success`, `:is-loading? false`, `:is-fetching? false`, and current timestamp.
+;;   - If `:on-success` message vector is configured in `opts`, emits `[::relm/dispatch! on-success]`.
 (defmethod relm/update ::fetch-success
   [state context [_ norm-key opts response] _event]
   (let [data (or (:body response) response)
@@ -366,6 +407,24 @@
     [state new-context (if (seq on-success) [[::relm/dispatch! on-success]] [])]))
 
 ;; Query fetch failure handler: [::fetch-failure norm-key attempt opts response]
+;;
+;; Message Signature:
+;;   `[::fetch-failure norm-key attempt opts response]`
+;;
+;; Parameters:
+;;   - `norm-key`: Normalized query key vector.
+;;   - `attempt`: Current zero-indexed retry attempt number.
+;;   - `opts`: Query configuration map containing `:retry` settings and lifecycle hooks.
+;;   - `response`: HTTP failure response or error descriptor map.
+;;
+;; Retry & Backoff Mechanics:
+;;   - If `attempt < max-retry` (default max: 3):
+;;       1. Calculates exponential backoff: `(min (* 1000 (Math/pow 2 attempt)) 30000)`.
+;;       2. Increments `:retry-count` in context cache entry.
+;;       3. Emits `[::relm/dispatch-later! {:ms delay-ms :dispatch! [::retry norm-key (inc attempt) opts]}]`.
+;;   - If retries are exhausted (`attempt >= max-retry`):
+;;       1. Sets query state to `:status :error` with error details via `set-query-error`.
+;;       2. If `:on-error` message vector is present in `opts`, emits `[::relm/dispatch! on-error]`.
 (defmethod relm/update ::fetch-failure
   [state context [_ norm-key attempt opts response] _event]
   (let [max-retry (if (false? (:retry opts)) 0 (or (:retry opts) 3))
@@ -383,6 +442,12 @@
         [state new-context (if (seq on-error) [[::relm/dispatch! on-error]] [])]))))
 
 ;; Query retry handler: [::retry norm-key attempt opts]
+;;
+;; Message Signature:
+;;   `[::retry norm-key attempt opts]`
+;;
+;; Dispatched by `::relm/dispatch-later!` when an exponential backoff timer elapses.
+;; Re-emits `[::http/fetch! http-req]` maintaining the current retry `attempt` index.
 (defmethod relm/update ::retry
   [state context [_ norm-key attempt opts] _event]
   (let [http-req (infer-request-from-key
@@ -393,11 +458,37 @@
     [state context [[::http/fetch! http-req]]]))
 
 ;; Manual cache data setter: [::set-query-data key data opts?]
+;;
+;; Message Signature:
+;;   `[::set-query-data query-key data-or-fn opts?]`
+;;
+;; Parameters:
+;;   - `query-key`: Vector or keyword identifying the cache entry.
+;;   - `data-or-fn`: Direct data value or updater function `(fn [prev-data] new-data)`.
+;;   - `opts`: (Optional) Additional options merged into cache entry.
+;;
+;; Updates `context[:queries norm-key]` immediately and marks status as `:success`.
+;; Ideal for optimistic UI updates in `:on-mutate` or manual cache synchronization.
 (defmethod relm/update ::set-query-data
   [state context [_ key data opts] _event]
   [state (set-query-data context key data opts)])
 
 ;; Query invalidation handler: [::invalidate key-prefix opts?]
+;;
+;; Message Signature:
+;;   `[::invalidate key-prefix opts?]`
+;;
+;; Parameters:
+;;   - `key-prefix`: Query key prefix vector to match against active queries (e.g. `[:posts]`).
+;;   - `opts`: (Optional) Invalidation options map:
+;;       - `:refetch-active?` Boolean indicating whether currently cached queries matching
+;;                            the prefix should be refetched immediately (default: true).
+;;       - `:predicate`       Custom `(fn [key query])` predicate for selective invalidation.
+;;
+;; Behavior:
+;;   1. Marks all matching queries in `context[:queries]` as `:stale? true`.
+;;   2. If `:refetch-active? true`, sets matching cached queries to `:is-fetching? true`
+;;      and emits `[::http/fetch!]` effects with original query options to revalidate them in the background.
 (defmethod relm/update ::invalidate
   [state context [_ key-prefix opts] _event]
   (let [opts (or opts {})
@@ -470,6 +561,28 @@
     invalidate-keys))
 
 ;; Mutation handler: [::mutate mutation-key opts]
+;;
+;; Message Signature:
+;;   `[::mutate mutation-key opts]`
+;;
+;; Parameters:
+;;   - `mutation-key`: Vector or keyword identifying the mutation (e.g. `[:posts]` or `:create-post`).
+;;   - `opts`: Mutation configuration map:
+;;       - `:data` / `:body`   Payload to send with the HTTP request.
+;;       - `:method`           HTTP method (default: `:post`).
+;;       - `:base-url`         Base URL prepended to inferred route path.
+;;       - `:url`              Explicit URL override.
+;;       - `:on-mutate`        Message vector dispatched immediately before network request for optimistic updates.
+;;       - `:on-success`       Message vector dispatched upon successful mutation completion.
+;;       - `:on-error`         Message vector dispatched upon mutation failure.
+;;       - `:on-settled`       Message vector dispatched upon mutation settling (success or failure).
+;;       - `:invalidate`       Vector of query key prefixes to invalidate and refetch on settle (defaults to `[mutation-key]`).
+;;       - `:rollback-context` Optional context snapshot for rollback on error (defaults to pre-mutation context).
+;;
+;; Lifecycle:
+;;   1. Updates `context[:mutations mutation-key]` to status `:loading`.
+;;   2. Emits `[::relm/dispatch! on-mutate]` if `:on-mutate` message is provided.
+;;   3. Emits `[::http/fetch! http-req]` targeting the inferred or explicit mutation endpoint.
 (defmethod relm/update ::mutate
   [state context [_ mutation-key opts] _event]
   (let [opts (or opts {})
@@ -501,13 +614,26 @@
     [state new-context all-effects]))
 
 ;; Mutation success handler: [::mutate-success mutation-key opts response]
+;;
+;; Message Signature:
+;;   `[::mutate-success mutation-key opts response]` or `[::mutate-success mutation-key _rollback opts response]`
+;;
+;; Parameters:
+;;   - `mutation-key`: Target mutation identifier.
+;;   - `opts`: Mutation options map.
+;;   - `response`: HTTP response map.
+;;
+;; Actions:
+;;   1. Sets mutation state to `:status :success` with response payload in `context[:mutations]`.
+;;   2. Invalidates and triggers background refetches for all keys specified in `:invalidate` (or `[mutation-key]`).
+;;   3. Emits `[::relm/dispatch! on-success]` and `[::relm/dispatch! on-settled]` if configured.
 (defmethod relm/update ::mutate-success
   [state context message _event]
   (let [[_ mutation-key opts response]
         (if (= 5 (count message))
-          message
-          (let [[_ m-key m-opts resp] message]
-            [_ m-key nil m-opts resp]))
+          (let [[_ m-key _rollback m-opts resp] message]
+            [_ m-key m-opts resp])
+          message)
         data (or (:body response) response)
         new-context (set-mutation-state
                       context
@@ -529,14 +655,28 @@
                             (seq on-settled) (conj [::relm/dispatch! on-settled]))]
     [state invalidated-context all-effects]))
 
-;; Mutation failure handler: [::mutate-failure mutation-key rollback-context opts response]
+;; Mutation failure handler: [::mutate-failure mutation-key opts response]
+;;
+;; Message Signature:
+;;   `[::mutate-failure mutation-key opts response]` or `[::mutate-failure mutation-key rollback-context opts response]`
+;;
+;; Parameters:
+;;   - `mutation-key`: Target mutation identifier.
+;;   - `opts`: Mutation options map (including optional `:rollback-context`).
+;;   - `response`: Error or HTTP failure response map.
+;;
+;; Actions:
+;;   1. Restores `:rollback-context` if supplied (or reverts to pre-mutation context).
+;;   2. Sets mutation state to `:status :error` in `context[:mutations]`.
+;;   3. Invalidates and triggers refetches for `:invalidate` keys to ensure server state consistency.
+;;   4. Emits `[::relm/dispatch! on-error]` and `[::relm/dispatch! on-settled]` if configured.
 (defmethod relm/update ::mutate-failure
   [state context message _event]
   (let [[_ mutation-key {:keys [rollback-context] :as opts} response]
         (if (= 5 (count message))
-          message
-          (let [[_ m-key m-opts resp] message]
-            [_ m-key m-opts resp]))
+          (let [[_ m-key m-rollback m-opts resp] message]
+            [_ m-key (assoc (or m-opts {}) :rollback-context m-rollback) resp])
+          message)
         base-context (or rollback-context context)
         new-context (set-mutation-state
                       base-context
