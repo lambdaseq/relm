@@ -1,5 +1,7 @@
 # relm.form
 
+[![Clojars Project](https://img.shields.io/clojars/v/io.github.conjurernix/relm.form.svg)](https://clojars.org/io.github.conjurernix/relm.form)
+
 `io.github.conjurernix/relm.form` provides declarative, robust form state management for Relm applications, inspired by Formik and React Hook Form, but tailored to Relm's Model-View-Update (MVU) and effects architecture.
 
 ## Table of Contents
@@ -23,12 +25,15 @@
 Add `io.github.conjurernix/relm.form` and `io.github.conjurernix/relm.core` to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core {:git/url "https://github.com/conjurernix/relm"
-                                         :sha     "..."
-                                         :deps/root "core"}
-        io.github.conjurernix/relm.form {:git/url "https://github.com/conjurernix/relm"
-                                         :sha     "..."
-                                         :deps/root "form"}}}
+{:deps {io.github.conjurernix/relm.core {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.form {:mvn/version "0.1.0-alpha5"}}}
+```
+
+For Leiningen / `project.clj`:
+
+```clojure
+[io.github.conjurernix/relm.core "0.1.0-alpha5"]
+[io.github.conjurernix/relm.form "0.1.0-alpha5"]
 ```
 
 ---

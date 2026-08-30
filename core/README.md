@@ -1,5 +1,7 @@
 # relm.core
 
+[![Clojars Project](https://img.shields.io/clojars/v/io.github.conjurernix/relm.core.svg)](https://clojars.org/io.github.conjurernix/relm.core)
+
 `io.github.conjurernix/relm.core` is the foundational module of Relm, providing an Elm-architecture (Model-View-Update + Effects) runtime on top of [Replicant](https://github.com/cjohansen/replicant) for Clojure and ClojureScript.
 
 ## Table of Contents
@@ -24,9 +26,13 @@
 Add the dependency to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core {:git/url "https://github.com/conjurernix/relm"
-                                         :sha     "..."
-                                         :deps/root "core"}}}
+{:deps {io.github.conjurernix/relm.core {:mvn/version "0.1.0-alpha5"}}}
+```
+
+For Leiningen / `project.clj`:
+
+```clojure
+[io.github.conjurernix/relm.core "0.1.0-alpha5"]
 ```
 
 ---

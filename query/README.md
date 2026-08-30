@@ -1,5 +1,7 @@
 # relm.query
 
+[![Clojars Project](https://img.shields.io/clojars/v/io.github.conjurernix/relm.query.svg)](https://clojars.org/io.github.conjurernix/relm.query)
+
 `io.github.conjurernix/relm.query` provides TanStack Query-style declarative server-state management for Relm applications. Built on top of Relm's Elm architecture and `relm.http`, it offers vector-based query keys, automatic REST URL/parameter inference, context-based caching, automatic stale detection, configurable retries with exponential backoff, optimistic mutations, and hierarchical cache invalidation.
 
 ## Table of Contents
@@ -31,12 +33,15 @@
 Add `io.github.conjurernix/relm.query` and `io.github.conjurernix/relm.core` to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core  {:git/url "https://github.com/conjurernix/relm"
-                                          :sha     "..."
-                                          :deps/root "core"}
-        io.github.conjurernix/relm.query {:git/url "https://github.com/conjurernix/relm"
-                                          :sha     "..."
-                                          :deps/root "query"}}}
+{:deps {io.github.conjurernix/relm.core  {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.query {:mvn/version "0.1.0-alpha5"}}}
+```
+
+For Leiningen / `project.clj`:
+
+```clojure
+[io.github.conjurernix/relm.core "0.1.0-alpha5"]
+[io.github.conjurernix/relm.query "0.1.0-alpha5"]
 ```
 
 ---

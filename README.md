@@ -1,5 +1,7 @@
 # relm
 
+[![Clojars Project](https://img.shields.io/clojars/v/io.github.conjurernix/relm.core.svg)](https://clojars.org/io.github.conjurernix/relm.core)
+
 A simple, purely functional abstraction layer on top of [Replicant](https://github.com/cjohansen/replicant) inspired by the Elm architecture for Clojure and ClojureScript applications.
 
 ## Status
@@ -26,18 +28,19 @@ This library is a Work In Progress (WIP) and the API may change.
 Add the required modules to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core   {:git/url "https://github.com/conjurernix/relm"
-                                           :sha     "..."
-                                           :deps/root "core"}
-        io.github.conjurernix/relm.form   {:git/url "https://github.com/conjurernix/relm"
-                                           :sha     "..."
-                                           :deps/root "form"}
-        io.github.conjurernix/relm.query  {:git/url "https://github.com/conjurernix/relm"
-                                           :sha     "..."
-                                           :deps/root "query"}
-        io.github.conjurernix/relm.reitit {:git/url "https://github.com/conjurernix/relm"
-                                           :sha     "..."
-                                           :deps/root "reitit"}}}
+{:deps {io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.form   {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.query  {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.reitit {:mvn/version "0.1.0-alpha5"}}}
+```
+
+For Leiningen / `project.clj`:
+
+```clojure
+[io.github.conjurernix/relm.core "0.1.0-alpha5"]
+[io.github.conjurernix/relm.form "0.1.0-alpha5"]
+[io.github.conjurernix/relm.query "0.1.0-alpha5"]
+[io.github.conjurernix/relm.reitit "0.1.0-alpha5"]
 ```
 
 ---

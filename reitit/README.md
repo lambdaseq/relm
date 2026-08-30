@@ -1,5 +1,7 @@
 # relm.reitit
 
+[![Clojars Project](https://img.shields.io/clojars/v/io.github.conjurernix/relm.reitit.svg)](https://clojars.org/io.github.conjurernix/relm.reitit)
+
 `io.github.conjurernix/relm.reitit` provides client-side routing integration for Relm applications powered by [Metosin Reitit](https://github.com/metosin/reitit).
 
 ## Table of Contents
@@ -19,12 +21,15 @@
 Add the dependency to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core   {:git/url "https://github.com/conjurernix/relm"
-                                           :sha     "..."
-                                           :deps/root "core"}
-        io.github.conjurernix/relm.reitit {:git/url "https://github.com/conjurernix/relm"
-                                           :sha     "..."
-                                           :deps/root "reitit"}}}
+{:deps {io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.reitit {:mvn/version "0.1.0-alpha5"}}}
+```
+
+For Leiningen / `project.clj`:
+
+```clojure
+[io.github.conjurernix/relm.core "0.1.0-alpha5"]
+[io.github.conjurernix/relm.reitit "0.1.0-alpha5"]
 ```
 
 ---
