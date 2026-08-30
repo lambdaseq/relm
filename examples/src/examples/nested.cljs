@@ -6,9 +6,9 @@
   - Automatic isolation of local component state across multiple instances using unique component IDs
   - Context-driven reactivity: all components share and react to global context updates (e.g. `:theme`)
   - Dynamic collections of nested components with Hiccup metadata `:key` support"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [examples.snippets :as snippets]
-            [examples.ui :as ui]))
+  (:require [examples.snippets :as snippets]
+            [examples.ui :as ui]
+            [relm.core :as relm]))
 
 ;; -----------------------------------------------------------------------------
 ;; Level 2: Nested Child Component (CounterItem)

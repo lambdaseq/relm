@@ -1,15 +1,15 @@
 (ns examples.navigation
-  "Navigation example component demonstrating browser and History API effects via `com.lambdaseq.relm.navigation`.
+  "Navigation example component demonstrating browser and History API effects via `relm.navigation`.
 
   Demonstrates:
   - Page redirection via `[::nav/navigate-to url]` (`location.assign`)
   - Page refresh via `[::nav/reload]` (`location.reload`)
   - URL replacement via `[::nav/replace url]` (`location.replace`)
   - Browser history stack manipulation via `[::nav/push-state ...]`, `[::nav/replace-state ...]`, `[::nav/back]`, and `[::nav/go n]`"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.navigation :as nav]
-            [examples.snippets :as snippets]
-            [examples.ui :as ui]))
+  (:require [examples.snippets :as snippets]
+            [examples.ui :as ui]
+            [relm.core :as relm]
+            [relm.navigation :as nav]))
 
 ;; -----------------------------------------------------------------------------
 ;; Component Initialization
@@ -79,7 +79,7 @@
     {:step        "3"
      :title       "Navigation & History FX"
      :difficulty  "Beginner"
-     :description "Declarative browser window location and HTML5 History API side effects using `com.lambdaseq.relm.navigation`."
+     :description "Declarative browser window location and HTML5 History API side effects using `relm.navigation`."
      :tags        ["relm.navigation" "push-state!" "replace-state!" "History API" "Location FX"]})
 
    ;; Current Browser URL Inspector
@@ -118,7 +118,7 @@
          (ui/button
           {:variant :outline
            :size    :sm
-           :on      {:click [::navigate-to "https://github.com/lambdaseq/relm"]}}
+           :on      {:click [::navigate-to "https://github.com/conjurernix/relm"]}}
           "Open ↗")]
 
         [:div {:class "flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200"}
@@ -138,7 +138,7 @@
          (ui/button
           {:variant :outline
            :size    :sm
-           :on      {:click [::replace-url "https://github.com/lambdaseq/relm"]}}
+           :on      {:click [::replace-url "https://github.com/conjurernix/relm"]}}
           "Replace")]])])
 
     ;; History Navigation Card
@@ -191,7 +191,7 @@
      [:div
       [:h4 {:class "font-semibold text-sm mb-0.5"} "Browser Integration Note"]
       [:p {:class "text-xs text-slate-600 leading-relaxed"}
-       "Navigation effects operate directly on standard browser APIs (`window.location` & `window.history`). When combined with Reitit routing (`com.lambdaseq.relm.reitit`), route changes automatically synchronise with component state."]]])
+       "Navigation effects operate directly on standard browser APIs (`window.location` & `window.history`). When combined with Reitit routing (`relm.reitit`), route changes automatically synchronise with component state."]]])
 
    ;; Expandable Source Code Panel
    (ui/code-panel

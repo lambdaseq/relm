@@ -1,7 +1,7 @@
-{:deps {com.lambdaseq/relm.core   {:local/root "./core"}
-        com.lambdaseq/relm.form   {:local/root "./form"}
-        com.lambdaseq/relm.query  {:local/root "./query"}
-        com.lambdaseq/relm.reitit {:local/root "./reitit"}}
+{:deps {io.github.conjurernix/relm.core   {:local/root "./core"}
+        io.github.conjurernix/relm.form   {:local/root "./form"}
+        io.github.conjurernix/relm.query  {:local/root "./query"}
+        io.github.conjurernix/relm.reitit {:local/root "./reitit"}}
  :aliases
  {:build      {:deps {io.github.clojure/tools.build {:mvn/version "0.10.14"}
                       slipset/deps-deploy           {:mvn/version "0.2.5"}}

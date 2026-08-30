@@ -26,18 +26,18 @@ This library is a Work In Progress (WIP) and the API may change.
 Add the required modules to your `deps.edn`:
 
 ```clojure
-{:deps {com.lambdaseq/relm.core   {:git/url "https://github.com/lambdaseq/relm"
-                                   :sha     "..."
-                                   :deps/root "core"}
-        com.lambdaseq/relm.form   {:git/url "https://github.com/lambdaseq/relm"
-                                   :sha     "..."
-                                   :deps/root "form"}
-        com.lambdaseq/relm.query  {:git/url "https://github.com/lambdaseq/relm"
-                                   :sha     "..."
-                                   :deps/root "query"}
-        com.lambdaseq/relm.reitit {:git/url "https://github.com/lambdaseq/relm"
-                                   :sha     "..."
-                                   :deps/root "reitit"}}}
+{:deps {io.github.conjurernix/relm.core   {:git/url "https://github.com/conjurernix/relm"
+                                           :sha     "..."
+                                           :deps/root "core"}
+        io.github.conjurernix/relm.form   {:git/url "https://github.com/conjurernix/relm"
+                                           :sha     "..."
+                                           :deps/root "form"}
+        io.github.conjurernix/relm.query  {:git/url "https://github.com/conjurernix/relm"
+                                           :sha     "..."
+                                           :deps/root "query"}
+        io.github.conjurernix/relm.reitit {:git/url "https://github.com/conjurernix/relm"
+                                           :sha     "..."
+                                           :deps/root "reitit"}}}
 ```
 
 ---
@@ -46,12 +46,12 @@ Add the required modules to your `deps.edn`:
 
 | Module | Namespace | Description | Documentation |
 | :--- | :--- | :--- | :--- |
-| **Core** | `com.lambdaseq.relm.core` | Elm runtime, component lifecycle, state, `update`, and `fx`. | [Core Documentation](core/README.md) |
-| **Form** | `com.lambdaseq.relm.form` | Declarative form state, `form/register`, validators, and submission. | [Form Documentation](form/README.md) |
-| **HTTP** | `com.lambdaseq.relm.http` | Fetch API side effects (`::fetch!`, `::abort!`) and JSON decoders. | [HTTP Documentation](core/README.md#http-client-comlambdaseqrelmhttp) |
-| **Navigation** | `com.lambdaseq.relm.navigation` | Browser History API effects (`::push-state!`, `::back!`, etc.). | [Navigation Documentation](core/README.md#browser-navigation-comlambdaseqrelmnavigation) |
-| **Query** | `com.lambdaseq.relm.query` | TanStack Query-style caching, retries, optimistic mutations, and key inference. | [Query Documentation](query/README.md) |
-| **Reitit** | `com.lambdaseq.relm.reitit` | Client-side routing with Reitit, context sync, and navigation messages. | [Reitit Documentation](reitit/README.md) |
+| **Core** | `relm.core` | Elm runtime, component lifecycle, state, `update`, and `fx`. | [Core Documentation](core/README.md) |
+| **Form** | `relm.form` | Declarative form state, `form/register`, validators, and submission. | [Form Documentation](form/README.md) |
+| **HTTP** | `relm.http` | Fetch API side effects (`::fetch!`, `::abort!`) and JSON decoders. | [HTTP Documentation](core/README.md#http-client-relmhttp) |
+| **Navigation** | `relm.navigation` | Browser History API effects (`::push-state!`, `::back!`, etc.). | [Navigation Documentation](core/README.md#browser-navigation-relmnavigation) |
+| **Query** | `relm.query` | TanStack Query-style caching, retries, optimistic mutations, and key inference. | [Query Documentation](query/README.md) |
+| **Reitit** | `relm.reitit` | Client-side routing with Reitit, context sync, and navigation messages. | [Reitit Documentation](reitit/README.md) |
 
 ---
 
@@ -99,7 +99,7 @@ Relm follows the Elm Architecture:
 
 ## Module Previews
 
-### 1. Core Component (`com.lambdaseq.relm.core`)
+### 1. Core Component (`relm.core`)
 
 Define isolated components with pure initialization, rendering, and update handlers:
 
@@ -122,7 +122,7 @@ Define isolated components with pure initialization, rendering, and update handl
 
 ---
 
-### 2. Form State Management (`com.lambdaseq.relm.form`)
+### 2. Form State Management (`relm.form`)
 
 Colocate validation rules and initial values directly on fields with `form/register`:
 
@@ -142,7 +142,7 @@ Colocate validation rules and initial values directly on fields with `form/regis
 
 ---
 
-### 3. HTTP Requests (`com.lambdaseq.relm.http`)
+### 3. HTTP Requests (`relm.http`)
 
 Declarative HTTP Fetch requests with automatic JSON parsing and cancellation:
 
@@ -157,11 +157,11 @@ Declarative HTTP Fetch requests with automatic JSON parsing and cancellation:
   [(assoc state :user body) context])
 ```
 
-[Read full HTTP documentation ->](core/README.md#http-client-comlambdaseqrelmhttp)
+[Read full HTTP documentation ->](core/README.md#http-client-relmhttp)
 
 ---
 
-### 4. Browser Navigation (`com.lambdaseq.relm.navigation`)
+### 4. Browser Navigation (`relm.navigation`)
 
 Browser History API side effects:
 
@@ -173,11 +173,11 @@ Browser History API side effects:
   [state context [[::nav/back!]]])
 ```
 
-[Read full Navigation documentation ->](core/README.md#browser-navigation-comlambdaseqrelmnavigation)
+[Read full Navigation documentation ->](core/README.md#browser-navigation-relmnavigation)
 
 ---
 
-### 5. Routing with Reitit (`com.lambdaseq.relm.reitit`)
+### 5. Routing with Reitit (`relm.reitit`)
 
 Declarative client-side routing with automatic context synchronization:
 
@@ -198,13 +198,13 @@ Declarative client-side routing with automatic context synchronization:
 
 ---
 
-### 6. Query & Cache Management (`com.lambdaseq.relm.query`)
+### 6. Query & Cache Management (`relm.query`)
 
 TanStack Query-style caching, automatic URL inference, retries, and optimistic mutations:
 
 ```clojure
 (ns my-app.posts
-  (:require [com.lambdaseq.relm.query :as query]))
+  (:require [relm.query :as query]))
 
 (def posts-key [:posts {:limit 10}])
 
@@ -254,16 +254,10 @@ TanStack Query-style caching, automatic URL inference, retries, and optimistic m
 ### Running Tests
 
 ```bash
-# Run Core tests
-cd core && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.core-test]) (t/run-tests 'com.lambdaseq.relm.core-test)"
+# Run tests via tools.build
+clojure -T:build test
 
-# Run Form tests
-cd form && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.form-test]) (t/run-tests 'com.lambdaseq.relm.form-test)"
-
-# Run Reitit tests
-cd reitit && clj -M:test -e "(require '[clojure.test :as t] '[com.lambdaseq.relm.reitit-test]) (t/run-tests 'com.lambdaseq.relm.reitit-test)"
-
-# Run Query and all module tests via Shadow-CLJS runner
+# Or run tests via Shadow-CLJS directly
 cd examples && npx shadow-cljs compile test && node out/test.js
 ```
 
@@ -280,7 +274,5 @@ Then open `http://localhost:8080` in your browser.
 ---
 
 ## License
-
-Copyright © 2023 LambdaSeq
 
 Distributed under the Eclipse Public License either version 1.0 or (at your option) any later version.

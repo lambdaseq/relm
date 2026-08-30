@@ -1,11 +1,11 @@
 {:paths ["src" "../query/test" "../form/test" "../reitit/test" "../core/test"]
- :deps  {com.lambdaseq/relm.core   {:local/root "../core"}
-         com.lambdaseq/relm.form   {:local/root "../form"}
-         com.lambdaseq/relm.query  {:local/root "../query"}
-         com.lambdaseq/relm.reitit {:local/root "../reitit"}
-         metosin/reitit            {:mvn/version "0.11.0-rc1"}
-         thheller/shadow-cljs      {:mvn/version "3.5.0"}
-         hashp/hashp               {:mvn/version "0.2.2"}}
+ :deps  {io.github.conjurernix/relm.core   {:local/root "../core"}
+         io.github.conjurernix/relm.form   {:local/root "../form"}
+         io.github.conjurernix/relm.query  {:local/root "../query"}
+         io.github.conjurernix/relm.reitit {:local/root "../reitit"}
+         metosin/reitit                    {:mvn/version "0.11.0-rc1"}
+         thheller/shadow-cljs              {:mvn/version "3.5.0"}
+         hashp/hashp                       {:mvn/version "0.2.2"}}
  :aliases
  {:clj-kondo  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2026.08.04"}}
                :main-opts    ["-m" "clj-kondo.main"]}

@@ -1,4 +1,4 @@
-(ns com.lambdaseq.relm.navigation
+(ns relm.navigation
   "Browser navigation and History API side effects for Relm applications.
 
   Provides `core/fx` implementations for browser navigation actions:
@@ -9,7 +9,7 @@
   - `::push-state!`    Push a new entry onto browser history stack via `history.pushState`
   - `::replace-state!` Replace current history entry via `history.replaceState`
   - `::go!`            Navigate by relative delta `n` via `history.go`"
-  (:require [com.lambdaseq.relm.core :as core]))
+  (:require [relm.core :as core]))
 
 ;; -----------------------------------------------------------------------------
 ;; Location / Page Navigation Effects

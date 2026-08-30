@@ -1,4 +1,4 @@
-(ns com.lambdaseq.relm.core
+(ns relm.core
   "Core Elm-architecture implementation on top of Replicant for Clojure/ClojureScript.
 
   Provides:
@@ -563,4 +563,4 @@
             (.catch (fn [err]
                       (when on-error
                         (let [msg (or (.-message err) (str err))]
-                          (dispatch! dom-event (if (fn? on-error) (on-error msg) [:com.lambdaseq.relm.form/set-error path msg])))))))))))
+                          (dispatch! dom-event (if (fn? on-error) (on-error msg) [:relm.form/set-error path msg])))))))))))

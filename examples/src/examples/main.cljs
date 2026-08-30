@@ -2,14 +2,12 @@
   "Main entry point for the Relm examples application.
 
   Demonstrates:
-  - Setting up routing with Metosin Reitit and `com.lambdaseq.relm.reitit`
+  - Setting up routing with Metosin Reitit and `relm.reitit`
   - Registering Replicant DOM dispatch via `(replicant.dom/set-dispatch! relm/dispatch!)`
   - Subscribing to active route information via Relm context (`current-route`, `current-view`)
   - Rendering top-level navigation with declarative route navigation events (`::relm.reitit/navigate-to`)
   - Mounting the root application component into `js/document.body`"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.reitit :as relm.reitit]
-            [examples.counter :refer [Counter]]
+  (:require [examples.counter :refer [Counter]]
             [examples.form :refer [FormExample]]
             [examples.http :refer [HttpExample]]
             [examples.navigation :refer [NavigationExample]]
@@ -17,6 +15,8 @@
             [examples.query :refer [QueryExample]]
             [examples.ui :as ui]
             [reitit.core :as reitit]
+            [relm.core :as relm]
+            [relm.reitit :as relm.reitit]
             [replicant.dom :as r]))
 
 ;; -----------------------------------------------------------------------------
@@ -94,7 +94,7 @@
           "Functional, declarative Elm Architecture for ClojureScript applications"]]]
 
        [:div {:class "flex items-center gap-3"}
-        [:a {:href   "https://github.com/lambdaseq/relm"
+        [:a {:href   "https://github.com/conjurernix/relm"
              :target "_blank"
              :rel    "noopener noreferrer"
              :class  "inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-md transition-colors border border-slate-200"}
@@ -129,7 +129,7 @@
         [:span "•"]
         [:span "Composable Elm Architecture & Reactive State for ClojureScript"]]
        [:div {:class "flex items-center gap-4"}
-        [:a {:href "https://github.com/lambdaseq/relm" :target "_blank" :rel "noopener noreferrer" :class "hover:underline"} "Source Code"]
+        [:a {:href "https://github.com/conjurernix/relm" :target "_blank" :rel "noopener noreferrer" :class "hover:underline"} "Source Code"]
         [:span "•"]
         [:span "Built with Replicant & Tailwind CSS"]]]]]))
 

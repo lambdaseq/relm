@@ -6,7 +6,7 @@
   - Declarative Hiccup views styled with Tailwind & shadcn UI primitives
   - Pure state transitions with `relm/update` (`::increment`, `::decrement`, `::reset`)
   - Isolated side effects with `relm/fx` (`::relm/alert!` via `::show-count`)"
-  (:require [com.lambdaseq.relm.core :as relm]
+  (:require [relm.core :as relm]
             [examples.snippets :as snippets]
             [examples.ui :as ui]))
 

@@ -1,6 +1,6 @@
 # relm.query
 
-`com.lambdaseq/relm.query` provides TanStack Query-style declarative server-state management for Relm applications. Built on top of Relm's Elm architecture and `com.lambdaseq.relm.http`, it offers vector-based query keys, automatic REST URL/parameter inference, context-based caching, automatic stale detection, configurable retries with exponential backoff, optimistic mutations, and hierarchical cache invalidation.
+`io.github.conjurernix/relm.query` provides TanStack Query-style declarative server-state management for Relm applications. Built on top of Relm's Elm architecture and `relm.http`, it offers vector-based query keys, automatic REST URL/parameter inference, context-based caching, automatic stale detection, configurable retries with exponential backoff, optimistic mutations, and hierarchical cache invalidation.
 
 ## Table of Contents
 
@@ -28,15 +28,15 @@
 
 ## Installation
 
-Add `com.lambdaseq/relm.query` and `com.lambdaseq/relm.core` to your `deps.edn`:
+Add `io.github.conjurernix/relm.query` and `io.github.conjurernix/relm.core` to your `deps.edn`:
 
 ```clojure
-{:deps {com.lambdaseq/relm.core  {:git/url "https://github.com/lambdaseq/relm"
-                                 :sha     "..."
-                                 :deps/root "core"}
-        com.lambdaseq/relm.query {:git/url "https://github.com/lambdaseq/relm"
-                                 :sha     "..."
-                                 :deps/root "query"}}}
+{:deps {io.github.conjurernix/relm.core  {:git/url "https://github.com/conjurernix/relm"
+                                          :sha     "..."
+                                          :deps/root "core"}
+        io.github.conjurernix/relm.query {:git/url "https://github.com/conjurernix/relm"
+                                          :sha     "..."
+                                          :deps/root "query"}}}
 ```
 
 ---
@@ -124,7 +124,7 @@ Explicit options always override or merge with inferred values:
 
 ### Reitit Router Integration
 
-If a Reitit router is present in `context` (e.g. at `(:router context)` via `com.lambdaseq.relm.reitit`), `relm.query` matches the first keyword against registered route names:
+If a Reitit router is present in `context` (e.g. at `(:router context)` via `relm.reitit`), `relm.query` matches the first keyword against registered route names:
 
 ```clojure
 ;; Given Reitit route ["/users/:id/profile" {:name :user-profile}]
@@ -285,7 +285,7 @@ All view helpers are pure functions that read from Relm's `context` map:
 
 ```clojure
 (ns my-app.views
-  (:require [com.lambdaseq.relm.query :as query]))
+  (:require [relm.query :as query]))
 ```
 
 | Function | Signature | Description |
@@ -333,8 +333,8 @@ Below is a complete, runnable component demonstrating cache-first data fetching,
 
 ```clojure
 (ns my-app.todos
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.query :as query]))
+  (:require [relm.core :as relm]
+            [relm.query :as query]))
 
 (def todos-key [:todos {:limit 10}])
 

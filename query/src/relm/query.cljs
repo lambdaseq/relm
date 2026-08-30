@@ -1,4 +1,4 @@
-(ns com.lambdaseq.relm.query
+(ns relm.query
   "TanStack Query-style declarative server-state management for Relm applications.
 
   Provides:
@@ -8,8 +8,8 @@
   - Pure context cache state reducers and Hiccup view query helpers
   - Automatic stale detection, configurable retries with exponential backoff, and optimistic mutations"
   (:require [clojure.string :as string]
-            [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.http :as http]
+            [relm.core :as relm]
+            [relm.http :as http]
             [reitit.core :as r]))
 
 ;; -----------------------------------------------------------------------------

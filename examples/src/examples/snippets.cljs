@@ -5,7 +5,7 @@
 (def counter-code
   "(ns examples.counter
   \"Counter example demonstrating the fundamental Elm architecture in Relm.\"
-  (:require [com.lambdaseq.relm.core :as relm]))
+  (:require [relm.core :as relm]))
 
 ;; 1. Initialize local state
 (defn init
@@ -48,9 +48,9 @@
 
 (def http-code
   "(ns examples.http
-  \"HTTP request example demonstrating async fetch effects with com.lambdaseq.relm.http.\"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.http :as relm.http]))
+  \"HTTP request example demonstrating async fetch effects with relm.http.\"
+  (:require [relm.core :as relm]
+            [relm.http :as relm.http]))
 
 ;; 1. Initialize async state
 (defn init
@@ -103,9 +103,9 @@
 
 (def navigation-code
   "(ns examples.navigation
-  \"Browser History and Location API side effects with com.lambdaseq.relm.navigation.\"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.navigation :as nav]))
+  \"Browser History and Location API side effects with relm.navigation.\"
+  (:require [relm.core :as relm]
+            [relm.navigation :as nav]))
 
 (defn init
   [_context _args]
@@ -148,7 +148,7 @@
 (def nested-code
   "(ns examples.nested
   \"Hierarchical multi-level component trees with isolated local states.\"
-  (:require [com.lambdaseq.relm.core :as relm]))
+  (:require [relm.core :as relm]))
 
 ;; -----------------------------------------------------------------------------
 ;; Level 1: Child Component with isolated state per ID
@@ -197,9 +197,9 @@
 
 (def form-code
   "(ns examples.form
-  \"Reactive form state management and declarative validation with com.lambdaseq.relm.form.\"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.form :as form]))
+  \"Reactive form state management and declarative validation with relm.form.\"
+  (:require [relm.core :as relm]
+            [relm.form :as form]))
 
 ;; 1. Initialize form state with validation triggers & schema
 (defn init
@@ -251,9 +251,9 @@
 
 (def query-code
   "(ns examples.query
-  \"Declarative server-state caching & optimistic mutations with com.lambdaseq.relm.query.\"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.query :as query]))
+  \"Declarative server-state caching & optimistic mutations with relm.query.\"
+  (:require [relm.core :as relm]
+            [relm.query :as query]))
 
 (def posts-query-key
   [:posts {:_limit 5}])

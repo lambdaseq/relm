@@ -1,11 +1,11 @@
-(ns com.lambdaseq.relm.http
+(ns relm.http
   "HTTP side-effect module for Relm built on the Fetch API.
 
   Provides `core/fx` side effects for making asynchronous HTTP requests (`::fetch`)
   and aborting active requests (`::abort`). Handles JSON serialization, query parameter
   encoding, response header parsing, response body decoding based on Content-Type,
   request timeouts, and error handling with automated message dispatching back into Relm."
-  (:require [com.lambdaseq.relm.core :as core]
+  (:require [relm.core :as core]
             [clojure.string :as string]
             [goog.object :as obj]))
 

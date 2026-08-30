@@ -5,13 +5,13 @@
   - Declarative data fetching and caching with vector keys (`[::query/update [:posts {:_limit 5}]]`)
   - Context view inspection with `query/data`, `query/loading?`, `query/fetching?`, `query/stale?`, `query/error`
   - Optimistic mutations with automatic query invalidation and refetching
-  - Form state management using `com.lambdaseq.relm.form` (`form/create`, `form/register`, `form/on-submit`)
+  - Form state management using `relm.form` (`form/create`, `form/register`, `form/on-submit`)
   - Real-time cache inspector visualizing queries and mutations in the global Relm context"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.form :as form]
-            [com.lambdaseq.relm.query :as query]
-            [examples.snippets :as snippets]
-            [examples.ui :as ui]))
+  (:require [examples.snippets :as snippets]
+            [examples.ui :as ui]
+            [relm.core :as relm]
+            [relm.form :as form]
+            [relm.query :as query]))
 
 ;; -----------------------------------------------------------------------------
 ;; Query Keys
@@ -67,7 +67,7 @@
       {:step        "6"
        :title       "Relm Query (TanStack Query Port)"
        :difficulty  "Advanced"
-       :description "Declarative server-state caching, automatic URL inference from vector keys, optimistic mutations, background fetching, and cache invalidation using `com.lambdaseq.relm.query`."
+       :description "Declarative server-state caching, automatic URL inference from vector keys, optimistic mutations, background fetching, and cache invalidation using `relm.query`."
        :tags        ["relm.query" "Server-State Cache" "Optimistic Mutations" "Stale-While-Revalidate" "Cache Invalidation"]})
 
      ;; Query Controls Bar

@@ -1,4 +1,4 @@
-(ns com.lambdaseq.relm.reitit
+(ns relm.reitit
   "Reitit routing integration for Relm applications.
 
   Provides seamless integration between Metosin's Reitit library and Relm:
@@ -6,8 +6,8 @@
   - Browser HTML5 history integration via `popstate` listeners managed through Relm side effects
   - Helper functions for querying routes and views from the context (`current-route`, `current-view`, `current-match`, `path-for`)
   - Declarative Relm `update` message handlers for navigation (`::navigate-to`, `::replace-to`, `::route-changed`, `::start`, `::stop`, etc.)"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.navigation :as nav]
+  (:require [relm.core :as relm]
+            [relm.navigation :as nav]
             [reitit.core :as r]))
 
 ;; -----------------------------------------------------------------------------

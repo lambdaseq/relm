@@ -1,4 +1,4 @@
-(ns com.lambdaseq.relm.query-test
+(ns relm.query-test
   "Comprehensive unit test suite for the Relm query module:
   - Vector key normalization and matching
   - Vector-to-URL and Reitit router inference
@@ -6,9 +6,9 @@
   - Query fetch, caching, stale evaluation, and exponential backoff retries
   - Mutations, optimistic updates, rollback, and hierarchical invalidation"
   (:require [cljs.test :refer-macros [deftest is testing]]
-            [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.http :as http]
-            [com.lambdaseq.relm.query :as query]
+            [relm.core :as relm]
+            [relm.http :as http]
+            [relm.query :as query]
             [reitit.core :as r]))
 
 ;; -----------------------------------------------------------------------------

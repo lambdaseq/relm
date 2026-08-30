@@ -1,7 +1,7 @@
-(ns com.lambdaseq.relm.core-test
+(ns relm.core-test
   "Unit tests for Relm core runtime, state management, and side effects."
   (:require [cljs.test :refer-macros [deftest is testing async]]
-            [com.lambdaseq.relm.core :as relm]))
+            [relm.core :as relm]))
 
 ;; -----------------------------------------------------------------------------
 ;; Test Handlers & Fixtures

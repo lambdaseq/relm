@@ -1,4 +1,4 @@
-(ns com.lambdaseq.relm.form
+(ns relm.form
   "Declarative, robust form state management module for Relm applications.
 
   Provides:
@@ -10,7 +10,7 @@
   - Side effects for async validation and DOM input focus (`::focus-field`, `::focus-first-error`, `::validate-async`)"
   (:refer-clojure :exclude [key])
   (:require [clojure.string :as string]
-            [com.lambdaseq.relm.core :as relm]))
+            [relm.core :as relm]))
 
 ;; -----------------------------------------------------------------------------
 ;; Path Normalization

@@ -1,5 +1,5 @@
 (ns examples.form
-  "Interactive form state management example component using `com.lambdaseq.relm.form`.
+  "Interactive form state management example component using `relm.form`.
 
   Demonstrates:
   - Form initialization with `form/create` in component `init`
@@ -9,10 +9,10 @@
   - Granular view query functions (`form/value`, `form/error`, `form/touched?`, `form/dirty?`, `form/submitting?`)
   - Real-time touch tracking on blur and instant feedback
   - Declarative submission with `on-submit` effect and reset with `::form/reset`"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.form :as form]
-            [examples.snippets :as snippets]
-            [examples.ui :as ui]))
+  (:require [examples.snippets :as snippets]
+            [examples.ui :as ui]
+            [relm.core :as relm]
+            [relm.form :as form]))
 
 ;; -----------------------------------------------------------------------------
 ;; Form Initialization
@@ -79,7 +79,7 @@
         clean-form (dissoc form :validators :validate-fn)]
     (ui/code-inspector
      {:title      "Form State Inspector"
-      :subtitle   "com.lambdaseq.relm.form"
+      :subtitle   "relm.form"
       :badge-text "LIVE TRACKING"}
      [:div {:class "space-y-4 font-mono text-xs"}
        ;; Status KPI Grid
@@ -141,7 +141,7 @@
       {:step        "5"
        :title       "Declarative Forms & Validation"
        :difficulty  "Advanced"
-       :description "Declarative form state, built-in composable validators, dirty and touch tracking, cross-field rules, and real-time inspector using `com.lambdaseq.relm.form`."
+       :description "Declarative form state, built-in composable validators, dirty and touch tracking, cross-field rules, and real-time inspector using `relm.form`."
        :tags        ["relm.form" "Validation" "Dirty Tracking" "Touch Tracking" "Live Inspector"]})
 
      [:div {:class "grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"}

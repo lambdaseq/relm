@@ -1,6 +1,6 @@
 # relm.form
 
-`com.lambdaseq/relm.form` provides declarative, robust form state management for Relm applications, inspired by Formik and React Hook Form, but tailored to Relm's Model-View-Update (MVU) and effects architecture.
+`io.github.conjurernix/relm.form` provides declarative, robust form state management for Relm applications, inspired by Formik and React Hook Form, but tailored to Relm's Model-View-Update (MVU) and effects architecture.
 
 ## Table of Contents
 
@@ -20,15 +20,15 @@
 
 ## Installation
 
-Add `com.lambdaseq/relm.form` and `com.lambdaseq/relm.core` to your `deps.edn`:
+Add `io.github.conjurernix/relm.form` and `io.github.conjurernix/relm.core` to your `deps.edn`:
 
 ```clojure
-{:deps {com.lambdaseq/relm.core {:git/url "https://github.com/lambdaseq/relm"
-                                 :sha     "..."
-                                 :deps/root "core"}
-        com.lambdaseq/relm.form {:git/url "https://github.com/lambdaseq/relm"
-                                 :sha     "..."
-                                 :deps/root "form"}}}
+{:deps {io.github.conjurernix/relm.core {:git/url "https://github.com/conjurernix/relm"
+                                         :sha     "..."
+                                         :deps/root "core"}
+        io.github.conjurernix/relm.form {:git/url "https://github.com/conjurernix/relm"
+                                         :sha     "..."
+                                         :deps/root "form"}}}
 ```
 
 ---
@@ -76,8 +76,8 @@ Initialize form state in your component's `init` function:
 
 ```clojure
 (ns my-app.profile
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.form :as form]))
+  (:require [relm.core :as relm]
+            [relm.form :as form]))
 
 (defn init [_context _args]
   {:form (form/create {:validate-on #{:change :blur :submit}})})
@@ -225,8 +225,8 @@ All query helpers accept the form state map and a field path (keyword or vector)
 
 ```clojure
 (ns my-app.registration
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.form :as form]))
+  (:require [relm.core :as relm]
+            [relm.form :as form]))
 
 (defn init [_context _args]
   {:form (form/create {:validate-on #{:change :blur :submit}})})

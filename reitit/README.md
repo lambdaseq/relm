@@ -1,6 +1,6 @@
 # relm.reitit
 
-`com.lambdaseq/relm.reitit` provides client-side routing integration for Relm applications powered by [Metosin Reitit](https://github.com/metosin/reitit).
+`io.github.conjurernix/relm.reitit` provides client-side routing integration for Relm applications powered by [Metosin Reitit](https://github.com/metosin/reitit).
 
 ## Table of Contents
 
@@ -19,19 +19,19 @@
 Add the dependency to your `deps.edn`:
 
 ```clojure
-{:deps {com.lambdaseq/relm.core   {:git/url "https://github.com/lambdaseq/relm"
-                                   :sha     "..."
-                                   :deps/root "core"}
-        com.lambdaseq/relm.reitit {:git/url "https://github.com/lambdaseq/relm"
-                                   :sha     "..."
-                                   :deps/root "reitit"}}}
+{:deps {io.github.conjurernix/relm.core   {:git/url "https://github.com/conjurernix/relm"
+                                           :sha     "..."
+                                           :deps/root "core"}
+        io.github.conjurernix/relm.reitit {:git/url "https://github.com/conjurernix/relm"
+                                           :sha     "..."
+                                           :deps/root "reitit"}}}
 ```
 
 ---
 
 ## Overview
 
-`com.lambdaseq.relm.reitit` synchronizes Reitit routes with Relm's Elm-architecture runtime:
+`relm.reitit` synchronizes Reitit routes with Relm's Elm-architecture runtime:
 
 - **Automatic Context Sync**: Matches the current URL on navigation and synchronizes the active router, options, route, and view component in Relm's global `context`.
 - **Pure MVU State Transitions**: Pure `update` message handlers (`::start`, `::stop`, `::set-router`, `::navigate-to`, `::replace-to`, `::route-changed`) without hidden top-level atoms or side effects during state transitions.
@@ -45,8 +45,8 @@ Add the dependency to your `deps.edn`:
 
 ```clojure
 (ns my-app.main
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.reitit :as relm.reitit]
+  (:require [relm.core :as relm]
+            [relm.reitit :as relm.reitit]
             [reitit.core :as reitit]
             [replicant.dom :as r]))
 
@@ -201,8 +201,8 @@ Dispatching `[::relm.reitit/stop]` triggers the `::unlisten-history!` effect to 
 
 ```clojure
 (ns my-app.routing-example
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.reitit :as relm.reitit]
+  (:require [relm.core :as relm]
+            [relm.reitit :as relm.reitit]
             [reitit.core :as reitit]
             [replicant.dom :as r]))
 

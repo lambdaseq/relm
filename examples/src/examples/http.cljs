@@ -1,5 +1,5 @@
 (ns examples.http
-  "HTTP request example component demonstrating asynchronous fetch side effects with `com.lambdaseq.relm.http`.
+  "HTTP request example component demonstrating asynchronous fetch side effects with `relm.http`.
 
   Demonstrates:
   - Initializing local state for async data (`:posts`, `:loading?`, `:error`)
@@ -7,10 +7,10 @@
   - Handling successful responses with automatically decoded JSON payloads into state
   - Handling fetch failure callbacks
   - Rendering loading, empty, and data states using shadcn UI components"
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.http :as relm.http]
-            [examples.snippets :as snippets]
-            [examples.ui :as ui]))
+  (:require [examples.snippets :as snippets]
+            [examples.ui :as ui]
+            [relm.core :as relm]
+            [relm.http :as relm.http]))
 
 ;; -----------------------------------------------------------------------------
 ;; Component Initialization
@@ -73,7 +73,7 @@
     {:step        "2"
      :title       "HTTP Requests"
      :difficulty  "Beginner"
-     :description "Demonstrates asynchronous, side-effect-driven network requests using `com.lambdaseq.relm.http` to communicate with external JSON REST APIs without coupling views to IO."
+     :description "Demonstrates asynchronous, side-effect-driven network requests using `relm.http` to communicate with external JSON REST APIs without coupling views to IO."
      :tags        ["relm.http/fetch!" "async" "REST API" "JSON decoding" "Error Handling"]})
 
    ;; Controls Bar Card

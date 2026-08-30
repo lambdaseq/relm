@@ -6,10 +6,10 @@
             [deps-deploy.deps-deploy :as dd]))
 
 (def lib-modules
-  {:core   {:lib 'com.lambdaseq/relm.core   :dir "core"}
-   :form   {:lib 'com.lambdaseq/relm.form   :dir "form"}
-   :query  {:lib 'com.lambdaseq/relm.query  :dir "query"}
-   :reitit {:lib 'com.lambdaseq/relm.reitit :dir "reitit"}})
+  {:core   {:lib 'io.github.conjurernix/relm.core   :dir "core"}
+   :form   {:lib 'io.github.conjurernix/relm.form   :dir "form"}
+   :query  {:lib 'io.github.conjurernix/relm.query  :dir "query"}
+   :reitit {:lib 'io.github.conjurernix/relm.reitit :dir "reitit"}})
 
 (def default-all-modules
   ["core" "form" "query" "reitit" "examples"])
@@ -69,7 +69,7 @@
            {:lib       lib
             :version   ver
             :jar-file  jar-file
-            :scm       (merge {:url "https://github.com/lambdaseq/relm"
+            :scm       (merge {:url "https://github.com/conjurernix/relm"
                                :tag (str "v" ver)}
                               (:scm opts))
             :basis     basis

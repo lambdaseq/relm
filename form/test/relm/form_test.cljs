@@ -1,8 +1,8 @@
-(ns com.lambdaseq.relm.form-test
+(ns relm.form-test
   "Unit tests for Relm form state management, reducers, validators, and update lifecycle."
   (:require [cljs.test :refer-macros [deftest is testing]]
-            [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.form :as form]))
+            [relm.core :as relm]
+            [relm.form :as form]))
 
 ;; -----------------------------------------------------------------------------
 ;; 1. Initialization Tests

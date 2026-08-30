@@ -1,7 +1,7 @@
 {:paths ["src"]
- :deps {org.clojure/clojurescript {:mvn/version "1.12.145"}
-        com.lambdaseq/relm.core   {:local/root "../core"}
-        metosin/reitit-core       {:mvn/version "0.7.0-alpha7"}}
+ :deps {org.clojure/clojurescript         {:mvn/version "1.12.145"}
+        io.github.conjurernix/relm.core   {:local/root "../core"}
+        metosin/reitit-core               {:mvn/version "0.7.0-alpha7"}}
  :aliases
  {:test       {:extra-paths ["test"]}
   :clj-kondo  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2026.08.04"}}

@@ -1,21 +1,21 @@
 # relm.core
 
-`com.lambdaseq/relm.core` is the foundational module of Relm, providing an Elm-architecture (Model-View-Update + Effects) runtime on top of [Replicant](https://github.com/cjohansen/replicant) for Clojure and ClojureScript.
+`io.github.conjurernix/relm.core` is the foundational module of Relm, providing an Elm-architecture (Model-View-Update + Effects) runtime on top of [Replicant](https://github.com/cjohansen/replicant) for Clojure and ClojureScript.
 
 ## Table of Contents
 
 - [Installation](#installation)
 - [Module Overview](#module-overview)
-- [Core Architecture (`com.lambdaseq.relm.core`)](#core-architecture-comlambdaseqrelmcore)
+- [Core Architecture (`relm.core`)](#core-architecture-relmcore)
   - [Component Lifecycle](#component-lifecycle)
   - [State & Context Model](#state--context-model)
   - [Message Handlers (`relm/update`)](#message-handlers-relmupdate)
   - [Side-Effect Handlers (`relm/fx`)](#side-effect-handlers-relmfx)
   - [Nested Components](#nested-components)
-- [HTTP Client (`com.lambdaseq.relm.http`)](#http-client-comlambdaseqrelmhttp)
+- [HTTP Client (`relm.http`)](#http-client-relmhttp)
   - [Fetch Effect (`::fetch!`)](#fetch-effect-fetch)
   - [Abort Effect (`::abort!`)](#abort-effect-abort)
-- [Browser Navigation (`com.lambdaseq.relm.navigation`)](#browser-navigation-comlambdaseqrelmnavigation)
+- [Browser Navigation (`relm.navigation`)](#browser-navigation-relmnavigation)
 
 ---
 
@@ -24,9 +24,9 @@
 Add the dependency to your `deps.edn`:
 
 ```clojure
-{:deps {com.lambdaseq/relm.core {:git/url "https://github.com/lambdaseq/relm"
-                                 :sha     "..."
-                                 :deps/root "core"}}}
+{:deps {io.github.conjurernix/relm.core {:git/url "https://github.com/conjurernix/relm"
+                                         :sha     "..."
+                                         :deps/root "core"}}}
 ```
 
 ---
@@ -37,13 +37,13 @@ The `core` module includes three functional namespaces:
 
 | Namespace | Role |
 | :--- | :--- |
-| `com.lambdaseq.relm.core` | Component runtime, lifecycle management, Replicant dispatcher, `relm/update`, and `relm/fx`. |
-| `com.lambdaseq.relm.http` | Fetch API integration, asynchronous HTTP requests, cancellation, and response decoders. |
-| `com.lambdaseq.relm.navigation` | Browser History API side effects (`pushState`, `replaceState`, `back`, `forward`, `reload`). |
+| `relm.core` | Component runtime, lifecycle management, Replicant dispatcher, `relm/update`, and `relm/fx`. |
+| `relm.http` | Fetch API integration, asynchronous HTTP requests, cancellation, and response decoders. |
+| `relm.navigation` | Browser History API side effects (`pushState`, `replaceState`, `back`, `forward`, `reload`). |
 
 ---
 
-## Core Architecture (`com.lambdaseq.relm.core`)
+## Core Architecture (`relm.core`)
 
 Relm structures applications using the Elm Architecture:
 
@@ -63,7 +63,7 @@ Components are defined with `relm/component` by passing a configuration map with
 
 ```clojure
 (ns my-app.counter
-  (:require [com.lambdaseq.relm.core :as relm]
+  (:require [relm.core :as relm]
             [replicant.dom :as r]))
 
 (defn init
@@ -167,7 +167,7 @@ Components can be nested arbitrarily. Each instance maintains isolated local sta
 
 ---
 
-## HTTP Client (`com.lambdaseq.relm.http`)
+## HTTP Client (`relm.http`)
 
 The `http` module provides declarative, asynchronous Fetch API requests with automatic JSON decoding and request cancellation.
 
@@ -177,8 +177,8 @@ Dispatch `::relm.http/fetch!` in your update handler's effects vector:
 
 ```clojure
 (ns my-app.posts
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.http :as relm.http]))
+  (:require [relm.core :as relm]
+            [relm.http :as relm.http]))
 
 (defmethod relm/update ::load-posts
   [state context _ _]
@@ -228,14 +228,14 @@ Cancel an active in-flight request using its `:request-id`:
 
 ---
 
-## Browser Navigation (`com.lambdaseq.relm.navigation`)
+## Browser Navigation (`relm.navigation`)
 
-`com.lambdaseq.relm.navigation` provides effect handlers for browser history manipulation:
+`relm.navigation` provides effect handlers for browser history manipulation:
 
 ```clojure
 (ns my-app.nav
-  (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.navigation :as nav]))
+  (:require [relm.core :as relm]
+            [relm.navigation :as nav]))
 
 ;; Push a new history entry
 (defmethod relm/update ::go-to-profile

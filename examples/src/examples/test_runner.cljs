@@ -1,13 +1,13 @@
 (ns examples.test-runner
-  (:require [cljs.test :as test :refer-macros [run-tests]]
-            [com.lambdaseq.relm.query-test]
-            [com.lambdaseq.relm.form-test]
-            [com.lambdaseq.relm.reitit-test]
-            [com.lambdaseq.relm.core-test]))
+  (:require [cljs.test :as test]
+            [relm.core-test]
+            [relm.form-test]
+            [relm.query-test]
+            [relm.reitit-test]))
 
 (defn main []
   (test/run-tests
-   'com.lambdaseq.relm.query-test
-   'com.lambdaseq.relm.form-test
-   'com.lambdaseq.relm.reitit-test
-   'com.lambdaseq.relm.core-test))
+   'relm.query-test
+   'relm.form-test
+   'relm.reitit-test
+   'relm.core-test))
