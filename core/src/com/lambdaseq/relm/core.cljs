@@ -360,7 +360,11 @@
         hiccup (view state (:context @!app-state))]
     (when hiccup
       (-> hiccup
-          (rh/update-attrs assoc :data-relm-component-id comp-id)
+          (rh/update-attrs
+            (fn [attrs]
+              (cond-> (assoc (or attrs {}) :data-relm-component-id comp-id)
+                (not (or (contains? attrs :replicant/key) (contains? attrs :key)))
+                (assoc :replicant/key comp-id))))
           (rh/update-attrs
             clojure.core/update :replicant/on-unmount
             (fn [on-unmount]

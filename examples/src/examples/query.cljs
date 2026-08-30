@@ -43,7 +43,8 @@
   "Initializes form state for creating a new post."
   [_context _args]
   {:form (form/create {:initial-values {:title ""
-                                        :body  ""}})})
+                                        :body  ""}
+                       :validators     {:title (form/required "Title is required")}})})
 ;; -----------------------------------------------------------------------------
 ;; View
 ;; -----------------------------------------------------------------------------
@@ -127,11 +128,11 @@
      [:div {:style {:padding       "16px"
                     :border        "1px solid #e5e7eb"
                     :border-radius "8px"
-                    :margin-bottom "20px"}
-            :replicant/on-unmount (form/on-clear form)}
+                    :margin-bottom "20px"}}
       [:h2 {:style {:font-size "16px" :font-weight "600" :margin-bottom "12px"}}
        "Optimistic Mutation: Add Post"]
-      [:div {:style {:display "flex" :gap "12px" :margin-bottom "8px"}}
+      [:form (form/form-attrs form {:on    {:submit [::form/submit form {:on-submit [::add-post]}]}
+                                    :style {:display "flex" :gap "12px" :margin-bottom "8px"}})
        [:input (merge (form/register form :title {:placeholder "Post Title..."
                                                   :required    "Title is required"})
                       {:style {:flex          "1"
@@ -154,7 +155,7 @@
                             :opacity          (if mutation-loading? "0.7" "1")
                             :font-weight      "500"}
                  :disabled mutation-loading?
-                 :on       {:click [::form/submit form {:on-submit [::add-post]}]}}
+                 :type     :submit}
         (if mutation-loading? "Submitting..." "Create Post")]]
       (when title-err
         [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}}
@@ -208,14 +209,8 @@
 ;; Component Export
 ;; -----------------------------------------------------------------------------
 
-(defn on-deinit
-  "Lifecycle hook that clears form state when QueryExample unmounts."
-  [state context _args _event]
-  [state context [[::relm/dispatch! (form/on-clear :form)]]])
-
 (def QueryExample
   "Query example component."
   (relm/component
-    {:init      init
-     :on-deinit on-deinit
-     :view      view}))
+    {:init init
+     :view view}))

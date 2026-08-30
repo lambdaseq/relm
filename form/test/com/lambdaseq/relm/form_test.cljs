@@ -598,32 +598,42 @@
           (is (false? (form/dirty? (:form state-after-reset))))
           (is (true? (form/value (:form state-after-reset) [:preferences :newsletter]))))))))
 
-(deftest unmount-form-cleanup-test
-  (testing "on-clear and ::form/clear clears registered field configs and state"
-    ;; 1. Register a form with a required title validator
-    (let [f1 (form/create)
-          _ (form/register f1 :title {:required "Title is required"})
-          state1 {:form f1}
-          [invalid-state] (relm/update state1 {} [::form/submit :form {:on-submit [::ok]}] nil)]
-      (is (= "Title is required" (form/error (:form invalid-state) :title)))
-      (is (= [::form/clear :form] (form/on-clear f1)))
-      (is (= [::form/clear :form] (form/on-clear :form)))
+(deftest form-navigation-and-isolation-test
+  (testing "independent form instances sharing :form key isolate their validators and errors"
+    ;; Step 1: FormExample component state with :username and :email required
+    (let [form1 (form/create {:validators {:username (form/required "Username is required")
+                                           :email    (form/required "Email is required")}})
+          _ (form/register form1 :username {:required "Username is required"})
+          _ (form/register form1 :email {:required "Email is required"})
+          state1 {:form form1}
+          ;; Trigger error in FormExample
+          [invalid-state1] (relm/update state1 {} [::form/submit :form {:on-submit [::save]}] nil)]
+      (is (= "Username is required" (form/error (:form invalid-state1) :username)))
+      (is (= "Email is required" (form/error (:form invalid-state1) :email)))
 
-      ;; 2. Unmount / clear form
-      (let [[cleaned-state] (relm/update invalid-state {} (form/on-clear f1) nil)]
-        (is (nil? (:form cleaned-state)))
+      ;; Step 2: Navigate to QueryExample view, initializing a new form state for posts
+      (let [form2 (form/create {:initial-values {:title "" :body ""}
+                                :validators     {:title (form/required "Title is required")}})
+            _ (form/register form2 :title {:required "Title is required"})
+            _ (form/register form2 :body {})
+            state2 {:form form2}]
+        ;; Query form should not have username/email errors from FormExample
+        (is (nil? (form/error (:form state2) :username)))
+        (is (nil? (form/error (:form state2) :email)))
+        (is (nil? (form/error (:form state2) :title)))
 
-        ;; 3. Create a new form reusing the same form key :form with different fields
-        (let [f2 (form/create)
-              _ (form/register f2 :username {:required "Username is required"})
-              state2 {:form f2}
-              [invalid-state2] (relm/update state2 {} [::form/submit :form {:on-submit [::ok]}] nil)]
-          ;; The old :title validator must no longer exist or leak into f2
-          (is (nil? (form/error (:form invalid-state2) :title)))
-          (is (= "Username is required" (form/error (:form invalid-state2) :username)))))))
+        ;; Touching or submitting in QueryExample MUST validate and produce error for post title
+        (let [[invalid-state2] (relm/update state2 {} [::form/submit :form {:on-submit [::add-post]}] nil)]
+          (is (= "Title is required" (form/error (:form invalid-state2) :title)))
+          (is (nil? (form/error (:form invalid-state2) :username)))
+          (is (nil? (form/error (:form invalid-state2) :email)))
+          (is (false? (form/valid? (:form invalid-state2))))))))
 
-  (testing "form-attrs attaches :replicant/on-unmount hook"
-    (let [f (form/create)
-          attrs (form/form-attrs f {:class "my-form"})]
-      (is (= "my-form" (:class attrs)))
-      (is (= [::form/clear :form] (:replicant/on-unmount attrs))))))
+  (testing "form-attrs attaches on-unmount clear message and clear removes form state"
+    (let [form (form/create {:initial-values {:username "alice"}})
+          attrs (form/form-attrs form {:class "form-class"})]
+      (is (= "form-class" (:class attrs)))
+      (is (= [::form/clear form] (:replicant/on-unmount attrs)))
+      (let [state {:form form}
+            [cleaned-state] (relm/update state {} (:replicant/on-unmount attrs) nil)]
+        (is (nil? (:form cleaned-state)))))))

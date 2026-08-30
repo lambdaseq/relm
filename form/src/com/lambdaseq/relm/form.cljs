@@ -255,6 +255,14 @@
     (merge-with deep-merge a b)
     b))
 
+(defn form-id
+  "Returns the unique instance identifier of the form (or falls back to `:key` or `:form`)."
+  [form-or-key]
+  (cond
+    (map? form-or-key) (or (:id form-or-key) (:key form-or-key) (:form-key form-or-key) :form)
+    (some? form-or-key) form-or-key
+    :else :form))
+
 (defn- extract-rule-val-and-msg
   [opt]
   (cond
@@ -340,48 +348,53 @@
     (persistent! validators)))
 
 (defn- register-field-config!
-  [form-k path val-fns init-val]
-  (let [norm-p (normalize-path path)]
-    (swap! !registered-field-configs assoc-in [form-k norm-p]
+  [form-id-or-k path val-fns init-val]
+  (let [norm-p (normalize-path path)
+        fid (form-id form-id-or-k)]
+    (swap! !registered-field-configs assoc-in [fid norm-p]
            {:validators    (vec val-fns)
             :initial-value init-val})))
 
 (defn- get-registered-validators
-  [form-k]
-  (reduce-kv
-    (fn [m p cfg]
-      (if (seq (:validators cfg))
-        (assoc m p (:validators cfg))
-        m))
-    {}
-    (get @!registered-field-configs form-k)))
+  [form-id-or-k]
+  (let [fid (form-id form-id-or-k)]
+    (reduce-kv
+      (fn [m p cfg]
+        (if (seq (:validators cfg))
+          (assoc m p (:validators cfg))
+          m))
+      {}
+      (get @!registered-field-configs fid))))
 
 (defn- get-registered-initial-values-map
-  [form-k]
-  (reduce-kv
-    (fn [m p cfg]
-      (if (some? (:initial-value cfg))
-        (assoc-in m p (:initial-value cfg))
-        m))
-    {}
-    (get @!registered-field-configs form-k)))
+  [form-id-or-k]
+  (let [fid (form-id form-id-or-k)]
+    (reduce-kv
+      (fn [m p cfg]
+        (if (some? (:initial-value cfg))
+          (assoc-in m p (:initial-value cfg))
+          m))
+      {}
+      (get @!registered-field-configs fid))))
 
 (defn create
   "Creates a normalized form state map.
 
   Options:
+  - `:id`             (string, optional): Unique instance ID for the form (defaults to auto-generated UUID).
   - `:key` / `:form-key` (keyword or vector, default `:form`): Key identifying form in component state.
   - `:initial-values` (map, default `{}`): Map of initial field values (optional, can also be defined in `register`).
   - `:validators`     (map, default `{}`): Map of field paths to validator or vector of validators (optional, prefer defining in `register`).
   - `:validate`       (fn [values] -> error-map, optional): Form-level custom validation function.
   - `:validate-on`    (set of #{:change :blur :submit}, default `#{:change :blur :submit}`): When validation triggers."
   ([] (create {}))
-  ([{:keys [key form-key initial-values validators validate validate-on]
+  ([{:keys [id key form-key initial-values validators validate validate-on]
      :or   {initial-values {}
             validators     {}
             validate-on    #{:change :blur :submit}}}]
    (let [k (or key form-key :form)
-         _ (swap! !registered-field-configs assoc k {})
+         fid (or id (str (random-uuid)))
+         _ (swap! !registered-field-configs assoc fid {})
          normalized-validators (reduce-kv
                                  (fn [m k-path v]
                                    (let [norm-k (normalize-path k-path)
@@ -389,7 +402,8 @@
                                      (assoc m norm-k norm-v)))
                                  {}
                                  validators)]
-     {:key            k
+     {:id             fid
+      :key            k
       :values         (or initial-values {})
       :initial-values (or initial-values {})
       :touched        #{}
@@ -429,8 +443,8 @@
   Merges validators configured via `form/create` with dynamic validators defined via `form/register`.
   Returns updated `form-state` with `:errors` map populated."
   [form-state]
-  (let [k (form-key form-state)
-        registered (get-registered-validators k)
+  (let [fid (form-id form-state)
+        registered (get-registered-validators fid)
         all-validators (merge registered (:validators form-state))
         form-state (assoc form-state :validators all-validators)
         current-values (values form-state)
@@ -467,8 +481,8 @@
   Updates `form-state` with the field validation result."
   [form-state path]
   (let [norm-p (normalize-path path)
-        k (form-key form-state)
-        all-validators (merge (get-registered-validators k) (:validators form-state))
+        fid (form-id form-state)
+        all-validators (merge (get-registered-validators fid) (:validators form-state))
         val-fns (get all-validators norm-p)
         current-values (values form-state)
         val (get-in current-values norm-p)
@@ -535,10 +549,10 @@
 (defn touch-all
   "Marks all fields (all configured validator paths and value paths) as touched."
   [form-state]
-  (let [k (form-key form-state)
+  (let [fid (form-id form-state)
         val-paths (collect-all-paths (values form-state))
         init-paths (collect-all-paths (initial-values form-state))
-        registered-paths (keys (get @!registered-field-configs k))
+        registered-paths (keys (get @!registered-field-configs fid))
         validator-paths (keys (:validators form-state))
         all-paths (into (set validator-paths) (concat val-paths init-paths registered-paths))]
     (assoc form-state :touched all-paths)))
@@ -615,8 +629,8 @@
        (let [init-val (get-in (:initial-values form-state) norm-p)]
          (if (some? init-val)
            init-val
-           (let [k (form-key form-state)
-                 reg-init (get-in @!registered-field-configs [k norm-p :initial-value])]
+           (let [fid (form-id form-state)
+                 reg-init (get-in @!registered-field-configs [fid norm-p :initial-value])]
              (if (some? reg-init)
                reg-init
                default-val))))))))
@@ -641,8 +655,8 @@
 (defn initial-values
   "Returns the complete `:initial-values` map from `form-state` merged with registered field initial values."
   [form-state]
-  (let [k (form-key form-state)
-        registered-inits (get-registered-initial-values-map k)
+  (let [fid (form-id form-state)
+        registered-inits (get-registered-initial-values-map fid)
         base-inits (or (:initial-values form-state) {})]
     (deep-merge registered-inits base-inits)))
 
@@ -760,8 +774,9 @@
 (defn clear-state!
   "Clears all dynamically registered field configurations and validators for `form-or-key`."
   [form-or-key]
-  (let [k (extract-form-key form-or-key)]
-    (swap! !registered-field-configs dissoc k)))
+  (let [fid (form-id form-or-key)
+        k (extract-form-key form-or-key)]
+    (swap! !registered-field-configs #(-> % (dissoc fid) (dissoc k)))))
 
 (defn on-change
   "Constructs a message vector for the `:input` or `:change` DOM event.
@@ -803,7 +818,7 @@
     (on-clear form)
     (on-clear :form)"
   [form-or-key]
-  [::clear (extract-form-key form-or-key)])
+  [::clear form-or-key])
 
 (defn form-attrs
   "Generates standard form element attributes including unmount cleanup hook.
@@ -813,14 +828,13 @@
   ([form-or-key]
    (form-attrs form-or-key {}))
   ([form-or-key attrs]
-   (let [k (extract-form-key form-or-key)]
-     (clojure.core/update (or attrs {}) :replicant/on-unmount
-                          (fn [on-unmount-hook]
-                            (cond
-                              (nil? on-unmount-hook) [::clear k]
-                              (and (vector? on-unmount-hook) (vector? (first on-unmount-hook))) (conj on-unmount-hook [::clear k])
-                              (vector? on-unmount-hook) [on-unmount-hook [::clear k]]
-                              :else [::clear k]))))))
+   (clojure.core/update (or attrs {}) :replicant/on-unmount
+                        (fn [on-unmount-hook]
+                          (cond
+                            (nil? on-unmount-hook) (on-clear form-or-key)
+                            (and (vector? on-unmount-hook) (vector? (first on-unmount-hook))) (conj on-unmount-hook (on-clear form-or-key))
+                            (vector? on-unmount-hook) [on-unmount-hook (on-clear form-or-key)]
+                            :else (on-clear form-or-key))))))
 
 ;; -----------------------------------------------------------------------------
 ;; View Helpers & Field Registration
@@ -832,7 +846,8 @@
         val-fns (extract-validators-from-opts opts)
         is-checkbox? (= (:type opts) "checkbox")
         init-val (extract-initial-val-from-opts opts is-checkbox?)
-        _ (register-field-config! form-k norm-p val-fns init-val)
+        fid (form-id form-state)
+        _ (register-field-config! fid norm-p val-fns init-val)
         val (value form-state norm-p init-val)
         min-val (when-let [m (:min opts)]
                   (let [[v _] (extract-rule-val-and-msg m)]
@@ -977,16 +992,21 @@
         new-state (update-form state form-key reset-form initial)]
     [new-state context]))
 
-;; Message format: `[::clear form-key]` or `[::clear form-state]`
+;; Message format: `[::clear form-key]` or `[::clear form-id]` or `[::clear form-state]`
 ;; Clears all registered field configurations/validators and removes the form state from local state.
 (defmethod relm/update ::clear
   [state context [_ form-or-key] _event]
-  (let [form-key (extract-form-key form-or-key)]
-    (clear-state! form-key)
-    (let [new-state (if (vector? form-key)
-                      (update-in state (butlast form-key) dissoc (last form-key))
-                      (dissoc state form-key))]
-      [new-state context])))
+  (clear-state! form-or-key)
+  (let [k (cond
+            (map? form-or-key) (form-key form-or-key)
+            (keyword? form-or-key) form-or-key
+            (vector? form-or-key) form-or-key
+            :else nil)
+        new-state (cond
+                    (nil? k) state
+                    (vector? k) (update-in state (butlast k) dissoc (last k))
+                    :else (dissoc state k))]
+    [new-state context]))
 
 (defn- ->dispatch-msg
   [target val]
@@ -995,12 +1015,12 @@
     (vector? target) (conj target val)
     :else target))
 
-;; Message format: `[::submit form-key opts]`
+;; Message format: `[::submit form-key opts]` or `[::submit form-state opts]`
 (defmethod relm/update ::submit
   [state context [_ form-or-key {:keys [on-submit on-invalid validate focus-error?]
                                  :or   {focus-error? true}}] event]
   (let [form-key (extract-form-key form-or-key)
-        current-form (get-form state form-key)
+        current-form (or (get-form state form-key) (when (map? form-or-key) form-or-key))
         touched-form (touch-all current-form)
         validated-form (validate-form touched-form)
         form-vals (values validated-form)

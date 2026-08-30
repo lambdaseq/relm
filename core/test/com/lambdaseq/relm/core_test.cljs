@@ -151,6 +151,8 @@
                           [:div {:id "rendered"} (str "Count: " count ", tag: " tag ", ctx: " (:app-initialized? ctx))])})
           hiccup (comp {:id "test-comp-1" :initial-val 42 :tag "alpha"})]
       (is (vector? hiccup))
+      (is (= "test-comp-1" (:replicant/key (second hiccup))))
+      (is (= "test-comp-1" (:data-relm-component-id (second hiccup))))
       (is (= {:count 42 :tag "alpha"} (get-in @relm/!app-state [:components "test-comp-1" :state])))
       (is (true? (:app-initialized? (:context @relm/!app-state))))
       (is (= ["initialized-alpha"] @test-fx-log))))
