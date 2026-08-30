@@ -112,6 +112,14 @@
       (relm/dispatch! event [::test-dispatch-fx "dispatched-value"])
       (is (= "dispatched-value" (get-in @relm/!app-state [:components "comp-1" :state :val])))))
 
+  (testing "event preserves :component-id through side effects when originating from DOM node"
+    (let [dummy-node #js {:getAttribute (fn [attr] (when (= attr "data-relm-component-id") "comp-from-dom"))
+                          :parentNode nil}
+          event {:replicant/node dummy-node}]
+      (swap! relm/!app-state assoc-in [:components "comp-from-dom" :state] {})
+      (relm/dispatch! event [::test-dispatch-fx "dispatched-from-dom"])
+      (is (= "dispatched-from-dom" (get-in @relm/!app-state [:components "comp-from-dom" :state :val])))))
+
   (testing "::relm/dispatch-n! effect triggers batch update messages"
     (reset! test-fx-log [])
     (let [event {:component-id "comp-1"}]

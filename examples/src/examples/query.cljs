@@ -9,7 +9,9 @@
   - Real-time cache inspector visualizing queries and mutations in the global Relm context"
   (:require [com.lambdaseq.relm.core :as relm]
             [com.lambdaseq.relm.form :as form]
-            [com.lambdaseq.relm.query :as query]))
+            [com.lambdaseq.relm.query :as query]
+            [examples.snippets :as snippets]
+            [examples.ui :as ui]))
 
 ;; -----------------------------------------------------------------------------
 ;; Query Keys
@@ -45,6 +47,7 @@
   {:form (form/create {:initial-values {:title ""
                                         :body  ""}
                        :validators     {:title (form/required "Title is required")}})})
+
 ;; -----------------------------------------------------------------------------
 ;; View
 ;; -----------------------------------------------------------------------------
@@ -59,151 +62,157 @@
         err (query/error context posts-query-key)
         mutation-loading? (query/mutation-loading? context [:posts])
         title-err (form/error form :title)]
-    [:div {:style {:max-width "800px" :margin "0 auto"}}
-     [:div {:style {:margin-bottom "24px"}}
-      [:h1 {:style {:font-size "24px" :font-weight "700" :margin-bottom "8px"}}
-       "Relm Query (TanStack Query Port)"]
-      [:p {:style {:color "#4b5563" :font-size "14px"}}
-       "Declarative server-state caching, automatic URL inference, optimistic mutations, and hierarchical cache invalidation."]]
+    [:div {:class "max-w-5xl mx-auto"}
+     (ui/example-header
+       {:step        "6"
+        :title       "Relm Query (TanStack Query Port)"
+        :difficulty  "Advanced"
+        :description "Declarative server-state caching, automatic URL inference from vector keys, optimistic mutations, background fetching, and cache invalidation using `com.lambdaseq.relm.query`."
+        :tags        ["relm.query" "Server-State Cache" "Optimistic Mutations" "Stale-While-Revalidate" "Cache Invalidation"]})
 
-     ;; Controls Bar
-     [:div {:style {:display          "flex"
-                    :gap              "12px"
-                    :align-items      "center"
-                    :padding          "16px"
-                    :background-color "#f9fafb"
-                    :border           "1px solid #e5e7eb"
-                    :border-radius    "8px"
-                    :margin-bottom    "20px"}}
-      [:button {:style {:padding          "8px 16px"
-                        :background-color "#4f46e5"
-                        :color            "white"
-                        :border           "none"
-                        :border-radius    "6px"
-                        :cursor           "pointer"
-                        :font-weight      "500"}
-                :on    {:click [::query/fetch posts-query-key {:base-url   "https://jsonplaceholder.typicode.com"
-                                                               :stale-time 10000}]}}
-       (if fetching? "Fetching..." "Fetch Posts (Cache-First)")]
+     ;; Query Controls Bar
+     (ui/card
+       {:class "mb-6 border-slate-200"}
+       [:div
+        (ui/card-header
+          [:div {:class "flex flex-wrap items-center justify-between gap-4"}
+           [:div
+            (ui/card-title "Query Key: [:posts {:_limit 5}]")
+            (ui/card-description "Trigger cache-first queries, manual background refetches, or hierarchical invalidations.")]
+           [:div {:class "flex items-center gap-2"}
+            (if (seq posts)
+              (if stale?
+                (ui/badge {:variant :warning} "STALE (5s+ old)")
+                (ui/badge {:variant :success} "FRESH CACHE"))
+              (ui/badge {:variant :secondary} "UNFETCHED"))
+            (when fetching?
+              (ui/badge {:variant :indigo} "FETCHING IN BACKGROUND"))]])
 
-      [:button {:style {:padding          "8px 16px"
-                        :background-color "#059669"
-                        :color            "white"
-                        :border           "none"
-                        :border-radius    "6px"
-                        :cursor           "pointer"
-                        :font-weight      "500"}
-                :on    {:click [::query/fetch posts-query-key {:base-url "https://jsonplaceholder.typicode.com"
-                                                               :force?   true}]}}
-       "Force Refetch"]
+        (ui/card-footer
+          [:div {:class "flex flex-wrap items-center gap-3 w-full"}
+           (ui/button
+             {:variant :default
+              :class   "bg-indigo-600 hover:bg-indigo-700 text-white"
+              :disabled fetching?
+              :on      {:click [::query/fetch posts-query-key {:base-url   "https://jsonplaceholder.typicode.com"
+                                                              :stale-time 10000}]}}
+             (if fetching? "Fetching..." "Fetch Posts (Cache-First)"))
 
-      [:button {:style {:padding          "8px 16px"
-                        :background-color "#d97706"
-                        :color            "white"
-                        :border           "none"
-                        :border-radius    "6px"
-                        :cursor           "pointer"
-                        :font-weight      "500"}
-                :on    {:click [::query/invalidate [:posts] {:refetch-active? true}]}}
-       "Invalidate [:posts]"]
+           (ui/button
+             {:variant :outline
+              :on      {:click [::query/fetch posts-query-key {:base-url "https://jsonplaceholder.typicode.com"
+                                                              :force?   true}]}}
+             "Force Refetch (Bypass Cache)")
 
-      [:div {:style {:margin-left "auto" :display "flex" :gap "8px" :align-items "center"}}
-       [:span {:style {:font-size        "13px"
-                       :padding          "4px 8px"
-                       :border-radius    "4px"
-                       :background-color (if stale? "#fee2e2" "#dcfce7")
-                       :color            (if stale? "#991b1b" "#166534")
-                       :font-weight      "600"}}
-        (if stale? "STALE" "FRESH")]
-       (when fetching?
-         [:span {:style {:font-size        "13px"
-                         :padding          "4px 8px"
-                         :border-radius    "4px"
-                         :background-color "#dbeafe"
-                         :color            "#1e40af"
-                         :font-weight      "600"}}
-          "FETCHING"])]]
+           (ui/button
+             {:variant :secondary
+              :class   "text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200"
+              :on      {:click [::query/invalidate [:posts] {:refetch-active? true}]}}
+             "Invalidate [:posts]")])])
 
-     ;; Mutation Form
-     [:div {:style {:padding       "16px"
-                    :border        "1px solid #e5e7eb"
-                    :border-radius "8px"
-                    :margin-bottom "20px"}}
-      [:h2 {:style {:font-size "16px" :font-weight "600" :margin-bottom "12px"}}
-       "Optimistic Mutation: Add Post"]
-      [:form (form/form-attrs form {:on    {:submit [::form/submit form {:on-submit [::add-post]}]}
-                                    :style {:display "flex" :gap "12px" :margin-bottom "8px"}})
-       [:input (merge (form/register form :title {:placeholder "Post Title..."
-                                                  :required    "Title is required"})
-                      {:style {:flex          "1"
-                               :padding       "8px 12px"
-                               :border        (str "1px solid " (if title-err "#ef4444" "#d1d5db"))
-                               :border-radius "6px"
-                               :outline       "none"}})]
-       [:input (merge (form/register form :body {:placeholder "Post Body..."})
-                      {:style {:flex          "2"
-                               :padding       "8px 12px"
-                               :border        "1px solid #d1d5db"
-                               :border-radius "6px"
-                               :outline       "none"}})]
-       [:button {:style    {:padding          "8px 20px"
-                            :background-color "#2563eb"
-                            :color            "white"
-                            :border           "none"
-                            :border-radius    "6px"
-                            :cursor           (if mutation-loading? "not-allowed" "pointer")
-                            :opacity          (if mutation-loading? "0.7" "1")
-                            :font-weight      "500"}
-                 :disabled mutation-loading?
-                 :type     :submit}
-        (if mutation-loading? "Submitting..." "Create Post")]]
-      (when title-err
-        [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}}
-         title-err])]
+     ;; Main Grid: Mutation Form + Posts List
+     [:div {:class "grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8 items-start"}
+      ;; Optimistic Mutation Form
+      [:div {:class "lg:col-span-5"}
+       (ui/card
+         {:class "border-slate-200 shadow-sm"}
+         [:div
+          (ui/card-header
+            (ui/card-title "Optimistic Mutation: Add Post")
+            (ui/card-description "Immediately prepends new post to cache UI before network responds."))
+          (ui/card-content
+            [:form (form/form-attrs form {:on {:submit [::form/submit form {:on-submit [::add-post]}]}})
+             [:div {:class "space-y-3"}
+              [:div
+               (ui/label {:required? true} "Post Title")
+               (ui/input (merge (form/register form :title {:placeholder "e.g., Relm Architecture in Practice"
+                                                            :required    "Title is required"})
+                                {:error? (boolean title-err)}))
+               (when title-err
+                 [:p {:class "text-xs font-medium text-red-600 mt-1"} title-err])]
 
-     ;; Data & Loading States
-     [:div {:style {:margin-bottom "24px"}}
-      [:h2 {:style {:font-size "18px" :font-weight "600" :margin-bottom "12px"}}
-       "Posts List"]
-      (cond
-        loading?
-        [:div {:style {:padding "32px" :text-align "center" :color "#6b7280"}}
-         "Loading posts..."]
+              [:div
+               (ui/label "Post Body Content")
+               (ui/input (merge (form/register form :body {:placeholder "Brief description or message..."})))]
 
-        err
-        [:div {:style {:padding "16px" :background-color "#fef2f2" :border "1px solid #f87171" :border-radius "6px" :color "#991b1b"}}
-         (str "Error: " (or (:problem-message err) (str err)))]
+              [:div {:class "pt-2"}
+               (ui/button
+                 {:type     :submit
+                  :variant  :default
+                  :class    "w-full bg-slate-900 hover:bg-slate-800 text-white"
+                  :disabled mutation-loading?}
+                 (if mutation-loading? "Committing Mutation..." "Create Post (Optimistic)"))]]])])]
 
-        (seq posts)
-        [:div {:style {:display "flex" :flex-direction "column" :gap "12px"}}
-         (for [p posts]
-           [:div {:key   (or (:id p) (str (rand)))
-                  :style {:padding          "12px 16px"
-                          :border           "1px solid #e5e7eb"
-                          :border-radius    "6px"
-                          :background-color "white"}}
-            [:h3 {:style {:font-size "15px" :font-weight "600" :color "#111827" :margin-bottom "4px"}}
-             (:title p)]
-            [:p {:style {:font-size "13px" :color "#4b5563" :margin 0}}
-             (:body p)]])]
+      ;; Posts List Panel
+      [:div {:class "lg:col-span-7 space-y-4"}
+       [:div {:class "flex items-center justify-between"}
+        [:h3 {:class "text-base font-semibold text-slate-900"} "Cached Server-State Posts"]
+        [:span {:class "text-xs font-mono text-slate-500"} (str (count posts) " items")]]
 
-        :else
-        [:div {:style {:padding "32px" :text-align "center" :color "#6b7280" :background-color "#f9fafb" :border-radius "6px"}}
-         "No posts loaded. Click 'Fetch Posts' above to query API."])]
+       (cond
+         loading?
+         [:div {:class "space-y-3"}
+          (for [i (range 3)]
+            ^{:key i}
+            (ui/card
+              {:class "border-slate-200 animate-pulse p-4"}
+              [:div {:class "space-y-2"}
+               [:div {:class "h-4 bg-slate-200 rounded w-1/3"}]
+               [:div {:class "h-8 bg-slate-100 rounded w-full"}]]))]
+
+         err
+         (ui/alert
+           {:variant :destructive}
+           [:div
+            [:h4 {:class "font-bold text-sm mb-1"} "Query Execution Error"]
+            [:p {:class "text-xs"} (str (or (:problem-message err) err))]])
+
+         (seq posts)
+         [:div {:class "space-y-3"}
+          (for [p posts]
+            ^{:key (or (:id p) (str (rand)))}
+            (ui/card
+              {:class "border-slate-200 hover:border-slate-300 transition-all shadow-2xs"}
+              [:div {:class "p-4"}
+               [:div {:class "flex items-center justify-between gap-2 mb-1"}
+                [:h4 {:class "font-semibold text-sm text-slate-900 capitalize"}
+                 (:title p)]
+                (when-let [id (:id p)]
+                  (ui/badge {:variant :secondary :class "font-mono text-[10px]"} (str "#" id)))]
+               (when-let [body (:body p)]
+                 [:p {:class "text-xs text-slate-600 leading-relaxed line-clamp-2 mt-1"}
+                  body])]))]
+
+         :else
+         (ui/card
+           {:class "border-dashed border-2 border-slate-300 bg-slate-50/50"}
+           [:div {:class "flex flex-col items-center justify-center p-8 text-center"}
+            [:span {:class "text-2xl mb-2"} "⚡"]
+            [:h4 {:class "text-sm font-semibold text-slate-800 mb-1"} "No Cached Server Records"]
+            [:p {:class "text-xs text-slate-500 mb-3"} "Click 'Fetch Posts (Cache-First)' to load query data from API."]
+            (ui/button
+              {:variant :outline
+               :size    :sm
+               :on      {:click [::query/fetch posts-query-key {:base-url   "https://jsonplaceholder.typicode.com"
+                                                                :stale-time 10000}]}}
+              "Fetch Now")]))]]
 
      ;; Context Cache Inspector
-     [:div {:style {:padding          "16px"
-                    :background-color "#111827"
-                    :color            "#f3f4f6"
-                    :border-radius    "8px"
-                    :font-family      "monospace"
-                    :font-size        "12px"}}
-      [:div {:style {:font-weight "700" :color "#93c5fd" :margin-bottom "8px"}}
-       "Relm Context Cache Inspector (:queries & :mutations)"]
-      [:pre {:style {:margin 0 :overflow-x "auto"}}
-       (let [cache-state {:queries   (into {} (map (fn [[k v]] [k (dissoc v :options)]) (:queries context)))
-                          :mutations (:mutations context)}]
-         (pr-str cache-state))]]]))
+     (ui/code-inspector
+       {:title      "Global Relm Context Cache"
+        :subtitle   ":queries & :mutations"
+        :badge-text "SERVER STATE"}
+       [:div {:class "space-y-3"}
+        [:pre {:class "bg-slate-900/90 p-3 rounded-lg border border-slate-800 text-slate-200 overflow-x-auto text-[11px] leading-relaxed"}
+         (let [cache-state {:queries   (into {} (map (fn [[k v]] [k (dissoc v :options)]) (:queries context)))
+                            :mutations (:mutations context)}]
+           (pr-str cache-state))]])
+
+     ;; Expandable Source Code Panel
+     (ui/code-panel
+       {:title    "Relm Query Example Source Code"
+        :filename "query.cljs"
+        :code     snippets/query-code})]))
 
 ;; -----------------------------------------------------------------------------
 ;; Component Export

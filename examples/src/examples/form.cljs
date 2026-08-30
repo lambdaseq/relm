@@ -10,7 +10,9 @@
   - Real-time touch tracking on blur and instant feedback
   - Declarative submission with `on-submit` effect and reset with `::form/reset`"
   (:require [com.lambdaseq.relm.core :as relm]
-            [com.lambdaseq.relm.form :as form]))
+            [com.lambdaseq.relm.form :as form]
+            [examples.snippets :as snippets]
+            [examples.ui :as ui]))
 
 ;; -----------------------------------------------------------------------------
 ;; Form Initialization
@@ -39,39 +41,33 @@
   [(assoc state :submitted-data nil) context])
 
 ;; -----------------------------------------------------------------------------
-;; Reusable View Components
+;; Reusable Input Field Component
 ;; -----------------------------------------------------------------------------
 
-(defn- input-field
-  "Reusable input component that pairs a label, form/register attributes, error styling, and inline validation error."
-  [form path {:keys [label container-style] :as opts}]
+(defn- form-input
+  "Renders a shadcn-styled input with label and automatic error messages."
+  [form path {:keys [label placeholder type required? min max min-length max-length validate] :as opts}]
   (let [err (form/error form path true)
-        reg-opts (dissoc opts :label :container-style)]
-    [:div {:style (merge {:margin-bottom "16px"} container-style)}
+        reg-opts (dissoc opts :label :required?)
+        reg-attrs (form/register form path (cond-> reg-opts
+                                             required? (assoc :required (if (string? required?) required? "This field is required"))))]
+    [:div {:class "space-y-1.5 mb-4"}
      (when label
-       [:label {:style {:display       "block"
-                        :font-size     "14px"
-                        :font-weight   "500"
-                        :color         "#374151"
-                        :margin-bottom "4px"}}
-        label])
-     [:input (merge (form/register form path reg-opts)
-                    {:style {:width         "100%"
-                             :box-sizing    "border-box"
-                             :padding       "8px 12px"
-                             :font-size     "14px"
-                             :border        (str "1px solid " (if err "#ef4444" "#d1d5db"))
-                             :border-radius "6px"
-                             :outline       "none"
-                             :background    (if err "#fef2f2" "#ffffff")}})]
+       (ui/label {:required? (boolean required?)} label))
+     (ui/input
+       (merge reg-attrs
+              {:type        (or type "text")
+               :placeholder placeholder
+               :error?      (boolean err)}))
      (when err
-       [:div {:style {:color "#dc2626" :font-size "12px" :margin-top "4px"}} err])]))
+       [:p {:class "text-xs font-medium text-red-600 flex items-center gap-1 mt-1"}
+        [:span "⚠"] err])]))
 
 ;; -----------------------------------------------------------------------------
-;; Live State Panel
+;; Live State Inspector
 ;; -----------------------------------------------------------------------------
 
-(defn- render-state-panel
+(defn- render-inspector
   [form]
   (let [values (form/values form)
         touched (form/touched form)
@@ -81,56 +77,56 @@
         is-submitting? (form/submitting? form)
         submit-count (form/submit-count form)
         clean-form (dissoc form :validators :validate-fn)]
-    [:div {:style {:background    "#0f172a"
-                   :color         "#e2e8f0"
-                   :border-radius "8px"
-                   :padding       "20px"
-                   :font-family   "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-                   :box-shadow    "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
-                   :font-size     "13px"}}
-     [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "16px" :border-bottom "1px solid #334155" :padding-bottom "12px"}}
-      [:div {:style {:font-weight "700" :font-size "15px" :color "#f8fafc"}} "⚡ Live Form State Inspector"]
-      [:span {:style {:background "#1e293b" :padding "2px 8px" :border-radius "4px" :font-size "11px" :color "#94a3b8"}}
-       "com.lambdaseq.relm.form"]]
+    (ui/code-inspector
+      {:title      "Form State Inspector"
+       :subtitle   "com.lambdaseq.relm.form"
+       :badge-text "LIVE TRACKING"}
+      [:div {:class "space-y-4 font-mono text-xs"}
+       ;; Status KPI Grid
+       [:div {:class "grid grid-cols-2 sm:grid-cols-4 gap-2"}
+        [:div {:class "bg-slate-900 p-2.5 rounded-lg border border-slate-800"}
+         [:div {:class "text-[10px] text-slate-400 uppercase tracking-wider font-semibold"} "valid?"]
+         [:div {:class (ui/cx "text-sm font-bold" (if is-valid? "text-emerald-400" "text-red-400"))}
+          (str is-valid?)]]
+        [:div {:class "bg-slate-900 p-2.5 rounded-lg border border-slate-800"}
+         [:div {:class "text-[10px] text-slate-400 uppercase tracking-wider font-semibold"} "dirty?"]
+         [:div {:class (ui/cx "text-sm font-bold" (if is-dirty? "text-amber-400" "text-slate-500"))}
+          (str is-dirty?)]]
+        [:div {:class "bg-slate-900 p-2.5 rounded-lg border border-slate-800"}
+         [:div {:class "text-[10px] text-slate-400 uppercase tracking-wider font-semibold"} "submitting?"]
+         [:div {:class (ui/cx "text-sm font-bold" (if is-submitting? "text-sky-400" "text-slate-500"))}
+          (str is-submitting?)]]
+        [:div {:class "bg-slate-900 p-2.5 rounded-lg border border-slate-800"}
+         [:div {:class "text-[10px] text-slate-400 uppercase tracking-wider font-semibold"} "submit-count"]
+         [:div {:class "text-sm font-bold text-slate-200"}
+          (str submit-count)]]]
 
-     ;; Status Flags Grid
-     [:div {:style {:display "grid" :grid-template-columns "1fr 1fr" :gap "8px" :margin-bottom "16px"}}
-      [:div {:style {:background "#1e293b" :padding "8px 12px" :border-radius "6px"}}
-       [:div {:style {:color "#94a3b8" :font-size "11px" :text-transform "uppercase"}} "valid?"]
-       [:div {:style {:font-weight "600" :color (if is-valid? "#4ade80" "#f87171")}} (str is-valid?)]]
-      [:div {:style {:background "#1e293b" :padding "8px 12px" :border-radius "6px"}}
-       [:div {:style {:color "#94a3b8" :font-size "11px" :text-transform "uppercase"}} "dirty?"]
-       [:div {:style {:font-weight "600" :color (if is-dirty? "#fbbf24" "#94a3b8")}} (str is-dirty?)]]
-      [:div {:style {:background "#1e293b" :padding "8px 12px" :border-radius "6px"}}
-       [:div {:style {:color "#94a3b8" :font-size "11px" :text-transform "uppercase"}} "submitting?"]
-       [:div {:style {:font-weight "600" :color (if is-submitting? "#60a5fa" "#94a3b8")}} (str is-submitting?)]]
-      [:div {:style {:background "#1e293b" :padding "8px 12px" :border-radius "6px"}}
-       [:div {:style {:color "#94a3b8" :font-size "11px" :text-transform "uppercase"}} "submit-count"]
-       [:div {:style {:font-weight "600" :color "#e2e8f0"}} (str submit-count)]]]
+       ;; Values Dump
+       [:div
+        [:div {:class "text-[11px] font-semibold text-sky-400 mb-1"} ":values"]
+        [:pre {:class "bg-slate-900/90 p-2.5 rounded-md border border-slate-800/80 text-slate-200 overflow-x-auto text-[11px] leading-relaxed"}
+         (pr-str values)]]
 
-     ;; Field Values
-     [:div {:style {:margin-bottom "16px"}}
-      [:div {:style {:color "#38bdf8" :font-weight "600" :margin-bottom "6px"}} ":values"]
-      [:pre {:style {:margin "0" :background "#1e293b" :padding "10px" :border-radius "6px" :overflow-x "auto" :color "#e2e8f0" :font-size "12px"}}
-       (pr-str values)]]
+       ;; Touched Paths
+       [:div
+        [:div {:class "text-[11px] font-semibold text-purple-400 mb-1"} ":touched"]
+        [:pre {:class "bg-slate-900/90 p-2.5 rounded-md border border-slate-800/80 text-slate-200 overflow-x-auto text-[11px] leading-relaxed"}
+         (if (seq touched) (pr-str touched) "#{} (none)")]]
 
-     ;; Touched Paths
-     [:div {:style {:margin-bottom "16px"}}
-      [:div {:style {:color "#a78bfa" :font-weight "600" :margin-bottom "6px"}} ":touched"]
-      [:pre {:style {:margin "0" :background "#1e293b" :padding "10px" :border-radius "6px" :overflow-x "auto" :color "#e2e8f0" :font-size "12px"}}
-       (if (seq touched) (pr-str touched) "#{} (none)")]]
+       ;; Errors Map
+       [:div
+        [:div {:class "text-[11px] font-semibold text-rose-400 mb-1"} ":errors"]
+        [:pre {:class (ui/cx "p-2.5 rounded-md border text-[11px] overflow-x-auto leading-relaxed"
+                             (if (seq errors)
+                               "bg-rose-950/40 border-rose-900/60 text-rose-300"
+                               "bg-slate-900/90 border-slate-800/80 text-slate-500"))}
+         (if (seq errors) (pr-str errors) "{} (no errors)")]]
 
-     ;; Errors Map
-     [:div {:style {:margin-bottom "16px"}}
-      [:div {:style {:color "#f87171" :font-weight "600" :margin-bottom "6px"}} ":errors"]
-      [:pre {:style {:margin "0" :background "#1e293b" :padding "10px" :border-radius "6px" :overflow-x "auto" :color (if (seq errors) "#fca5a5" "#94a3b8") :font-size "12px"}}
-       (if (seq errors) (pr-str errors) "{} (no errors)")]]
-
-     ;; Full Form State Map
-     [:div
-      [:div {:style {:color "#94a3b8" :font-weight "600" :margin-bottom "6px"}} "Complete Form State Map"]
-      [:pre {:style {:margin "0" :background "#020617" :padding "10px" :border-radius "6px" :overflow-x "auto" :color "#cbd5e1" :font-size "11px" :max-height "260px"}}
-       (pr-str clean-form)]]]))
+       ;; Clean Form State Map
+       [:div
+        [:div {:class "text-[11px] font-semibold text-slate-400 mb-1"} "Complete State Map"]
+        [:pre {:class "bg-slate-950 p-2.5 rounded-md border border-slate-900 text-slate-400 text-[10px] max-h-48 overflow-y-auto leading-relaxed"}
+         (pr-str clean-form)]]])))
 
 ;; -----------------------------------------------------------------------------
 ;; View
@@ -139,134 +135,119 @@
 (defn view
   [{:keys [form submitted-data]} _context]
   (let [is-dirty? (form/dirty? form)
-        is-submitting? (form/submitting? form)
-        is-valid? (form/valid? form)
-        submit-count (form/submit-count form)]
-    [:div {:style {:max-width "1100px"
-                   :margin    "0 auto"
-                   :padding   "12px"}}
-     [:div {:style {:margin-bottom "20px" :padding-bottom "12px" :border-bottom "1px solid #e5e7eb"}}
-      [:h2 {:style {:margin "0 0 8px 0" :font-size "22px" :color "#111827"}} "Relm Form Module"]
-      [:p {:style {:margin "0" :font-size "14px" :color "#6b7280"}}
-       "Declarative form state, built-in and custom validators, dirty tracking, touch state, and live state inspector."]]
+        is-submitting? (form/submitting? form)]
+    [:div {:class "max-w-5xl mx-auto"}
+     (ui/example-header
+       {:step        "5"
+        :title       "Declarative Forms & Validation"
+        :difficulty  "Advanced"
+        :description "Declarative form state, built-in composable validators, dirty and touch tracking, cross-field rules, and real-time inspector using `com.lambdaseq.relm.form`."
+        :tags        ["relm.form" "Validation" "Dirty Tracking" "Touch Tracking" "Live Inspector"]})
 
-     [:div {:style {:display "grid"
-                    :grid-template-columns "repeat(auto-fit, minmax(420px, 1fr))"
-                    :gap "24px"
-                    :align-items "start"}}
+     [:div {:class "grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"}
       ;; Left Column: Registration Form
-      [:div {:style {:background "#ffffff"
-                     :border-radius "8px"
-                     :border "1px solid #e5e7eb"
-                     :padding "24px"
-                     :box-shadow "0 1px 3px rgba(0,0,0,0.05)"}}
-       [:h3 {:style {:margin "0 0 16px 0" :font-size "18px" :color "#111827"}} "Account Registration"]
+      [:div {:class "lg:col-span-6"}
+       (ui/card
+         {:class "border-slate-200 shadow-sm"}
+         (ui/card-header
+           (ui/card-title "Account Registration")
+           (ui/card-description "Fill in the fields below. Validation triggers dynamically on change and blur."))
 
-       (when submitted-data
-         [:div {:style {:margin-bottom "20px"
-                        :padding       "12px 16px"
-                        :background    "#f0fdf4"
-                        :border        "1px solid #86efac"
-                        :border-radius "6px"
-                        :color         "#166534"}}
-          [:div {:style {:display "flex" :justify-content "space-between" :align-items "center"}}
-           [:strong "Registration submitted successfully!"]
-           [:button {:style {:background "none" :border "none" :cursor "pointer" :color "#166534" :font-weight "bold"}
-                     :on    {:click [::dismiss-success]}} "✕"]]
-          [:pre {:style {:margin-top "8px" :font-size "12px" :overflow-x "auto"}}
-           (pr-str submitted-data)]])
+         (ui/card-content
+           ;; Success Alert Banner
+           (when submitted-data
+             [:div {:class "mb-6"}
+              (ui/alert
+                {:variant :success}
+                [:div {:class "flex items-start justify-between gap-2"}
+                 [:div
+                  [:h4 {:class "font-bold text-sm mb-1"} "Account Created Successfully!"]
+                  [:p {:class "text-xs mb-2"} "The form passed all validations and submitted pure values:"]
+                  [:pre {:class "bg-emerald-950/20 p-2 rounded text-[11px] font-mono overflow-x-auto"}
+                   (pr-str submitted-data)]]
+                 (ui/button
+                   {:variant :ghost
+                    :size    :sm
+                    :class   "h-6 w-6 p-0 text-emerald-800 hover:bg-emerald-200"
+                    :on      {:click [::dismiss-success]}}
+                   "✕")])])
 
-       [:form (form/form-attrs form {:on {:submit [::form/submit form {:on-submit [::handle-registration-success]}]}})
-        ;; Username Field
-        (input-field form :username {:label       "Username"
-                                     :type        "text"
-                                     :placeholder "johndoe"
-                                     :required    "Username is required"
-                                     :min-length  [3 "Username must be at least 3 characters"]})
+           ;; Form Definition
+           [:form (form/form-attrs form {:on {:submit [::form/submit form {:on-submit [::handle-registration-success]}]}})
+            ;; Username
+            (form-input form :username {:label       "Username"
+                                        :placeholder "alice_smith"
+                                        :required?   "Username is required"
+                                        :min-length  [3 "Username must be at least 3 characters"]})
 
-        ;; Email Field
-        (input-field form :email {:label       "Email Address"
-                                  :type        "email"
-                                  :placeholder "john@example.com"
-                                  :required    "Email is required"
-                                  :email       "Please enter a valid email address"})
+            ;; Email Address
+            (form-input form :email {:label       "Email Address"
+                                     :type        "email"
+                                     :placeholder "alice@example.com"
+                                     :required?   "Email is required"
+                                     :email       "Please enter a valid email address"})
 
-        ;; Password and Confirm Password Row
-        [:div {:style {:display "grid" :grid-template-columns "1fr 1fr" :gap "12px"}}
-         (input-field form :password {:label      "Password"
-                                      :type       "password"
-                                      :required   "Password is required"
-                                      :min-length [6 "Password must be at least 6 characters"]})
+            ;; Password and Confirm Password Row
+            [:div {:class "grid grid-cols-1 sm:grid-cols-2 gap-3"}
+             (form-input form :password {:label       "Password"
+                                         :type        "password"
+                                         :placeholder "••••••••"
+                                         :required?   "Password is required"
+                                         :min-length  [6 "Minimum 6 characters"]})
 
-         (input-field form :confirm-password {:label    "Confirm Password"
-                                              :type     "password"
-                                              :required "Please confirm your password"
-                                              :validate (fn [val values]
-                                                          (when (and (seq (:password values))
-                                                                     (seq val)
-                                                                     (not= (:password values) val))
-                                                            "Passwords do not match"))})]
+             (form-input form :confirm-password {:label       "Confirm Password"
+                                                 :type        "password"
+                                                 :placeholder "••••••••"
+                                                 :required?   "Please confirm your password"
+                                                 :validate    (fn [val values]
+                                                                (when (and (seq (:password values))
+                                                                           (seq val)
+                                                                           (not= (:password values) val))
+                                                                  "Passwords do not match"))})]
 
-        ;; Profile Nested Fields: Age & Bio
-        [:div {:style {:display "grid" :grid-template-columns "120px 1fr" :gap "12px"}}
-         (input-field form [:profile :age] {:label       "Age"
-                                            :type        "number"
-                                            :placeholder "18+"
-                                            :min         [18 "You must be at least 18 years old"]
-                                            :max         [120 "Please enter a valid age"]})
+            ;; Profile Age & Bio Row
+            [:div {:class "grid grid-cols-1 sm:grid-cols-3 gap-3"}
+             [:div {:class "sm:col-span-1"}
+              (form-input form [:profile :age] {:label       "Age"
+                                                :type        "number"
+                                                :placeholder "25"
+                                                :min         [18 "Must be 18+"]
+                                                :max         [120 "Invalid age"]})]
+             [:div {:class "sm:col-span-2"}
+              (form-input form [:profile :bio] {:label       "Short Bio"
+                                                :placeholder "Software developer & Clojurist"})]]
 
-         (input-field form [:profile :bio] {:label       "Bio"
-                                            :type        "text"
-                                            :placeholder "Short bio"})]
+            ;; Newsletter Checkbox
+            [:div {:class "flex items-center gap-2.5 my-4 pt-1"}
+             [:input (merge (form/register form [:preferences :newsletter] {:type "checkbox" :default true})
+                            {:id    "newsletter-cb"
+                             :class "h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"})]
+             [:label {:for "newsletter-cb" :class "text-sm text-slate-700 select-none cursor-pointer"}
+              "Subscribe to the monthly product changelog"]]
 
-        [:div {:style {:margin-bottom "20px"}}
-         [:label {:style {:display "flex" :align-items "center" :gap "8px" :font-size "14px" :color "#374151" :cursor "pointer"}}
-          [:input (form/register form [:preferences :newsletter] {:type "checkbox" :default true})]
-          "Subscribe to monthly newsletter"]]
+            ;; Actions Footer
+            [:div {:class "flex items-center justify-between pt-4 border-t border-slate-100 mt-6"}
+             (ui/button
+               {:variant   :outline
+                :disabled? (not is-dirty?)
+                :on        {:click (form/on-reset form)}}
+               "Reset Form")
+             (ui/button
+               {:type     :submit
+                :variant  :default
+                :class    "bg-indigo-600 hover:bg-indigo-700 text-white"
+                :disabled is-submitting?}
+               (if is-submitting? "Submitting..." "Register Account"))]]))]
 
-        ;; Status Summary Badge Bar
-        [:div {:style {:display "flex"
-                       :gap "8px"
-                       :margin-bottom "20px"
-                       :font-size "12px"
-                       :color "#4b5563"
-                       :background "#f9fafb"
-                       :padding "8px 12px"
-                       :border-radius "6px"}}
-         [:span (str "Dirty: " (if is-dirty? "Yes" "No"))]
-         [:span "•"]
-         [:span (str "Valid: " (if is-valid? "Yes" "No"))]
-         [:span "•"]
-         [:span (str "Submit attempts: " submit-count)]]
+      ;; Right Column: Live State Inspector
+      [:div {:class "lg:col-span-6 lg:sticky lg:top-6"}
+       (render-inspector form)]]
 
-        [:div {:style {:display "flex" :gap "12px" :justify-content "flex-end"}}
-         [:button {:type  "button"
-                   :style {:padding          "8px 16px"
-                           :border-radius    "6px"
-                           :border           "1px solid #d1d5db"
-                           :background-color "#ffffff"
-                           :color            "#374151"
-                           :font-size        "14px"
-                           :font-weight      "500"
-                           :cursor           (if is-dirty? "pointer" "default")
-                           :opacity          (if is-dirty? "1" "0.6")}
-                   :disabled (not is-dirty?)
-                   :on    {:click (form/on-reset form)}}
-          "Reset"]
-         [:button {:type  "submit"
-                   :style {:padding          "8px 20px"
-                           :border-radius    "6px"
-                           :border           "none"
-                           :background-color "#4f46e5"
-                           :color            "#ffffff"
-                           :font-size        "14px"
-                           :font-weight      "600"
-                           :cursor           (if is-submitting? "wait" "pointer")
-                           :opacity          (if is-submitting? "0.7" "1")}}
-          (if is-submitting? "Submitting..." "Register Account")]]]]
-
-      ;; Right Column: Live Form State Inspector Panel
-      (render-state-panel form)]]))
+     ;; Expandable Source Code Panel
+     (ui/code-panel
+       {:title    "Form Validation Example Source Code"
+        :filename "form.cljs"
+        :code     snippets/form-code})]))
 
 ;; -----------------------------------------------------------------------------
 ;; Component Definition

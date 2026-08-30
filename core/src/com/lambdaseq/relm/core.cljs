@@ -257,6 +257,8 @@
 
       (let [comp-id (or (:component-id event)
                         (-get-component-id node))
+            event (cond-> event
+                    comp-id (assoc :component-id comp-id))
             component-info (when comp-id
                              (get-in @!app-state [:components comp-id]))
             state (:state component-info)

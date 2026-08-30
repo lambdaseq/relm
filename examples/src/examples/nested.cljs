@@ -6,7 +6,9 @@
   - Automatic isolation of local component state across multiple instances using unique component IDs
   - Context-driven reactivity: all components share and react to global context updates (e.g. `:theme`)
   - Dynamic collections of nested components with Hiccup metadata `:key` support"
-  (:require [com.lambdaseq.relm.core :as relm]))
+  (:require [com.lambdaseq.relm.core :as relm]
+            [examples.snippets :as snippets]
+            [examples.ui :as ui]))
 
 ;; -----------------------------------------------------------------------------
 ;; Level 2: Nested Child Component (CounterItem)
@@ -44,19 +46,46 @@
 (defn- counter-view
   "Renders a leaf CounterItem component with theme styling from global context."
   [{:keys [label count step]} context]
-  [:div {:style {:border "1px solid #ccc"
-                 :border-radius "6px"
-                 :padding "12px"
-                 :margin "8px 0"
-                 :background-color (if (= (:theme context) :dark) "#333333" "#f9f9f9")
-                 :color (if (= (:theme context) :dark) "#f0f0f0" "#333333")}}
-   [:h4 {:style {:margin "0 0 8px 0"}} label]
-   [:p {:style {:margin "4px 0"}} (str "Local Count: " count " (step: " step ")")]
-   [:div {:style {:display "flex" :gap "8px"}}
-    [:button {:on {:click [::child-increment]}} (str "+" step)]
-    [:button {:on {:click [::child-decrement]}} (str "-" step)]
-    [:button {:on {:click [::child-increase-step]}} "Increase Step"]
-    [:button {:on {:click [::child-reset 0]}} "Reset"]]])
+  (let [dark? (= (:theme context) :dark)]
+    [:div {:class (ui/cx "rounded-lg border p-4 transition-colors"
+                         (if dark?
+                           "bg-slate-900/90 border-slate-700 text-slate-100"
+                           "bg-slate-50 border-slate-200 text-slate-900"))}
+     [:div {:class "flex items-center justify-between mb-3"}
+      [:div
+       [:h4 {:class "font-medium text-sm"} label]
+       [:span {:class (if dark? "text-slate-400 text-xs font-mono" "text-slate-500 text-xs font-mono")}
+        (str "Isolated Local State • Step: " step)]]
+      [:span {:class (ui/cx "text-xl font-bold font-mono px-3 py-1 rounded border"
+                            (if dark? "bg-slate-800 text-indigo-300 border-slate-700"
+                                      "bg-white text-indigo-600 border-slate-200 shadow-xs"))}
+       count]]
+
+     [:div {:class "flex flex-wrap items-center gap-2 pt-1"}
+      (ui/button
+        {:variant :default
+         :size    :sm
+         :class   (if dark? "bg-indigo-600 hover:bg-indigo-500 text-white" "bg-slate-900 hover:bg-slate-800 text-white")
+         :on      {:click [::child-increment]}}
+        (str "+" step))
+      (ui/button
+        {:variant :outline
+         :size    :sm
+         :class   (if dark? "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700" "border-slate-300 bg-white")
+         :on      {:click [::child-decrement]}}
+        (str "−" step))
+      (ui/button
+        {:variant :secondary
+         :size    :sm
+         :class   (if dark? "bg-slate-800 text-slate-300 hover:bg-slate-700 border-slate-700" "bg-slate-200/80")
+         :on      {:click [::child-increase-step 1]}}
+        "Step +1")
+      (ui/button
+        {:variant :ghost
+         :size    :sm
+         :class   (if dark? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" "text-slate-500 hover:bg-slate-200")
+         :on      {:click [::child-reset 0]}}
+        "Reset")]]))
 
 (def CounterItem
   "Leaf counter component instance used within CardComponent."
@@ -86,29 +115,37 @@
 (defn- card-view
   "Renders collapsible card containing an inner nested CounterItem child component."
   [{:keys [title subtitle collapsed? initial-count card-id]} context]
-  [:div {:style {:border "2px solid #6366f1"
-                 :border-radius "8px"
-                 :padding "16px"
-                 :margin "12px 0"
-                 :background-color (if (= (:theme context) :dark) "#222222" "#ffffff")
-                 :color (if (= (:theme context) :dark) "#f0f0f0" "#111111")}}
-   [:div {:style {:display "flex"
-                  :justify-content "space-between"
-                  :align-items "center"}}
-    [:div
-     [:h3 {:style {:margin "0"}} title]
-     (when subtitle
-       [:small {:style {:color (if (= (:theme context) :dark) "#aaa" "#666")}} subtitle])]
-    [:button {:on {:click [::toggle-card]}}
-     (if collapsed? "Expand" "Collapse")]]
-   (when-not collapsed?
-     [:div {:style {:margin-top "12px"}}
-      [:p {:style {:font-style "italic" :font-size "14px"}}
-       "This card is a child component containing a nested CounterItem component:"]
-      (CounterItem {:id (str "counter-" card-id)
-                    :label (str title " - Counter")
-                    :initial-count initial-count
-                    :step 1})])])
+  (let [dark? (= (:theme context) :dark)]
+    [:div {:class (ui/cx "rounded-xl border shadow-sm transition-all overflow-hidden mb-4"
+                         (if dark?
+                           "bg-slate-900 border-slate-800 text-slate-100"
+                           "bg-white border-slate-200 text-slate-900"))}
+     [:div {:class (ui/cx "p-5 flex items-center justify-between border-b"
+                          (if dark? "border-slate-800 bg-slate-900" "border-slate-100 bg-slate-50/50"))}
+      [:div {:class "flex items-center gap-3"}
+       [:span {:class (ui/cx "flex h-7 w-7 items-center justify-center rounded-md font-mono text-xs font-bold"
+                             (if dark? "bg-indigo-900/60 text-indigo-300 border border-indigo-700"
+                                       "bg-indigo-50 text-indigo-700 border border-indigo-200"))}
+        (str "#" card-id)]
+       [:div
+        [:h3 {:class "font-semibold text-base leading-snug"} title]
+        (when subtitle
+          [:p {:class (if dark? "text-xs text-slate-400" "text-xs text-slate-500")} subtitle])]]
+      (ui/button
+        {:variant :ghost
+         :size    :sm
+         :class   (if dark? "text-slate-300 hover:bg-slate-800" "text-slate-600 hover:bg-slate-200/60")
+         :on      {:click [::toggle-card]}}
+        (if collapsed? "Expand ↓" "Collapse ↑"))]
+
+     (when-not collapsed?
+       [:div {:class "p-5"}
+        [:p {:class (ui/cx "text-xs mb-3 italic" (if dark? "text-slate-400" "text-slate-500"))}
+         "Child component embedding nested leaf counter with isolated state:"]
+        (CounterItem {:id            (str "counter-" card-id)
+                      :label         (str title " Counter")
+                      :initial-count initial-count
+                      :step          1})])]))
 
 (def CardComponent
   "Card container component embedding nested CounterItem."
@@ -123,10 +160,10 @@
 (defn init
   "Initializes root dashboard state with a collection of card descriptors."
   [_context _args]
-  {:title "Nested Components Example"
-   :cards [{:id 1 :title "Card A" :subtitle "First nested component section" :count 5}
-           {:id 2 :title "Card B" :subtitle "Second nested component section" :count 10}
-           {:id 3 :title "Card C" :subtitle "Third nested component section" :count 20}]})
+  {:title "Component Hierarchy & Context Reactivity"
+   :cards [{:id 1 :title "Alpha Section" :subtitle "First nested branch instance" :count 5}
+           {:id 2 :title "Beta Section" :subtitle "Second nested branch instance" :count 12}
+           {:id 3 :title "Gamma Section" :subtitle "Third nested branch instance" :count 42}]})
 
 ;; Toggles global application theme (`:light` <-> `:dark`) inside context.
 (defmethod relm/update ::toggle-global-theme
@@ -139,42 +176,76 @@
   [state context _ _]
   (let [next-id (inc (count (:cards state)))
         new-card {:id next-id
-                  :title (str "Card " (char (+ 64 next-id)))
-                  :subtitle "Dynamically added section"
+                  :title (str "Section " (char (+ 64 next-id)))
+                  :subtitle "Dynamically spawned component instance"
                   :count 0}]
     [(update state :cards conj new-card) context]))
 
 (defn view
   "Renders the dashboard parent component containing dynamic list of child cards."
   [{:keys [title cards]} context]
-  [:div {:style {:font-family "sans-serif"
-                 :max-width "600px"
-                 :margin "20px auto"
-                 :padding "20px"
-                 :background-color (if (= (:theme context) :dark) "#1a1a1a" "#ffffff")
-                 :color (if (= (:theme context) :dark) "#f0f0f0" "#111111")
-                 :border-radius "12px"
-                 :box-shadow "0 4px 12px rgba(0,0,0,0.1)"}}
-   [:h1 title]
-   [:p "This example demonstrates parent-child nested components in relm."]
-   [:ul {:style {:font-size "14px" :color (if (= (:theme context) :dark) "#aaa" "#555")}}
-    [:li "Each nested component maintains its own local state independently."]
-    [:li "Parent and child components share and react to global context (e.g. Theme)."]
-    [:li "Parent component can dynamically render a collection of child components."]]
+  (let [dark? (= (:theme context) :dark)]
+    [:div {:class "max-w-4xl mx-auto"}
+     (ui/example-header
+       {:step        "4"
+        :title       "Nested Components"
+        :difficulty  "Intermediate"
+        :description "Demonstrates multi-level component trees with automatic state isolation per instance ID, coupled with global context reactivity for theme distribution."
+        :tags        ["Component Tree" "Local State Isolation" "Context Reactivity" "Dynamic Collections"]})
 
-   [:div {:style {:display "flex" :gap "10px" :margin "16px 0"}}
-    [:button {:on {:click [::toggle-global-theme]}}
-     (str "Toggle Theme (Current: " (name (get context :theme :light)) ")")]
-    [:button {:on {:click [::add-card]}} "Add New Card"]]
+     ;; Dashboard Context Controls Box
+     (ui/card
+       {:class (ui/cx "mb-6 border-slate-200 transition-colors"
+                      (if dark? "bg-slate-900 border-slate-800 text-white" "bg-white text-slate-900"))}
+       [:div
+        (ui/card-header
+          [:div {:class "flex flex-wrap items-center justify-between gap-4"}
+           [:div
+            (ui/card-title (if dark? {:class "text-white"} {}) "Global Context & Dynamic Hierarchy")
+            (ui/card-description (if dark? {:class "text-slate-400"} {})
+                                 "Manage global context properties and spawn new component subtrees dynamically.")]
+           [:div {:class "flex items-center gap-2"}
+            (ui/badge {:variant (if dark? :purple :indigo)} (str "Theme: " (name (get context :theme :light))))
+            (ui/badge {:variant :secondary} (str (count cards) " Active Cards"))]])
 
-   [:div {:style {:margin-top "16px"}}
-    (for [card cards]
-      ^{:key (:id card)}
-      (CardComponent {:id (str "card-" (:id card))
-                      :card-id (:id card)
-                      :title (:title card)
-                      :subtitle (:subtitle card)
-                      :default-count (:count card)}))]])
+        (ui/card-footer
+          [:div {:class "flex flex-wrap items-center gap-3 w-full"}
+           (ui/button
+             {:variant :default
+              :class   (if dark? "bg-indigo-600 hover:bg-indigo-500" "bg-slate-900 hover:bg-slate-800")
+              :on      {:click [::toggle-global-theme]}}
+             (str (if dark? "☀️ Switch to Light Theme" "🌙 Switch to Dark Theme")))
+           (ui/button
+             {:variant :outline
+              :class   (if dark? "border-slate-700 text-slate-200 hover:bg-slate-800" "")
+              :on      {:click [::add-card]}}
+             "+ Add New Component Section")])])
+
+     ;; List of Child Cards
+     [:div {:class "space-y-4 mb-6"}
+      (for [card cards]
+        ^{:key (:id card)}
+        (CardComponent {:id            (str "card-" (:id card))
+                        :card-id       (:id card)
+                        :title         (:title card)
+                        :subtitle      (:subtitle card)
+                        :default-count (:count card)}))]
+
+     ;; Explanatory Callout
+     (ui/alert
+       {:variant :info}
+       [:div {:class "flex items-start gap-3"}
+        [:span {:class "text-base"} "💡"]
+        [:div
+         [:h4 {:class "font-semibold text-sm mb-0.5"} "State Isolation Mechanism"]
+         [:p {:class "text-xs text-slate-600 leading-relaxed"}
+          "Each nested component instance automatically maintains its own isolated state tree identified by its unique component ID. Modifying one counter never affects adjacent siblings, while context updates propagate seamlessly to all branches."]]])
+
+     ;; Expandable Source Code Panel
+     (ui/code-panel
+       {:title    "Nested Components Example Source Code"
+        :filename "nested.cljs"
+        :code     snippets/nested-code})]))
 
 (def NestedExample
   "Root nested component container for the example dashboard."
