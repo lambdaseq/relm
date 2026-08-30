@@ -76,12 +76,15 @@ Add the dependency to your `deps.edn`:
       (when view-fn
         (view-fn path-params))]]))
 
+(defn on-init [state context _args _event]
+  [state context [[::relm/dispatch! [::relm.reitit/start router {:default-path "/"}]]]])
+
 (def AppRoot
-  (relm/component {:view root-view}))
+  (relm/component {:on-init on-init
+                   :view    root-view}))
 
 ;; 3. Bootstrap application
-(r/set-dispatch! relm/dispatch)
-(relm.reitit/start! router {:default-path "/"})
+(r/set-dispatch! relm/dispatch!)
 (relm/render js/document.body AppRoot)
 ```
 
@@ -169,24 +172,28 @@ All side effects (attaching/removing `popstate` event listeners and pushing/repl
 - `::relm.reitit/listen-history!` - Attaches popstate event listener for the active router and default fallback path.
 - `::relm.reitit/unlisten-history!` - Cleans up active popstate event listener from `window`.
 
-### Lifecycle Functions
+### Router Initialization & Teardown
 
-Convenience bootstrap functions dispatch the corresponding MVU messages:
+Router lifecycle is managed entirely through standard message dispatch:
 
-#### `(relm.reitit/start! router opts)`
-Dispatches `[::relm.reitit/start router opts]`, registers `popstate` listeners in the browser, and populates `!app-state` context with the initial match:
+#### Initializing the Router (`::start`)
+Dispatching `[::relm.reitit/start router opts]` initializes the router, synchronizes the matched route and view in Relm's context, and triggers the `::listen-history!` effect to attach browser `popstate` listeners:
 
 ```clojure
-(relm.reitit/start! router {:default-path       "/"
-                            :dispatch-initial? true})
+(relm/dispatch! nil [::relm.reitit/start router {:default-path       "/"
+                                                 :dispatch-initial? true}])
 ```
 
 ##### Options
 - `:default-path`: Fallback path string if the current URL does not match any route.
 - `:dispatch-initial?`: Whether to immediately update `!app-state` context with current matched route (default: `true`).
 
-#### `(relm.reitit/stop!)`
-Dispatches `[::relm.reitit/stop]` to remove the browser `popstate` event listener and clear router data from context during application teardown or testing.
+#### Stopping the Router (`::stop`)
+Dispatching `[::relm.reitit/stop]` triggers the `::unlisten-history!` effect to remove the browser `popstate` event listener and clears router data from context during application teardown or testing:
+
+```clojure
+(relm/dispatch! nil [::relm.reitit/stop])
+```
 
 ---
 
@@ -229,10 +236,14 @@ Dispatches `[::relm.reitit/stop]` to remove the browser `popstate` event listene
       (when curr-view
         (curr-view params))]]))
 
-(def App (relm/component {:view layout-view}))
+(defn on-init [state context _args _event]
+  [state context [[::relm/dispatch! [::relm.reitit/start router {:default-path "/"}]]]])
+
+(def App
+  (relm/component {:on-init on-init
+                   :view    layout-view}))
 
 (defn init! []
-  (r/set-dispatch! relm/dispatch)
-  (relm.reitit/start! router {:default-path "/"})
+  (r/set-dispatch! relm/dispatch!)
   (relm/render js/document.body App))
 ```

@@ -132,10 +132,28 @@
                        :font-size "16px"}}
          "Loading..."]])]))
 
+(defn init
+  "Initializes the root component local state."
+  [_context _args]
+  nil)
+
+(defn on-init
+  "Lifecycle hook that starts the Reitit router upon component initialization."
+  [state context _args _event]
+  [state context [[::relm/dispatch! [::relm.reitit/start router {:default-path "/nested"}]]]])
+
+(defn on-deinit
+  "Lifecycle hook that stops the Reitit router upon component deinitialization."
+  [state context _args _event]
+  [state context [[::relm/dispatch! [::relm.reitit/stop]]]])
+
 (def Examples
   "Root Relm component wrapping the example application shell."
   (relm/component
-    {:view view}))
+    {:init      init
+     :on-init   on-init
+     :on-deinit on-deinit
+     :view      view}))
 
 ;; -----------------------------------------------------------------------------
 ;; Bootstrap
@@ -143,9 +161,6 @@
 
 ;; Register Relm's message dispatcher as the Replicant event handler
 (r/set-dispatch! relm/dispatch!)
-
-;; Initialize router, history listener, and sync route match into Relm context
-(relm.reitit/start! router {:default-path "/nested"})
 
 ;; Mount root component to DOM body
 (relm/render js/document.body Examples {:id "examples-root"})

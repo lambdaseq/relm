@@ -300,24 +300,3 @@
          (set-route-context match))
      [[::listen-history! {:router new-router :default-path default-path}]]]))
 
-;; -----------------------------------------------------------------------------
-;; Lifecycle & History Management Convenience Functions
-;; -----------------------------------------------------------------------------
-
-(defn start!
-  "Initializes the Reitit router, stores it and initial route match in Relm's context,
-  and attaches a browser `popstate` listener for history navigation via Relm message dispatch.
-
-  Options map:
-  - `:default-path`: Fallback path string when a route is not matched (e.g. `\"/\"`)
-  - `:dispatch-initial?`: Whether to immediately update `!app-state` context with current route (default: `true`)"
-  ([r-router]
-   (start! r-router {}))
-  ([r-router opts]
-   (relm/dispatch! nil [::start r-router opts])
-   (current-match (:context @relm/!app-state))))
-
-(defn stop!
-  "Stops listening for browser `popstate` events and clears the registered router from context."
-  []
-  (relm/dispatch! nil [::stop]))

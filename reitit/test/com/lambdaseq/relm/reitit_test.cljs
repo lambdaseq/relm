@@ -168,21 +168,20 @@
       (is (seq stop-fx)))))
 
 ;; -----------------------------------------------------------------------------
-;; Router Lifecycle Helper Tests
+;; Router Lifecycle Dispatch Tests
 ;; -----------------------------------------------------------------------------
 
 (deftest start-and-stop-router-test
-  (testing "start! initializes router and registers current route in global application state"
-    (let [match (relm.reitit/start! test-router {:default-path "/users"})]
-      (is (some? match))
-      (is (= test-router (:router (:context @relm/!app-state))))
-      (is (some? (:route (:context @relm/!app-state))))))
+  (testing "::start message initializes router and registers current route in global application state"
+    (relm/dispatch! nil [::relm.reitit/start test-router {:default-path "/users"}])
+    (is (= test-router (:router (:context @relm/!app-state))))
+    (is (some? (:route (:context @relm/!app-state)))))
 
   (testing "router helper extracts router from context and returns nil when absent"
     (is (= test-router (relm.reitit/router {:router test-router})))
     (is (nil? (relm.reitit/router {}))))
 
-  (testing "stop! cleans up router and route from global application state"
-    (relm.reitit/stop!)
+  (testing "::stop message cleans up router and route from global application state"
+    (relm/dispatch! nil [::relm.reitit/stop])
     (is (nil? (:router (:context @relm/!app-state))))
     (is (nil? (:route (:context @relm/!app-state))))))

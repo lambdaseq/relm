@@ -181,6 +181,47 @@
 ;; Dispatch and Message Handling
 ;; -----------------------------------------------------------------------------
 
+(defn- -invoke-lifecycle-fn
+  "Invokes a lifecycle hook function (`on-init` or `on-deinit`) passing state, context, args, and event.
+  Supports arities from 0 to 4 arguments."
+  [f state context args event]
+  (when (fn? f)
+    (let [len (.-length f)]
+      (cond
+        (= len 0) (f)
+        (= len 1) (f state)
+        (= len 2) (f state context)
+        (= len 3) (f state context args)
+        (= len 4) (f state context args event)
+        :else
+        (try
+          (f state context args event)
+          (catch :default e
+            (if (or (instance? js/RangeError e)
+                    (and (instance? js/Error e)
+                         (re-find #"wrong number of args|Invalid arity" (.-message e))))
+              (try
+                (f state context args)
+                (catch :default _
+                  (f state context)))
+              (throw e))))))))
+
+(defn- -process-lifecycle-result
+  "Normalizes the return value of a lifecycle function into `[new-state new-context effects]`."
+  [result current-state current-context]
+  (cond
+    (vector? result)
+    (let [new-state (nth result 0 nil)
+          new-context (if (>= (count result) 2) (nth result 1) current-context)
+          effects (if (>= (count result) 3) (nth result 2) nil)]
+      [new-state new-context effects])
+
+    (some? result)
+    [result current-context nil]
+
+    :else
+    [current-state current-context nil]))
+
 (defn -handle-message
   "Internal message processor for a single message.
   - Handles lifecycle messages (`::init-component`, `::deinit-component`).
@@ -199,7 +240,19 @@
 
       ::deinit-component
       (let [[_ comp-id] message
-            comp-id-str (str comp-id)]
+            comp-id-str (str comp-id)
+            comp-info (get-in @!app-state [:components comp-id-str])
+            state (:state comp-info)
+            on-deinit (:on-deinit comp-info)
+            args (:args comp-info)
+            context (:context @!app-state)]
+        (when on-deinit
+          (let [res (-invoke-lifecycle-fn on-deinit state context args event)
+                [_ new-context effects] (-process-lifecycle-result res state context)]
+            (when (some? new-context)
+              (swap! !app-state assoc :context new-context))
+            (when (seq effects)
+              (-dispatch-fx! event effects))))
         (swap! !app-state clojure.core/update :components dissoc comp-id-str))
 
       (let [comp-id (or (:component-id event)
@@ -273,9 +326,10 @@
   "Renders an individual component instance:
   1. Resolves a unique ID for the component instance.
   2. Initializes state via `(init context args)` on first mount.
-  3. Evaluates `(view state context)` to obtain Hiccup.
-  4. Injects `:data-relm-component-id` and `:replicant/on-unmount` hook into root Hiccup element."
-  [default-id-or-id init view args]
+  3. Executes optional `on-init` lifecycle hook on first mount.
+  4. Evaluates `(view state context)` to obtain Hiccup.
+  5. Injects `:data-relm-component-id` and `:replicant/on-unmount` hook into root Hiccup element."
+  [default-id-or-id init view on-init on-deinit args]
   (let [args (or args {})
         comp-id (str (if (and (string? default-id-or-id) (not (map? default-id-or-id)))
                        (resolve-component-id default-id-or-id args)
@@ -283,10 +337,27 @@
         context (:context @!app-state)
         state (if (contains? (:components @!app-state) comp-id)
                 (get-in @!app-state [:components comp-id :state])
-                (let [initial-state (init context args)]
-                  (swap! !app-state assoc-in [:components comp-id :state] initial-state)
-                  initial-state))
-        hiccup (view state context)]
+                (let [initial-state (init context args)
+                      _ (swap! !app-state (fn [app]
+                                            (-> app
+                                                (assoc-in [:components comp-id :state] initial-state)
+                                                (assoc-in [:components comp-id :on-deinit] on-deinit)
+                                                (assoc-in [:components comp-id :args] args))))
+                      event {:component-id comp-id}
+                      [init-state new-context effects] (if on-init
+                                                         (let [res (-invoke-lifecycle-fn on-init initial-state context args event)]
+                                                           (-process-lifecycle-result res initial-state context))
+                                                         [initial-state context nil])]
+                  (when on-init
+                    (when (or (not= init-state initial-state) (some? new-context))
+                      (swap! !app-state (fn [app]
+                                          (cond-> app
+                                            (some? init-state) (assoc-in [:components comp-id :state] init-state)
+                                            (some? new-context) (assoc :context new-context)))))
+                    (when (seq effects)
+                      (-dispatch-fx! event effects)))
+                  (or init-state initial-state)))
+        hiccup (view state (:context @!app-state))]
     (when hiccup
       (-> hiccup
           (rh/update-attrs assoc :data-relm-component-id comp-id)
@@ -307,7 +378,7 @@
                 [::deinit-component comp-id])))))))
 
 (defn component
-  "Creates a new Elm-style component with initialization and view functions.
+  "Creates a new Elm-style component with initialization, lifecycle hooks, and view functions.
 
   Returns a component function that, when invoked (with 0, 1, or 2 arguments),
   produces Hiccup markup managed by the relm runtime.
@@ -315,6 +386,8 @@
   Component options map:
   - `:init` Function `(fn [context args] initial-state)` returning initial local state (defaults to `(fn [_ _] nil)`)
   - `:view` Function `(fn [state context] hiccup)` returning Hiccup structure representing the UI
+  - `:on-init` Function `(fn [state context args event] [state context effects])` lifecycle hook called on initial mount
+  - `:on-deinit` Function `(fn [state context args event] [state context effects])` lifecycle hook called on unmount
 
   Invocation arities for returned component:
   - `(MyComponent)` - Renders with auto-generated ID and empty args
@@ -327,6 +400,8 @@
     (relm/component
       {:init (fn [_context {:keys [initial-count] :or {initial-count 0}}]
                {:count initial-count})
+       :on-init (fn [state context _args _event]
+                  [state context [[::log! \"Counter initialized\"]]])
        :view (fn [{:keys [count]} _context]
                [:div
                 [:p \"Count: \" count]
@@ -336,17 +411,17 @@
   (Counter {:id \"counter-a\" :initial-count 10})
   (Counter {:id \"counter-b\" :initial-count 20})
   ```"
-  [{:keys [init view]}]
+  [{:keys [init view on-init on-deinit]}]
   (let [default-id (str (random-uuid))
         init-fn (or init (fn [_ _] nil))
         view-fn (or view (constantly nil))]
     (fn
       ([]
-       (-render-component default-id init-fn view-fn {}))
+       (-render-component default-id init-fn view-fn on-init on-deinit {}))
       ([args]
-       (-render-component default-id init-fn view-fn args))
+       (-render-component default-id init-fn view-fn on-init on-deinit args))
       ([id args]
-       (-render-component id init-fn view-fn args)))))
+       (-render-component id init-fn view-fn on-init on-deinit args)))))
 
 ;; Built-in effect handlers for dispatching follow-up messages from inside effect flows.
 ;; Formats:

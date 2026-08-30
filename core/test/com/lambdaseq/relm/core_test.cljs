@@ -137,6 +137,40 @@
                             [::test-no-fx "second"]])
       (is (= "second" (get-in @relm/!app-state [:components "comp-batch" :state :val]))))))
 
+(deftest component-lifecycle-hooks-test
+  (testing "component renders and invokes on-init hook with state, context, and effects"
+    (reset! test-fx-log [])
+    (let [comp (relm/component
+                 {:init (fn [_ctx {:keys [initial-val]}]
+                          {:count (or initial-val 0)})
+                  :on-init (fn [state context {:keys [tag]} _event]
+                             [(assoc state :tag tag)
+                              (assoc context :app-initialized? true)
+                              [[::log-fx! (str "initialized-" tag)]]])
+                  :view (fn [{:keys [count tag]} ctx]
+                          [:div {:id "rendered"} (str "Count: " count ", tag: " tag ", ctx: " (:app-initialized? ctx))])})
+          hiccup (comp {:id "test-comp-1" :initial-val 42 :tag "alpha"})]
+      (is (vector? hiccup))
+      (is (= {:count 42 :tag "alpha"} (get-in @relm/!app-state [:components "test-comp-1" :state])))
+      (is (true? (:app-initialized? (:context @relm/!app-state))))
+      (is (= ["initialized-alpha"] @test-fx-log))))
+
+  (testing "component invokes on-deinit hook on ::deinit-component message"
+    (reset! test-fx-log [])
+    (let [comp (relm/component
+                 {:init (fn [_ctx _args] {:active true})
+                  :on-deinit (fn [_state context _args _event]
+                               [nil
+                                (assoc context :cleaned-up? true)
+                                [[::log-fx! "deinitialized"]]])
+                  :view (fn [_state _ctx] [:div "active"])})]
+      (comp {:id "test-comp-2"})
+      (is (some? (get-in @relm/!app-state [:components "test-comp-2"])))
+      (relm/dispatch! nil [::relm/deinit-component "test-comp-2"])
+      (is (nil? (get-in @relm/!app-state [:components "test-comp-2"])))
+      (is (true? (:cleaned-up? (:context @relm/!app-state))))
+      (is (= ["deinitialized"] @test-fx-log)))))
+
 (deftest built-in-fx-test
   (testing "::relm/prevent-default! effect calls preventDefault on event"
     (let [prevented? (atom false)

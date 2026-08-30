@@ -55,7 +55,11 @@ DOM Event -> relm/dispatch -> relm/update -> [new-state new-context effects]
 
 ### Component Lifecycle
 
-Components are defined with `relm/component` by passing an `:init` function and a `:view` function:
+Components are defined with `relm/component` by passing a configuration map with:
+- `:init` - Pure function `(fn [context args] initial-state)` returning initial local state.
+- `:view` - Pure function `(fn [state context] hiccup)` returning Hiccup structure representing the UI.
+- `:on-init` - Optional lifecycle hook function `(fn [state context args event] [state context effects])` executed when component mounts.
+- `:on-deinit` - Optional lifecycle hook function `(fn [state context args event] [state context effects])` executed when component unmounts.
 
 ```clojure
 (ns my-app.counter
@@ -63,9 +67,19 @@ Components are defined with `relm/component` by passing an `:init` function and 
             [replicant.dom :as r]))
 
 (defn init
-  "Initializes local component state. Receives global context and mount arguments."
+  "Pure function initializing local component state. Receives global context and mount arguments."
   [_context {:keys [initial-count] :or {initial-count 0}}]
   {:count initial-count})
+
+(defn on-init
+  "Lifecycle hook with update-style signature and return format called when component initializes."
+  [state context {:keys [initial-count]} _event]
+  [state context [[::log-mount! (str "Mounted with count: " initial-count)]]])
+
+(defn on-deinit
+  "Lifecycle hook called when component is unmounted from the DOM."
+  [state context _args _event]
+  [state context [[::log-unmount! "Unmounted counter"]]])
 
 (defn view
   "Pure function of (state, context) returning Replicant Hiccup."
@@ -77,11 +91,13 @@ Components are defined with `relm/component` by passing an `:init` function and 
 
 (def Counter
   (relm/component
-    {:init init
-     :view view}))
+    {:init      init
+     :on-init   on-init
+     :on-deinit on-deinit
+     :view      view}))
 
 ;; Mount into the DOM
-(r/set-dispatch! relm/dispatch)
+(r/set-dispatch! relm/dispatch!)
 (relm/render js/document.body Counter {:initial-count 10})
 ```
 
