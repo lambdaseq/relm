@@ -1,7 +1,7 @@
 {:paths ["src"]
  :deps  {org.clojure/clojure       {:mvn/version "1.13.0-alpha6"}
          org.clojure/clojurescript {:mvn/version "1.12.145"}
-         io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha3"}
+         io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha4"}
          metosin/reitit            {:mvn/version "0.11.0-rc1"}}
  :aliases
  {:test       {:extra-paths ["test"]}

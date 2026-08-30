@@ -1,8 +1,8 @@
 {:paths ["src" "../query/test" "../form/test" "../reitit/test" "../core/test"]
- :deps  {io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha3"}
-         io.github.conjurernix/relm.form   {:mvn/version "0.1.0-alpha3"}
-         io.github.conjurernix/relm.query  {:mvn/version "0.1.0-alpha3"}
-         io.github.conjurernix/relm.reitit {:mvn/version "0.1.0-alpha3"}
+ :deps  {io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha4"}
+         io.github.conjurernix/relm.form   {:mvn/version "0.1.0-alpha4"}
+         io.github.conjurernix/relm.query  {:mvn/version "0.1.0-alpha4"}
+         io.github.conjurernix/relm.reitit {:mvn/version "0.1.0-alpha4"}
          metosin/reitit                    {:mvn/version "0.11.0-rc1"}
          thheller/shadow-cljs              {:mvn/version "3.5.0"}
          hashp/hashp                       {:mvn/version "0.2.2"}}
