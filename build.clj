@@ -118,7 +118,8 @@
         (b/copy-dir {:src-dirs   src-dirs
                      :target-dir class-dir})
         (println (str "Building JAR: " jar-file "..."))
-        (b/jar m-opts)))
+        (b/jar m-opts)
+        (b/install m-opts)))
     (println "\nJAR build complete.")
     opts))
 
@@ -160,11 +161,11 @@
     opts))
 
 (defn ci
-  "Runs the CI pipeline: tests, clean, and builds JARs for all modules."
+  "Runs the CI pipeline: clean, builds JARs, and runs tests for all modules."
   [opts]
-  (test opts)
   (clean opts)
   (jar opts)
+  (test opts)
   opts)
 
 ;; ----------------------------------------------------------------------------
