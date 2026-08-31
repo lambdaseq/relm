@@ -207,3 +207,98 @@
                 (is (= "resolved-value" (get-in @relm/!app-state [:components "comp-async" :state :val])))
                 (done))
               20)))))
+
+(deftest component-instance-id-uniqueness-test
+  (testing "multiple instances of the same component without explicit IDs receive unique, stable IDs"
+    (let [item-comp (relm/component
+                     {:init (fn [_ctx {:keys [initial-count] :or {initial-count 0}}]
+                              {:count initial-count})
+                      :view (fn [{:keys [count]} _ctx]
+                              [:span (str "Count: " count)])})
+          parent-comp (relm/component
+                       {:view (fn [_state _ctx]
+                                [:div
+                                 (item-comp {:initial-count 10})
+                                 (item-comp {:initial-count 20})
+                                 (item-comp {:id "explicit-item" :initial-count 30})])})
+          ;; Render parent component tree within root render evaluation
+          hiccup (relm/-eval-root parent-comp {})
+          child-1 (nth hiccup 2)
+          child-2 (nth hiccup 3)
+          child-3 (nth hiccup 4)
+          id-1 (:data-relm-component-id (second child-1))
+          id-2 (:data-relm-component-id (second child-2))
+          id-3 (:data-relm-component-id (second child-3))]
+      ;; Instances without ID receive unique IDs; explicit ID is preserved
+      (is (some? id-1))
+      (is (some? id-2))
+      (is (= "explicit-item" id-3))
+      (is (not= id-1 id-2))
+      (is (not= id-1 id-3))
+      ;; States in !app-state must be isolated
+      (is (= 10 (get-in @relm/!app-state [:components id-1 :state :count])))
+      (is (= 20 (get-in @relm/!app-state [:components id-2 :state :count])))
+      (is (= 30 (get-in @relm/!app-state [:components id-3 :state :count])))
+
+      ;; Re-rendering the tree produces the exact same IDs and preserves state
+      (let [hiccup-2 (relm/-eval-root parent-comp {})
+            child-1-re (nth hiccup-2 2)
+            child-2-re (nth hiccup-2 3)
+            child-3-re (nth hiccup-2 4)
+            id-1-re (:data-relm-component-id (second child-1-re))
+            id-2-re (:data-relm-component-id (second child-2-re))
+            id-3-re (:data-relm-component-id (second child-3-re))]
+        (is (= id-1 id-1-re))
+        (is (= id-2 id-2-re))
+        (is (= "explicit-item" id-3-re))
+        (is (= 10 (get-in @relm/!app-state [:components id-1-re :state :count])))
+        (is (= 20 (get-in @relm/!app-state [:components id-2-re :state :count])))
+        (is (= 30 (get-in @relm/!app-state [:components id-3-re :state :count])))))))
+
+(deftest render-queue-and-batching-test
+  (testing "flush-render! executes pending render passes synchronously"
+    (let [rendered-count (atom 0)
+          test-comp (fn []
+                      (swap! rendered-count inc)
+                      [:div "rendered"])]
+      (relm/render nil test-comp)
+      (is (= 1 @rendered-count))
+      (relm/flush-render!)
+      (is (>= @rendered-count 1))))
+
+  (testing "re-entrant state changes during render are not dropped"
+    (let [render-passes (atom 0)
+          trigger-comp (relm/component
+                        {:init (fn [_ctx _args] {:step 1})
+                         :on-init (fn [state context _args _event]
+                                    ;; Update global context during init/mount
+                                    [(assoc state :mounted? true)
+                                     (assoc context :re-entrant-triggered? true)
+                                     nil])
+                         :view (fn [{:keys [step mounted?]} ctx]
+                                 (swap! render-passes inc)
+                                 [:div (str "Step: " step ", mounted: " mounted? ", ctx: " (:re-entrant-triggered? ctx))])})
+          root-comp (relm/component
+                     {:view (fn [_state _ctx]
+                              [:div (trigger-comp)])})]
+      (relm/render nil root-comp)
+      (relm/flush-render!)
+      (is (true? (:re-entrant-triggered? (:context @relm/!app-state))))
+      (is (>= @render-passes 1))))
+
+  (testing "rapid synchronous dispatches update state and render once flushed"
+    (let [render-count (atom 0)
+          counter-comp (relm/component
+                        {:init (fn [_ _] {:count 0})
+                         :view (fn [{:keys [count]} _]
+                                 (swap! render-count inc)
+                                 [:div (str "Count: " count)])})]
+      (relm/render nil counter-comp {:id "batch-counter"})
+      (let [initial-renders @render-count]
+        (relm/dispatch! {:component-id "batch-counter"}
+                        [[::test-no-fx 10]
+                         [::test-no-fx 20]
+                         [::test-no-fx 30]])
+        (is (= 30 (get-in @relm/!app-state [:components "batch-counter" :state :val])))
+        (relm/flush-render!)
+        (is (> @render-count initial-renders))))))

@@ -26,9 +26,32 @@
          :components {}
          :root       nil}))
 
-(defonce ^:private ^{:doc "Flag used to prevent re-entrant rendering cycles."}
+(defonce ^:private ^{:doc "Flag indicating whether a Replicant render pass is currently executing."}
   !rendering?
   (atom false))
+
+(defonce ^:private ^{:doc "Flag indicating whether an additional render pass was requested while rendering."}
+  !render-pending?
+  (atom false))
+
+(defonce ^:private ^{:doc "Flag indicating whether a render frame has been scheduled via RAF or microtask."}
+  !render-scheduled?
+  (atom false))
+
+(def ^:dynamic ^:private *render-scope*
+  "Dynamic binding holding an atom with component instance sequence counts during a render pass.
+  Ensures multiple component instances of the same type without explicit IDs receive unique,
+  stable IDs across re-renders."
+  nil)
+
+(defn- next-auto-id
+  "Generates a unique, positional instance ID for a component type within the active render scope.
+  If outside an active render scope, falls back to `comp-type-id`."
+  [comp-type-id]
+  (if *render-scope*
+    (let [idx (get (swap! *render-scope* clojure.core/update comp-type-id (fnil inc 0)) comp-type-id)]
+      (str comp-type-id "-" idx))
+    (str comp-type-id)))
 
 ;; -----------------------------------------------------------------------------
 ;; Utilities
@@ -118,35 +141,68 @@
         (.getAttribute curr "data-relm-component-id")
         (recur (.-parentNode curr))))))
 
-(defn- -eval-root
-  "Evaluates the root component function with optional arguments to obtain Hiccup data."
+(defn ^:no-doc -eval-root
+  "Evaluates the root component function with optional arguments to obtain Hiccup data.
+  Establishes dynamic `*render-scope*` for the render pass to provide unique, stable IDs."
   [component args]
-  (if (fn? component)
-    (if (some? args)
-      (component args)
-      (component))
-    component))
+  (binding [*render-scope* (atom {})]
+    (if (fn? component)
+      (if (some? args)
+        (component args)
+        (component))
+      component)))
+
+(declare -schedule-render!)
 
 (defn- -do-render-root!
-  "Performs a Replicant render pass for the registered root component into its target DOM node."
+  "Performs a Replicant render pass for the registered root component into its target DOM node.
+  Guarantees that re-entrant state updates or dispatches mid-render are never dropped."
   []
-  (when-not @!rendering?
-    (when-let [{:keys [node component args]} (:root @!app-state)]
-      (when (and node component)
-        (reset! !rendering? true)
-        (try
-          (r/render node (-eval-root component args))
-          (finally
-            (reset! !rendering? false)))))))
+  (if @!rendering?
+    (reset! !render-pending? true)
+    (do
+      (reset! !render-pending? true)
+      (reset! !rendering? true)
+      (try
+        (loop []
+          (when @!render-pending?
+            (reset! !render-pending? false)
+            (when-let [{:keys [node component args]} (:root @!app-state)]
+              (when component
+                (let [hiccup (-eval-root component args)]
+                  (when node
+                    (r/render node hiccup)))))
+            (when @!render-pending?
+              (recur))))
+        (finally
+          (reset! !rendering? false)
+          (when @!render-pending?
+            (-schedule-render!)))))))
+
+(defn- -schedule-render!
+  "Schedules a batched render pass on the next animation frame or microtask tick.
+  Batches rapid synchronous state changes into a single DOM update."
+  []
+  (when (:root @!app-state)
+    (if @!rendering?
+      (reset! !render-pending? true)
+      (when (compare-and-set! !render-scheduled? false true)
+        (let [schedule-fn (cond
+                            (exists? js/requestAnimationFrame) js/requestAnimationFrame
+                            (exists? js/queueMicrotask) js/queueMicrotask
+                            :else (fn [cb] (js/setTimeout cb 0)))]
+          (schedule-fn (fn []
+                         (reset! !render-scheduled? false)
+                         (-do-render-root!))))))))
 
 (defn- -on-app-state-change
-  "Watch function invoked whenever `!app-state` changes. Triggers re-rendering when context
+  "Watch function invoked whenever `!app-state` changes. Triggers batched re-rendering when context
   or component local state is modified."
   [_ _ old-state new-state]
   (when (and (:root new-state)
              (or (not= (:context old-state) (:context new-state))
                  (not= (:components old-state) (:components new-state))))
-    (-do-render-root!)))
+    (-schedule-render!)))
 
 (defonce ^:private -init-watch
   (add-watch !app-state :relm/root-render -on-app-state-change))
@@ -154,6 +210,11 @@
 ;; -----------------------------------------------------------------------------
 ;; Public Rendering API
 ;; -----------------------------------------------------------------------------
+
+(defn flush-render!
+  "Immediately executes any pending render passes synchronously."
+  []
+  (-do-render-root!))
 
 (defn render
   "Renders the root component into the given DOM node and tracks it in `!app-state`.
@@ -417,15 +478,17 @@
   (Counter {:id \"counter-a\" :initial-count 10})
   (Counter {:id \"counter-b\" :initial-count 20})
   ```"
-  [{:keys [init view on-init on-deinit]}]
-  (let [default-id (str (random-uuid))
+  [{:keys [init view on-init on-deinit id]}]
+  (let [comp-type-id (str (or id (random-uuid)))
         init-fn (or init (fn [_ _] nil))
         view-fn (or view (constantly nil))]
     (fn
       ([]
-       (-render-component default-id init-fn view-fn on-init on-deinit {}))
+       (let [default-id (next-auto-id comp-type-id)]
+         (-render-component default-id init-fn view-fn on-init on-deinit {})))
       ([args]
-       (-render-component default-id init-fn view-fn on-init on-deinit args))
+       (let [default-id (next-auto-id comp-type-id)]
+         (-render-component default-id init-fn view-fn on-init on-deinit args)))
       ([id args]
        (-render-component id init-fn view-fn on-init on-deinit args)))))
 

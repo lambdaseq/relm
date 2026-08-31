@@ -1,4 +1,4 @@
-{:paths ["src" "../query/test" "../form/test" "../reitit/test" "../core/test"]
+{:paths ["src" "../core/src" "../form/src" "../query/src" "../reitit/src" "../query/test" "../form/test" "../reitit/test" "../core/test"]
  :deps  {io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha5"}
          io.github.conjurernix/relm.form   {:mvn/version "0.1.0-alpha5"}
          io.github.conjurernix/relm.query  {:mvn/version "0.1.0-alpha5"}
