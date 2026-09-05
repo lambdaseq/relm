@@ -179,7 +179,26 @@
       (relm/dispatch! nil [::relm/deinit-component "test-comp-2"])
       (is (nil? (get-in @relm/!app-state [:components "test-comp-2"])))
       (is (true? (:cleaned-up? (:context @relm/!app-state))))
-      (is (= ["deinitialized"] @test-fx-log)))))
+      (is (= ["deinitialized"] @test-fx-log))))
+
+  (testing "::init-component and ::deinit-component are standard update multimethod handlers"
+    (let [init-res (relm/update nil {:ctx :val} [::relm/init-component "my-comp" {:count 10}] nil)]
+      (is (= [{:count 10} {:ctx :val}] init-res)))
+    (let [init-res-existing (relm/update {:count 20} {:ctx :val} [::relm/init-component "my-comp" {:count 10}] nil)]
+      (is (= [{:count 20} {:ctx :val}] init-res-existing)))
+    (let [deinit-res (relm/update {:count 10} {:ctx :val} [::relm/deinit-component "my-comp"] nil)]
+      (is (= [nil {:ctx :val} [[::relm/deinit-component "my-comp"]]] deinit-res))))
+
+  (testing "::init-component message dispatched updates state in !app-state"
+    (relm/dispatch! nil [::relm/init-component "manual-init-comp" {:initialized? true}])
+    (is (= {:initialized? true} (get-in @relm/!app-state [:components "manual-init-comp" :state]))))
+
+  (testing "::init-component and ::deinit-component fx handlers update !app-state"
+    (swap! relm/!app-state assoc :components {})
+    (relm/fx nil [::relm/init-component "fx-comp" {:from-fx true}])
+    (is (= {:from-fx true} (get-in @relm/!app-state [:components "fx-comp" :state])))
+    (relm/fx nil [::relm/deinit-component "fx-comp"])
+    (is (nil? (get-in @relm/!app-state [:components "fx-comp"])))))
 
 (deftest built-in-fx-test
   (testing "::relm/prevent-default! effect calls preventDefault on event"

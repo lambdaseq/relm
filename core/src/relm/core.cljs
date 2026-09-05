@@ -98,6 +98,51 @@
     (fx event effect)))
 
 ;; -----------------------------------------------------------------------------
+;; Lifecycle Helpers
+;; -----------------------------------------------------------------------------
+
+(defn- -invoke-lifecycle-fn
+  "Invokes a lifecycle hook function (`on-init` or `on-deinit`) passing state, context, args, and event.
+  Supports arities from 0 to 4 arguments."
+  [f state context args event]
+  (when (fn? f)
+    (let [len (.-length f)]
+      (cond
+        (= len 0) (f)
+        (= len 1) (f state)
+        (= len 2) (f state context)
+        (= len 3) (f state context args)
+        (= len 4) (f state context args event)
+        :else
+        (try
+          (f state context args event)
+          (catch :default e
+            (if (or (instance? js/RangeError e)
+                    (and (instance? js/Error e)
+                         (re-find #"wrong number of args|Invalid arity" (.-message e))))
+              (try
+                (f state context args)
+                (catch :default _
+                  (f state context)))
+              (throw e))))))))
+
+(defn- -process-lifecycle-result
+  "Normalizes the return value of a lifecycle function into `[new-state new-context effects]`."
+  [result current-state current-context]
+  (cond
+    (vector? result)
+    (let [new-state (nth result 0 nil)
+          new-context (if (>= (count result) 2) (nth result 1) current-context)
+          effects (if (>= (count result) 3) (nth result 2) nil)]
+      [new-state new-context effects])
+
+    (some? result)
+    [result current-context nil]
+
+    :else
+    [current-state current-context nil]))
+
+;; -----------------------------------------------------------------------------
 ;; State Update Multimethod
 ;; -----------------------------------------------------------------------------
 
@@ -127,6 +172,29 @@
           ```"
   (fn [_state _context message _event]
     (first message)))
+
+;; Built-in update handler for initializing component local state.
+;; Accepts messages of the form `[::init-component initial-state]` or `[::init-component comp-id initial-state]`.
+(defmethod update ::init-component
+  [state context [_ a b :as message] _event]
+  (let [initial-state (if (= (count message) 3) b a)]
+    [(if (some? state) state initial-state) context]))
+
+;; Built-in update handler for deinitializing a component.
+;; Invokes optional `on-deinit` lifecycle hook and returns `[::deinit-component comp-id]`
+;; effect to clean up component state.
+(defmethod update ::deinit-component
+  [state context [_ comp-id-arg] event]
+  (let [comp-id (str (or comp-id-arg (:component-id event)))
+        comp-info (get-in @!app-state [:components comp-id])
+        state (or state (:state comp-info))
+        on-deinit (:on-deinit comp-info)
+        args (:args comp-info)]
+    (if on-deinit
+      (let [res (-invoke-lifecycle-fn on-deinit state context args event)
+            [_ new-context effects] (-process-lifecycle-result res state context)]
+        [nil (or new-context context) (into [[::deinit-component comp-id]] (or effects []))])
+      [nil context [[::deinit-component comp-id]]])))
 
 ;; -----------------------------------------------------------------------------
 ;; Component Identification & Rendering Internals
@@ -242,97 +310,35 @@
 ;; Dispatch and Message Handling
 ;; -----------------------------------------------------------------------------
 
-(defn- -invoke-lifecycle-fn
-  "Invokes a lifecycle hook function (`on-init` or `on-deinit`) passing state, context, args, and event.
-  Supports arities from 0 to 4 arguments."
-  [f state context args event]
-  (when (fn? f)
-    (let [len (.-length f)]
-      (cond
-        (= len 0) (f)
-        (= len 1) (f state)
-        (= len 2) (f state context)
-        (= len 3) (f state context args)
-        (= len 4) (f state context args event)
-        :else
-        (try
-          (f state context args event)
-          (catch :default e
-            (if (or (instance? js/RangeError e)
-                    (and (instance? js/Error e)
-                         (re-find #"wrong number of args|Invalid arity" (.-message e))))
-              (try
-                (f state context args)
-                (catch :default _
-                  (f state context)))
-              (throw e))))))))
-
-(defn- -process-lifecycle-result
-  "Normalizes the return value of a lifecycle function into `[new-state new-context effects]`."
-  [result current-state current-context]
-  (cond
-    (vector? result)
-    (let [new-state (nth result 0 nil)
-          new-context (if (>= (count result) 2) (nth result 1) current-context)
-          effects (if (>= (count result) 3) (nth result 2) nil)]
-      [new-state new-context effects])
-
-    (some? result)
-    [result current-context nil]
-
-    :else
-    [current-state current-context nil]))
-
 (defn -handle-message
   "Internal message processor for a single message.
-  - Handles lifecycle messages (`::init-component`, `::deinit-component`).
-  - Resolves target component ID from the event/DOM node.
+  - Resolves target component ID from the event, message, or DOM node.
   - Invokes `update` multimethod with current component state and global context.
   - Updates `!app-state` with new component state and context.
   - Executes any returned side effects."
   [{:keys [replicant/node] :as event} [message-type :as message]]
   (when (some? message)
-    (case message-type
-      ::init-component
-      (let [[_ comp-id initial-state] message
-            comp-id-str (str comp-id)]
-        (when-not (contains? (:components @!app-state) comp-id-str)
-          (swap! !app-state assoc-in [:components comp-id-str :state] initial-state)))
-
-      ::deinit-component
-      (let [[_ comp-id] message
-            comp-id-str (str comp-id)
-            comp-info (get-in @!app-state [:components comp-id-str])
-            state (:state comp-info)
-            on-deinit (:on-deinit comp-info)
-            args (:args comp-info)
-            context (:context @!app-state)]
-        (when on-deinit
-          (let [res (-invoke-lifecycle-fn on-deinit state context args event)
-                [_ new-context effects] (-process-lifecycle-result res state context)]
-            (when (some? new-context)
-              (swap! !app-state assoc :context new-context))
-            (when (seq effects)
-              (-dispatch-fx! event effects))))
-        (swap! !app-state clojure.core/update :components dissoc comp-id-str))
-
-      (let [comp-id (or (:component-id event)
-                        (-get-component-id node))
-            event (cond-> event
-                    comp-id (assoc :component-id comp-id))
-            component-info (when comp-id
-                             (get-in @!app-state [:components comp-id]))
-            state (:state component-info)
-            context (:context @!app-state)
-            result (update state context message event)
-            [new-state new-context effects] (if (vector? result)
-                                              result
-                                              [result context])]
-        (swap! !app-state (fn [app]
-                            (cond-> app
-                              comp-id (assoc-in [:components comp-id :state] new-state)
-                              (some? new-context) (assoc :context new-context))))
-        (-dispatch-fx! event effects)))))
+    (let [comp-id (or (:component-id event)
+                      (when (and (vector? message)
+                                 (contains? #{::init-component ::deinit-component} message-type)
+                                 (some? (second message)))
+                        (str (second message)))
+                      (-get-component-id node))
+          event (cond-> event
+                  comp-id (assoc :component-id comp-id))
+          component-info (when comp-id
+                           (get-in @!app-state [:components comp-id]))
+          state (:state component-info)
+          context (:context @!app-state)
+          result (update state context message event)
+          [new-state new-context effects] (if (vector? result)
+                                            result
+                                            [result context])]
+      (swap! !app-state (fn [app]
+                          (cond-> app
+                            comp-id (assoc-in [:components comp-id :state] new-state)
+                            (some? new-context) (assoc :context new-context))))
+      (-dispatch-fx! event effects))))
 
 (defn dispatch!
   "Handles message dispatching for components.
@@ -345,11 +351,11 @@
   - Single message: `(dispatch event [::message-type])`
   - Multiple messages: `(dispatch event [[::message-type-1] [::message-type-2]])`
 
-  Lifecycle message types handled internally:
+  Built-in lifecycle message handlers:
   - `::init-component`: Initializes a component's local state in `!app-state`
   - `::deinit-component`: Cleans up a component when it is unmounted from the DOM
 
-  For other message types, it calls the appropriate `update` multimethod implementation."
+  Delegates to the `update` multimethod and dispatches returned side effects to `fx`."
   [event message-or-messages]
   (if (vector-of-vectors? message-or-messages)
     (doseq [message message-or-messages
@@ -491,6 +497,22 @@
          (-render-component default-id init-fn view-fn on-init on-deinit args)))
       ([id args]
        (-render-component id init-fn view-fn on-init on-deinit args)))))
+
+;; Built-in effect handlers for component lifecycle side effects.
+;; Formats:
+;; - `[::relm/init-component comp-id initial-state]`
+;; - `[::relm/deinit-component comp-id]`
+
+(defmethod fx ::init-component
+  [_dom-event [_ comp-id initial-state]]
+  (let [comp-id-str (str comp-id)]
+    (when-not (contains? (:components @!app-state) comp-id-str)
+      (swap! !app-state assoc-in [:components comp-id-str :state] initial-state))))
+
+(defmethod fx ::deinit-component
+  [_dom-event [_ comp-id]]
+  (let [comp-id-str (str comp-id)]
+    (swap! !app-state clojure.core/update :components dissoc comp-id-str)))
 
 ;; Built-in effect handlers for dispatching follow-up messages from inside effect flows.
 ;; Formats:
