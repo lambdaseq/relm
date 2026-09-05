@@ -31,11 +31,13 @@
      context
      [[::relm/dispatch!
        [::query/mutate [:posts]
-        {:base-url  "https://jsonplaceholder.typicode.com"
-         :data      values
-         :on-mutate [::query/set-query-data posts-query-key
-                     (fn [current-posts]
-                       (into [values] (or current-posts [])))]}]]]]))
+        {:url        (query/key->url [:posts])
+         :base-url   "https://jsonplaceholder.typicode.com"
+         :data       values
+         :on-settled (query/invalidate-hierarchical [:posts])
+         :on-mutate  [::query/set-query-data posts-query-key
+                      (fn [current-posts]
+                        (into [values] (or current-posts [])))]}]]]]))
 
 ;; -----------------------------------------------------------------------------
 ;; Component Initialization
@@ -94,20 +96,20 @@
           {:variant :default
            :class   "bg-indigo-600 hover:bg-indigo-700 text-white"
            :disabled fetching?
-           :on      {:click [::query/fetch posts-query-key {:base-url   "https://jsonplaceholder.typicode.com"
-                                                            :stale-time 10000}]}}
+           :on      {:click [::query/fetch posts-query-key (query/key->opts posts-query-key {:base-url   "https://jsonplaceholder.typicode.com"
+                                                                                             :stale-time 10000})]}}
           (if fetching? "Fetching..." "Fetch Posts (Cache-First)"))
 
          (ui/button
           {:variant :outline
-           :on      {:click [::query/fetch posts-query-key {:base-url "https://jsonplaceholder.typicode.com"
-                                                            :force?   true}]}}
+           :on      {:click [::query/fetch posts-query-key (query/key->opts posts-query-key {:base-url "https://jsonplaceholder.typicode.com"
+                                                                                             :force?   true})]}}
           "Force Refetch (Bypass Cache)")
 
          (ui/button
           {:variant :secondary
            :class   "text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200"
-           :on      {:click [::query/invalidate [:posts] {:refetch-active? true}]}}
+           :on      {:click [::query/invalidate-hierarchical [:posts] {:refetch-active? true}]}}
           "Invalidate [:posts]")])])
 
      ;; Main Grid: Mutation Form + Posts List
@@ -193,8 +195,8 @@
            (ui/button
             {:variant :outline
              :size    :sm
-             :on      {:click [::query/fetch posts-query-key {:base-url   "https://jsonplaceholder.typicode.com"
-                                                              :stale-time 10000}]}}
+             :on      {:click [::query/fetch posts-query-key (query/key->opts posts-query-key {:base-url   "https://jsonplaceholder.typicode.com"
+                                                                                               :stale-time 10000})]}}
             "Fetch Now")]))]]
 
      ;; Context Cache Inspector

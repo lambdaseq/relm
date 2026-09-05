@@ -36,14 +36,16 @@
     (is (= [] (query/normalize-key nil)))
     (is (= [:users 1 :posts] (query/normalize-key [:users 1 :posts]))))
 
-  (testing "key-match? checks normalized equality"
+  (testing "key-match? and exact-match? check normalized equality"
     (is (true? (query/key-match? :todos [:todos])))
+    (is (true? (query/exact-match? :todos [:todos])))
     (is (true? (query/key-match? [:users 1] [:users 1])))
     (is (false? (query/key-match? [:users 1] [:users 2])))
     (is (true? (query/key-match? [:todos {:status "open"}] [:todos {:status "open"}]))))
 
-  (testing "prefix-match? supports hierarchical matching"
+  (testing "prefix-match? and hierarchical-match? support hierarchical matching"
     (is (true? (query/prefix-match? [:users] [:users])))
+    (is (true? (query/hierarchical-match? [:users] [:users])))
     (is (true? (query/prefix-match? [:users] [:users 1])))
     (is (true? (query/prefix-match? [:users] [:users 1 :posts])))
     (is (true? (query/prefix-match? [:users] [:users {:role "admin"}])))
@@ -53,11 +55,11 @@
     (is (false? (query/prefix-match? [:users 1 :posts :details] [:users 1])))))
 
 ;; -----------------------------------------------------------------------------
-;; 2. URL and Request Inference Tests
+;; 2. URL and Request Helpers Tests
 ;; -----------------------------------------------------------------------------
 
-(deftest url-inference-test
-  (testing "key->path-and-params converts vector segments into REST URL path"
+(deftest url-helpers-test
+  (testing "key->path-and-params converts vector segments into REST URL path and params"
     (is (= ["/todos" {}]
            (query/key->path-and-params [:todos])))
     (is (= ["/users/42/posts" {}]
@@ -66,6 +68,26 @@
            (query/key->path-and-params ["api" "v1" :items])))
     (is (= ["/todos" {:status "completed" :limit 10}]
            (query/key->path-and-params [:todos {:status "completed" :limit 10}]))))
+
+  (testing "key->url, key->path, and key->params helpers"
+    (is (= "/todos" (query/key->url [:todos])))
+    (is (= "/users/42/posts" (query/key->url [:users 42 :posts])))
+    (is (= "https://api.example.com/todos" (query/key->url "https://api.example.com" [:todos])))
+    (is (= "/users/42" (query/key->path [:users 42])))
+    (is (= {:limit 10} (query/key->params [:todos {:limit 10}])))
+    (is (= {} (query/key->params [:todos 42]))))
+
+  (testing "key->opts helper"
+    (is (= {:url "/todos", :params {:status "open"}}
+           (query/key->opts [:todos {:status "open"}])))
+    (is (= {:url "https://api.example.com/todos/1", :base-url "https://api.example.com", :stale-time 5000}
+           (query/key->opts [:todos 1] {:base-url "https://api.example.com", :stale-time 5000}))))
+
+  (testing "reitit-url helper with router"
+    (let [ctx {:router test-router}]
+      (is (= "/users" (query/reitit-url ctx :users)))
+      (is (= "/users/99" (query/reitit-url ctx :user {:id 99})))
+      (is (= "/users/99/posts" (query/reitit-url test-router :user-posts {:id 99})))))
 
   (testing "infer-request-from-key with standard vector key"
     (let [req (query/infer-request-from-key {} [:users 42 :posts {:page 2}] {:headers {"X-Custom" "1"}})]
@@ -93,15 +115,11 @@
       (is (= "https://custom.api.com/posts" (:url req-3)))
       (is (= {:_limit 10} (:params req-3)))))
 
-  (testing "infer-request-from-key respects explicit overrides"
-    (let [req (query/infer-request-from-key {} [:todos] {:url "/custom/api"
-                                                         :method :post
-                                                         :params {:override true}
-                                                         :body {:title "New"}})]
-      (is (= "/custom/api" (:url req)))
-      (is (= :post (:method req)))
-      (is (= {:override true} (:params req)))
-      (is (= {:title "New"} (:body req))))))
+  (testing "build-request respects explicit options and base-url"
+    (let [req (query/build-request {:base-url "https://api.com"} {:url "/todos" :params {:limit 5}})]
+      (is (= "https://api.com/todos" (:url req)))
+      (is (= {:limit 5} (:params req)))
+      (is (= :get (:method req))))))
 
 ;; -----------------------------------------------------------------------------
 ;; 3. Context Cache Reducers and View Queries Tests
@@ -143,75 +161,108 @@
       (is (= :error (query/status ctx [:todos])))
       (is (= {:problem :server :status 500} (query/error ctx [:todos])))))
 
-  (testing "invalidate-query-keys marks matching queries stale hierarchically"
+  (testing "invalidate-exact only invalidates exact query key"
+    (let [ctx (-> {}
+                  (query/set-query-data [:users] [{:id 1}])
+                  (query/set-query-data [:users 1] {:id 1 :name "Alice"})
+                  (query/set-query-data [:users 2] {:id 2 :name "Bob"}))
+          invalidated (query/invalidate-exact ctx [:users])]
+      (is (true? (query/stale? invalidated [:users])))
+      (is (false? (query/stale? invalidated [:users 1] 60000)))
+      (is (false? (query/stale? invalidated [:users 2] 60000)))))
+
+  (testing "invalidate-hierarchical marks matching queries stale hierarchically"
     (let [ctx (-> {}
                   (query/set-query-data [:users] [{:id 1}])
                   (query/set-query-data [:users 1] {:id 1 :name "Alice"})
                   (query/set-query-data [:users 2] {:id 2 :name "Bob"})
                   (query/set-query-data [:posts] [{:id 101}]))
-          invalidated (query/invalidate-query-keys ctx [:users])]
+          invalidated (query/invalidate-hierarchical ctx [:users])]
       (is (true? (query/stale? invalidated [:users])))
       (is (true? (query/stale? invalidated [:users 1])))
       (is (true? (query/stale? invalidated [:users 2])))
-      (is (false? (query/stale? invalidated [:posts] 60000))))))
+      (is (false? (query/stale? invalidated [:posts] 60000)))))
+
+  (testing "invalidate-all marks all queries stale"
+    (let [ctx (-> {}
+                  (query/set-query-data [:users] [{:id 1}])
+                  (query/set-query-data [:posts] [{:id 101}]))
+          invalidated (query/invalidate-all ctx)]
+      (is (true? (query/stale? invalidated [:users])))
+      (is (true? (query/stale? invalidated [:posts])))))
+
+  (testing "invalidate-predicate marks queries matching custom predicate"
+    (let [ctx (-> {}
+                  (query/set-query-data [:users 1] {:role "admin"})
+                  (query/set-query-data [:users 2] {:role "user"}))
+          invalidated (query/invalidate-predicate ctx (fn [_k q] (= "admin" (get-in q [:data :role]))))]
+      (is (true? (query/stale? invalidated [:users 1])))
+      (is (false? (query/stale? invalidated [:users 2] 60000))))))
 
 ;; -----------------------------------------------------------------------------
 ;; 4. Query Update Lifecycle and Retry Tests
 ;; -----------------------------------------------------------------------------
 
 (deftest query-lifecycle-test
-  (testing "::update on empty cache sets loading and emits http/fetch effect"
+  (testing "::update on empty cache sets loading and emits http/fetch effect with explicit url"
     (let [ctx {}
-          [new-state new-ctx effects] (relm/update nil ctx [::query/fetch [:todos]] nil)]
+          [new-state new-ctx effects] (relm/update nil ctx [::query/fetch [:todos] {:url "/todos"}] nil)]
       (is (query/loading? new-ctx [:todos]))
       (is (= 1 (count effects)))
       (let [[effect-type req] (first effects)]
         (is (= ::http/fetch! effect-type))
         (is (= "/todos" (:url req)))
         (is (= :get (:method req)))
-        (is (= [::query/fetch-success [:todos] {}] (:on-success req))))))
+        (is (= [::query/fetch-success [:todos] {:url "/todos"}] (:on-success req))))))
+
+  (testing "::update accepts string as opts for url"
+    (let [ctx {}
+          [_ new-ctx effects] (relm/update nil ctx [::query/update :todos "/todos"] nil)]
+      (is (query/loading? new-ctx :todos))
+      (is (= 1 (count effects)))
+      (is (= "/todos" (get-in (first effects) [1 :url])))))
 
   (testing "::update on fresh cache returns cache hit without HTTP effect"
     (let [ctx (query/set-query-data {} [:todos] [{:id 1}] {:stale-time 60000})
-          [_ new-ctx effects] (relm/update nil ctx [::query/fetch [:todos] {:stale-time 60000}] nil)]
+          [_ new-ctx effects] (relm/update nil ctx [::query/fetch [:todos] {:url "/todos" :stale-time 60000}] nil)]
       (is (= ctx new-ctx))
       (is (empty? effects))))
 
   (testing "::update with :force? true bypasses fresh cache"
-    (let [ctx (query/set-query-data {} [:todos] [{:id 1}] {:stale-time 60000})
-          [_ new-ctx effects] (relm/update nil ctx [::query/fetch [:todos] {:force? true}] nil)]
+    (let [ctx (query/set-query-data {} [:todos] [{:id 1}] {:url "/todos" :stale-time 60000})
+          [_ new-ctx effects] (relm/update nil ctx [::query/fetch [:todos] {:url "/todos" :force? true}] nil)]
       (is (query/fetching? new-ctx [:todos]))
       (is (= 1 (count effects)))))
 
   (testing "::fetch-success updates cache data and sets status to success"
     (let [ctx (query/set-query-loading {} [:todos])
           response {:status 200 :ok? true :body [{:id 1 :title "Done"}]}
-          [_ new-ctx _] (relm/update nil ctx [::query/fetch-success [:todos] {} response] nil)]
+          [_ new-ctx _] (relm/update nil ctx [::query/fetch-success [:todos] {:url "/todos"} response] nil)]
       (is (= :success (query/status new-ctx [:todos])))
       (is (= [{:id 1 :title "Done"}] (query/data new-ctx [:todos])))))
 
   (testing "::fetch-failure with retry attempts schedules ::relm/dispatch-later!"
-    (let [ctx (query/set-query-loading {} [:todos] {:retry 3})
+    (let [ctx (query/set-query-loading {} [:todos] {:retry 3 :url "/todos"})
           error-resp {:problem :fetch :problem-message "Network failed"}
-          [_ new-ctx effects] (relm/update nil ctx [::query/fetch-failure [:todos] 0 {:retry 3} error-resp] nil)]
+          [_ new-ctx effects] (relm/update nil ctx [::query/fetch-failure [:todos] 0 {:retry 3 :url "/todos"} error-resp] nil)]
       (is (= 1 (get-in new-ctx [:queries [:todos] :retry-count])))
       (is (= 1 (count effects)))
       (let [[effect-type timer-payload] (first effects)]
         (is (= ::relm/dispatch-later! effect-type))
         (is (= 1000 (:ms timer-payload)))
-        (is (= [::query/retry [:todos] 1 {:retry 3}] (:dispatch! timer-payload))))))
+        (is (= [::query/retry [:todos] 1 {:retry 3 :url "/todos"}] (:dispatch! timer-payload))))))
 
   (testing "::fetch-failure when retries are exhausted sets status to error"
-    (let [ctx (query/set-query-loading {} [:todos] {:retry 3})
+    (let [ctx (query/set-query-loading {} [:todos] {:retry 3 :url "/todos"})
           error-resp {:problem :server :status 500}
-          [_ new-ctx effects] (relm/update nil ctx [::query/fetch-failure [:todos] 3 {:retry 3} error-resp] nil)]
+          [_ new-ctx effects] (relm/update nil ctx [::query/fetch-failure [:todos] 3 {:retry 3 :url "/todos"} error-resp] nil)]
       (is (= :error (query/status new-ctx [:todos])))
       (is (= error-resp (query/error new-ctx [:todos])))
       (is (empty? effects))))
 
   (testing "::fetch alias behaves like ::update"
     (let [ctx {}
-          [_ new-ctx effects] (relm/update nil ctx [::query/fetch [:todos]] nil)]
+          [_ new-ctx effects] (relm/update nil ctx [::query/fetch [:todos] {:url "/todos"}] nil)]
       (is (query/loading? new-ctx [:todos]))
       (is (= 1 (count effects)))))
 
@@ -229,20 +280,74 @@
       (is (= [{:id 99}] (query/data new-ctx-1 [:todos])))
       (is (= [{:id 99} {:id 100}] (query/data new-ctx-2 [:todos])))))
 
-  (testing "::invalidate marks queries stale and optionally refetches"
+  (testing "::invalidate-exact only refetches exact key"
+    (let [ctx (-> {}
+                  (query/set-query-data [:users] [{:id 1}] {:url "/users"})
+                  (query/set-query-data [:users 1] {:id 1} {:url "/users/1"}))
+          [_ new-ctx effects] (relm/update nil ctx [::query/invalidate-exact [:users]] nil)]
+      (is (true? (query/stale? new-ctx [:users])))
+      (is (false? (query/stale? new-ctx [:users 1] 60000)))
+      (is (= 1 (count effects)))
+      (is (= "/users" (get-in (first effects) [1 :url])))))
+
+  (testing "::invalidate-hierarchical refetches matching key prefix"
     (let [ctx (-> {}
                   (query/set-query-data [:users] [{:id 1}] {:url "https://api.example.com/users"})
                   (query/set-query-data [:users 1] {:id 1} {:url "https://api.example.com/users/1"})
                   (query/set-query-data [:posts] [{:id 100}]))
-          [_ ctx-no-refetch effects-none] (relm/update nil ctx [::query/invalidate [:users] {:refetch-active? false}] nil)
-          [_ ctx-refetch effects-refetch] (relm/update nil ctx [::query/invalidate [:users] {:refetch-active? true}] nil)]
+          [_ ctx-no-refetch effects-none] (relm/update nil ctx [::query/invalidate-hierarchical [:users] {:refetch-active? false}] nil)
+          [_ ctx-refetch effects-refetch] (relm/update nil ctx [::query/invalidate-hierarchical [:users] {:refetch-active? true}] nil)]
       (is (true? (query/stale? ctx-no-refetch [:users])))
       (is (true? (query/stale? ctx-no-refetch [:users 1])))
       (is (false? (query/stale? ctx-no-refetch [:posts] 60000)))
       (is (empty? effects-none))
       (is (= 2 (count effects-refetch)))
       (is (= "https://api.example.com/users" (get-in (first effects-refetch) [1 :url])))
-      (is (= "https://api.example.com/users/1" (get-in (second effects-refetch) [1 :url]))))))
+      (is (= "https://api.example.com/users/1" (get-in (second effects-refetch) [1 :url])))))
+
+  (testing "invalidation helpers produce vectors of invalidation messages"
+    (is (= [[::query/invalidate-exact [:users]]]
+           (query/invalidate-exact [:users])))
+    (is (= [[::query/invalidate-exact [:users]]]
+           (query/exact [:users])))
+    (is (= [[::query/invalidate-single [:users 1]]]
+           (query/invalidate-single [:users 1])))
+    (is (= [[::query/invalidate-single [:users 1]]]
+           (query/single [:users 1])))
+    (is (= [[::query/invalidate-hierarchical [:users]]]
+           (query/invalidate-hierarchical [:users])))
+    (is (= [[::query/invalidate-hierarchical [:users]]]
+           (query/hierarchical [:users])))
+    (is (= [[::query/invalidate-hierarchical [:users]] [::query/invalidate-hierarchical [:posts]]]
+           (query/invalidate-hierarchical [:users] [:posts])))
+    (is (= [[::query/invalidate-hierarchical [:users]] [::query/invalidate-hierarchical [:posts]]]
+           (query/invalidate-hierarchical [[:users] [:posts]])))
+    (is (= [[::query/invalidate-hierarchical [:users] {:refetch-active? false}]]
+           (query/invalidate-hierarchical [:users] {:refetch-active? false})))
+    (is (= [[::query/invalidate-prefix [:users]]]
+           (query/invalidate-prefix [:users])))
+    (is (= [[::query/invalidate-all]]
+           (query/invalidate-all)))
+    (is (= [[::query/invalidate-all]]
+           (query/all)))
+    (is (= [[::query/invalidate-all-keys]]
+           (query/invalidate-all-keys)))
+    (is (= [[::query/invalidate-all {:refetch-active? false}]]
+           (query/invalidate-all {:refetch-active? false})))
+    (let [p-fn (fn [_ _] true)]
+      (is (= [[::query/invalidate-predicate p-fn]]
+             (query/invalidate-predicate p-fn)))
+      (is (= [[::query/invalidate-predicate p-fn]]
+             (query/predicate p-fn)))))
+
+  (testing "::invalidate with invalidation specifiers and messages"
+    (let [ctx (-> {}
+                  (query/set-query-data [:users] [{:id 1}] {:url "/users"})
+                  (query/set-query-data [:users 1] {:id 1} {:url "/users/1"}))
+          [_ exact-ctx exact-fx] (relm/update nil ctx [::query/invalidate [::query/invalidate-exact [:users]]] nil)
+          [_ hier-ctx hier-fx] (relm/update nil ctx [::query/invalidate [::query/invalidate-hierarchical [:users]]] nil)]
+      (is (= 1 (count exact-fx)))
+      (is (= 2 (count hier-fx))))))
 
 ;; -----------------------------------------------------------------------------
 ;; 5. Mutation Lifecycle, Optimistic Updates, and Invalidation Tests
@@ -261,10 +366,10 @@
         (is (= :post (:method req)))
         (is (= {:title "New Todo"} (:body req))))))
 
-  (testing "::mutate infers URL from vector key and supports :data / :body keys"
+  (testing "::mutate with explicit url and options"
     (let [ctx {}
-          [_ new-ctx-1 effects-1] (relm/update nil ctx [::query/mutate [:todos] {:data {:title "New Todo"}}] nil)
-          [_ new-ctx-2 effects-2] (relm/update nil ctx [::query/mutate [:todos 123] {:method :put
+          [_ new-ctx-1 effects-1] (relm/update nil ctx [::query/mutate [:todos] {:url "/todos" :data {:title "New Todo"}}] nil)
+          [_ new-ctx-2 effects-2] (relm/update nil ctx [::query/mutate [:todos 123] {:url "/todos/123" :method :put
                                                                                      :body {:title "Updated Todo"}}] nil)]
       (is (query/mutation-loading? new-ctx-1 [:todos]))
       (is (query/mutation-loading? new-ctx-1 :todos))
@@ -312,54 +417,34 @@
       (is (= [::relm/dispatch! [::query/set-query-data [:error-log] {:occurred? true}]] (first effects)))
       (is (= [::relm/dispatch! [::query/set-query-data [:settled-log] {:settled? true}]] (second effects)))))
 
-  (testing "::mutate-success and ::mutate-failure are aware of base-url during invalidation refetches"
-    (let [ctx (-> {}
-                  (query/set-query-data [:todos] [{:id 1}])
-                  (query/set-query-data [:todos 1] {:id 1}))
-          resp {:status 200 :ok? true :body {:id 2}}
-          err-resp {:problem :server :status 500}
-          [_ success-ctx success-fxs] (relm/update nil ctx [::query/mutate-success [:todos] nil {:base-url "https://api.example.com"} resp] nil)
-          [_ failure-ctx failure-fxs] (relm/update nil ctx [::query/mutate-failure [:todos] ctx {:base-url "https://api.example.com"} err-resp] nil)]
-      (is (= 2 (count success-fxs)))
-      (is (= "https://api.example.com/todos" (get-in (first success-fxs) [1 :url])))
-      (is (= "https://api.example.com/todos/1" (get-in (second success-fxs) [1 :url])))
-      (is (= 2 (count failure-fxs)))
-      (is (= "https://api.example.com/todos" (get-in (first failure-fxs) [1 :url])))
-      (is (= "https://api.example.com/todos/1" (get-in (second failure-fxs) [1 :url])))))
-
-  (testing "::mutate-success invalidates matching queries automatically when key matches"
+  (testing "::mutate-success dispatches on-settled invalidation messages"
     (let [ctx (-> {}
                   (query/set-query-data [:todos] [{:id 1}] {:url "https://api.example.com/todos"})
                   (query/set-query-data [:todos 1] {:id 1} {:url "https://api.example.com/todos/1"})
-                  (query/set-query-data [:users] [{:id 10}]))
+                  (query/set-query-data [:users] [{:id 10}] {:url "https://api.example.com/users"}))
           response {:status 201 :ok? true :body {:id 2 :title "Created"}}
-          ;; Automatic invalidation using mutation key [:todos]
-          [_ new-ctx effects] (relm/update nil ctx [::query/mutate-success [:todos] {} response] nil)]
-      (is (= :success (get-in new-ctx [:mutations [:todos] :status])))
-      (is (= {:id 2 :title "Created"} (query/mutation-data new-ctx [:todos])))
-      (is (true? (query/stale? new-ctx [:todos])))
-      (is (true? (query/stale? new-ctx [:todos 1])))
-      (is (false? (query/stale? new-ctx [:users] 60000)))
-      (is (= 2 (count effects)))
-      (is (= "https://api.example.com/todos" (get-in (first effects) [1 :url])))
-      (is (= "https://api.example.com/todos/1" (get-in (second effects) [1 :url])))))
+          ;; Hierarchical invalidation of [:todos] via on-settled
+          [_ hier-ctx hier-fx] (relm/update nil ctx [::query/mutate-success [:todos] {:on-settled (query/invalidate-hierarchical [:todos])} response] nil)
+          ;; Exact invalidation of [:todos] via on-settled
+          [_ exact-ctx exact-fx] (relm/update nil ctx [::query/mutate-success [:todos] {:on-settled (query/invalidate-exact [:todos])} response] nil)]
+      (is (= :success (get-in hier-ctx [:mutations [:todos] :status])))
+      (is (= [::relm/dispatch! [[::query/invalidate-hierarchical [:todos]]]] (first hier-fx)))
+      (is (= [::relm/dispatch! [[::query/invalidate-exact [:todos]]]] (first exact-fx)))))
 
-  (testing "::mutate-success respects explicit :invalidate overrides and disabling"
-    (let [ctx (-> {}
-                  (query/set-query-data [:todos] [{:id 1}])
-                  (query/set-query-data [:users] [{:id 10}]))
-          response {:status 201 :ok? true :body {:id 2 :title "Created"}}
-          ;; Explicit invalidation overrides default mutation-key invalidation
-          [_ ctx-custom effects-custom] (relm/update nil ctx [::query/mutate-success [:todos] {:invalidate [[:users]]} response] nil)
-          ;; Disabling invalidation with :invalidate false
-          [_ ctx-disabled effects-disabled] (relm/update nil ctx [::query/mutate-success [:todos] {:invalidate false} response] nil)]
-      (is (false? (query/stale? ctx-custom [:todos] 60000)))
-      (is (true? (query/stale? ctx-custom [:users])))
-      (is (= 1 (count effects-custom)))
-
-      (is (false? (query/stale? ctx-disabled [:todos] 60000)))
-      (is (false? (query/stale? ctx-disabled [:users] 60000)))
-      (is (empty? effects-disabled))))
+  (testing "relm/dispatch dispatches on-settled invalidations end-to-end"
+    (let [event {:component-id "comp-settled"}]
+      (reset! relm/!app-state {:context (-> {}
+                                            (query/set-query-data [:todos] [{:id 1}] {:url "https://api.example.com/todos"})
+                                            (query/set-query-data [:todos 1] {:id 1} {:url "https://api.example.com/todos/1"})
+                                            (query/set-query-data [:users] [{:id 10}] {:url "https://api.example.com/users"}))
+                               :components {"comp-settled" {:state {}}}})
+      ;; Simulate successful mutation with on-settled hierarchical invalidation
+      (relm/dispatch! event [::query/mutate-success [:todos]
+                             {:on-settled (query/invalidate-hierarchical [:todos])}
+                             {:id 2 :title "Created"}])
+      (is (true? (query/stale? (:context @relm/!app-state) [:todos])))
+      (is (true? (query/stale? (:context @relm/!app-state) [:todos 1])))
+      (is (false? (query/stale? (:context @relm/!app-state) [:users] 60000)))))
 
   (testing "::relm/dispatch! effect handler executes query messages"
     (let [event {:component-id "comp-fx-test"}]

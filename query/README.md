@@ -2,26 +2,32 @@
 
 [![Clojars Project](https://img.shields.io/clojars/v/io.github.conjurernix/relm.query.svg)](https://clojars.org/io.github.conjurernix/relm.query)
 
-`io.github.conjurernix/relm.query` provides TanStack Query-style declarative server-state management for Relm applications. Built on top of Relm's Elm architecture and `relm.http`, it offers vector-based query keys, automatic REST URL/parameter inference, context-based caching, automatic stale detection, configurable retries with exponential backoff, optimistic mutations, and hierarchical cache invalidation.
+`io.github.conjurernix/relm.query` provides TanStack Query-style declarative server-state management for Relm
+applications. Built on top of Relm's Elm architecture and `relm.http`, it offers vector-based query keys, explicit
+request configuration, context-based caching, automatic stale detection, configurable retries with exponential backoff,
+optimistic mutations, and flexible single/hierarchical/predicate cache invalidation with optional URL helpers.
 
 ## Table of Contents
 
 - [Installation](#installation)
 - [Overview & Architecture](#overview--architecture)
-- [Vector Query Keys & Request Inference](#vector-query-keys--request-inference)
-  - [Vector Key Structure](#vector-key-structure)
-  - [Automatic URL & Query Parameter Inference](#automatic-url--query-parameter-inference)
-  - [Reitit Router Integration](#reitit-router-integration)
+- [Vector Query Keys & Request Helpers](#vector-query-keys--request-helpers)
+    - [Vector Key Structure](#vector-key-structure)
+    - [Optional URL & Parameter Helpers](#optional-url--parameter-helpers)
+    - [Reitit Router Helpers](#reitit-router-helpers)
 - [Queries (`::query/update` & `::query/fetch`)](#queries-queryupdate--queryfetch)
-  - [Dispatching Queries](#dispatching-queries)
-  - [Caching & Stale Times](#caching--stale-times)
-  - [Exponential Backoff Retries](#exponential-backoff-retries)
-  - [Query Options Reference](#query-options-reference)
+    - [Dispatching Queries](#dispatching-queries)
+    - [Caching & Stale Times](#caching--stale-times)
+    - [Exponential Backoff Retries](#exponential-backoff-retries)
+    - [Query Options Reference](#query-options-reference)
 - [Mutations (`::query/mutate`)](#mutations-querymutate)
-  - [Dispatching Mutations](#dispatching-mutations)
-  - [Optimistic Updates & Rollback](#optimistic-updates--rollback)
-  - [Mutation Options Reference](#mutation-options-reference)
-- [Hierarchical Cache Invalidation (`::query/invalidate`)](#hierarchical-cache-invalidation-queryinvalidate)
+    - [Dispatching Mutations](#dispatching-mutations)
+    - [Optimistic Updates & Rollback](#optimistic-updates--rollback)
+    - [Mutation Options Reference](#mutation-options-reference)
+- [Cache Invalidation (`::query/invalidate`)](#cache-invalidation-queryinvalidate)
+    - [Single / Exact Key Invalidation](#single--exact-key-invalidation)
+    - [Hierarchical Prefix Invalidation](#hierarchical-prefix-invalidation)
+    - [Predicate & All-Queries Invalidation](#predicate--all-queries-invalidation)
 - [View Query Helpers](#view-query-helpers)
 - [Pure Context Cache Reducers](#pure-context-cache-reducers)
 - [Complete Working Example](#complete-working-example)
@@ -48,7 +54,9 @@ For Leiningen / `project.clj`:
 
 ## Overview & Architecture
 
-`relm.query` organizes remote server data inside Relm's reactive global `context` under `:queries` and `:mutations`. Components read data and loading states synchronously using pure view helpers, while update handlers dispatch declarative HTTP side effects.
+`relm.query` organizes remote server data inside Relm's reactive global `context` under `:queries` and `:mutations`.
+Components read data and loading states synchronously using pure view helpers, while update handlers dispatch
+declarative HTTP side effects.
 
 ```
        +-------------------------------------------------------+
@@ -79,63 +87,68 @@ For Leiningen / `project.clj`:
          ::fetch-success                     ::fetch-failure
       - Store data in context              - Retry if attempt < max
       - Mark status :success               - Else set error status
-      - Run :invalidate prefixes
+      - Run :invalidate targets
 ```
 
 ### Key Highlights
 
-- **Vector Query Keys**: Express resources hierarchically as Clojure vectors (e.g. `[:users 1 :posts {:limit 10}]`).
-- **Zero-Boilerplate URL Inference**: Automatically transforms vector keys into REST endpoints and query parameter strings without requiring duplicate route strings.
-- **Pure Elm Lifecycle**: No hidden background stores or stateful class instances; query caches and mutation lifecycles live directly in Relm's immutable `context`.
-- **Hierarchical Invalidation**: Invalidate entire resource subtrees with prefix matching (e.g. invalidating `[:users]` invalidates `[:users 1]` and `[:users 2]`).
-- **Optimistic UI Updates**: Instantly update the UI before network requests complete, with automatic snapshot rollback on failure.
+- **Vector Query Keys**: Express cache resources as arbitrary Clojure vectors or keywords (e.g. `[:users 1 :posts]`).
+- **No Implied Inference**: Query keys are purely cache identifiers—URLs and invalidations are explicit or built via
+  optional helpers.
+- **Pure Elm Lifecycle**: No hidden background stores or stateful class instances; query caches and mutation lifecycles
+  live directly in Relm's immutable `context`.
+- **Flexible Invalidation**: Invalidate exact single keys (`query/exact`), hierarchical subtrees (`query/hierarchical`),
+  predicates (`query/predicate`), or all queries (`query/all`).
+- **Optimistic UI Updates**: Instantly update the UI before network requests complete, with automatic snapshot rollback
+  on failure.
 - **Smart Retries**: Built-in exponential backoff retry scheduling for resilient data fetching.
 
 ---
 
-## Vector Query Keys & Request Inference
+## Vector Query Keys & Request Helpers
 
 ### Vector Key Structure
 
-Query keys in `relm.query` are normalized vectors containing keywords, strings, integers, and optional parameter maps:
+Query keys in `relm.query` identify cache entries and are normalized into vectors:
 
 ```clojure
-[:todos]                                ;; Top-level collection
-[:todos 42]                             ;; Specific entity by ID
-[:users 1 :posts]                       ;; Nested resource
-[:todos {:status "active" :limit 10}]   ;; Resource with query parameters
+[:todos]                                ;; Top-level collection key
+[:todos 42]                             ;; Specific entity key
+[:users 1 :posts]                       ;; Nested resource key
+[:todos {:status "active" :limit 10}]   ;; Resource key with parameter metadata
 ```
 
-### Automatic URL & Query Parameter Inference
+### Optional URL & Parameter Helpers
 
-When `:url` is not explicitly provided in options, `relm.query` infers the URL path and query parameters from the vector key using `key->path-and-params`:
+If you want to derive URLs or options from vector keys, `relm.query` provides several optional helpers:
 
-1. Leading keyword, string, or numeric elements are joined with `/` into a URL path.
-2. If the last element is a map, it is extracted and converted into HTTP query parameters (`:params`).
-
-| Query Key | Inferred Path | Inferred Params | Inferred Method |
-| :--- | :--- | :--- | :--- |
-| `[:todos]` | `"/todos"` | `{}` | `:get` |
-| `[:users 42 :posts]` | `"/users/42/posts"` | `{}` | `:get` |
-| `[:todos {:status "active"}]` | `"/todos"` | `{:status "active"}` | `:get` |
-
-Explicit options always override or merge with inferred values:
+- `(query/key->url key [base-url])`: Returns the URL path string (e.g. `(query/key->url [:users 42 :posts])` ->
+  `"/users/42/posts"`).
+- `(query/key->params key)`: Extracts the trailing map from a vector key as query parameters.
+- `(query/key->path-and-params key)`: Deconstructs the key into `[path params]`.
+- `(query/key->opts key [extra-opts])`: Converts a key into a complete options map with `:url` and `:params`.
+- `(query/infer-request-from-key context key opts)`: Builds an HTTP request map from key and options.
 
 ```clojure
+;; Explicit URL in query options
 [::query/update [:posts]
- {:url "https://api.example.com/v1/posts"  ;; Overrides inferred "/posts"
-  :params {:sort "desc"}}]                 ;; Injected query parameters
+ {:url    "/api/v1/posts"
+  :params {:sort "desc"}}]
+
+;; Or optionally using key->opts helper
+[::query/update [:posts {:sort "desc"}]
+ (query/key->opts [:posts {:sort "desc"}] {:base-url "https://api.example.com"})]
 ```
 
-### Reitit Router Integration
+### Reitit Router Helpers
 
-If a Reitit router is present in `context` (e.g. at `(:router context)` via `relm.reitit`), `relm.query` matches the first keyword against registered route names:
+If a Reitit router is present in `context` (e.g. at `(:router context)` via `relm.reitit`), you can resolve route names
+to URL paths:
 
 ```clojure
 ;; Given Reitit route ["/users/:id/profile" {:name :user-profile}]
-;; With key [:user-profile {:id 42 :tab "activity"}]
-;; Inferred path -> "/users/42/profile"
-;; Inferred query params -> {:tab "activity"}
+(query/reitit-url context :user-profile {:id 42})
+;; => "/users/42/profile"
 ```
 
 ---
@@ -147,34 +160,38 @@ If a Reitit router is present in `context` (e.g. at `(:router context)` via `rel
 Trigger query fetching declaratively inside event handlers or view clicks:
 
 ```clojure
-[:button {:on {:click [::query/update [:todos {:status "active"}]]}}
+[:button {:on {:click [::query/update [:todos {:status "active"}]
+                       {:url    "/todos"
+                        :params {:status "active"}}]}}
  "Load Active Todos"]
 ```
 
-`::query/fetch` is provided as an exact alias for `::query/update`.
+`::query/fetch` is provided as an exact alias for `::query/update`. You can also pass a URL string directly as options:
+`[::query/update :todos "/todos"]`.
 
 ### Caching & Stale Times
 
 `relm.query` implements a cache-first strategy:
 
 1. When a query is requested, `relm.query` checks if fresh data is already present in `context`.
-2. If data exists and the elapsed time since `:updated-at` is less than `:stale-time`, the cached data is retained without emitting a network request.
-3. If data is missing or stale, `relm.query` marks the query as `:is-fetching? true` and dispatches `::http/fetch`.
+2. If data exists and the elapsed time since `:updated-at` is less than `:stale-time`, the cached data is retained
+   without emitting a network request.
+3. If data is missing or stale, `relm.query` marks the query as `:is-fetching? true` and dispatches `::http/fetch!`.
 4. Pass `:force? true` to bypass fresh cache checks and trigger a guaranteed network refetch.
 
 ```clojure
 ;; Cache for 60 seconds (60000 ms)
-[::query/update [:users] {:stale-time 60000}]
+[::query/update [:users] {:url "/users" :stale-time 60000}]
 
 ;; Force background refetch regardless of staleness
-[::query/update [:users] {:force? true}]
+[::query/update [:users] {:url "/users" :force? true}]
 ```
 
 ### Exponential Backoff Retries
 
 Failed queries automatically retry up to 3 times (configurable via `:retry`) using exponential backoff:
 
-$$\text{delay} = \min(1000 \times 2^{\text{attempt}}, 30000)\text{ ms}$$
+$$\text{delay} = \min (1000 \times 2^{\text{attempt}}, 30000)\text{ ms}$$
 
 - **Attempt 0**: 1,000 ms (1s)
 - **Attempt 1**: 2,000 ms (2s)
@@ -185,18 +202,18 @@ To disable retries, pass `{:retry false}` or `{:retry 0}`.
 
 ### Query Options Reference
 
-| Option | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `:base-url` | `string` | `nil` | Base URL prepended to inferred REST path (e.g. `"https://api.example.com"`). |
-| `:url` | `string` | Inferred | Target URL. Overrides inferred path / base URL. |
-| `:params` | `map` | Inferred | HTTP query parameters map. Merged with key params. |
-| `:headers` | `map` | `{}` | HTTP request headers map. |
-| `:method` | `keyword` | `:get` | HTTP method (`:get`, `:post`, etc.). |
-| `:stale-time` | `number` | `0` | Milliseconds data remains fresh before refetch is required. |
-| `:force?` | `boolean` | `false` | When true, skips cache check and forces immediate fetch. |
-| `:retry` | `number \| boolean` | `3` | Max retry attempts, or `false` to disable. |
-| `:on-success` | `vector` | `nil` | Message vector dispatched on success `[::msg ...]`. |
-| `:on-error` | `vector` | `nil` | Message vector dispatched on final error `[::msg ...]`. |
+| Option        | Type                | Default | Description                                                               |
+|:--------------|:--------------------|:--------|:--------------------------------------------------------------------------|
+| `:url`        | `string`            | `nil`   | Target URL. Required for HTTP fetches (or string passed as `opts`).       |
+| `:base-url`   | `string`            | `nil`   | Base URL prepended to relative `:url` (e.g. `"https://api.example.com"`). |
+| `:params`     | `map`               | `nil`   | HTTP query parameters map.                                                |
+| `:headers`    | `map`               | `{}`    | HTTP request headers map.                                                 |
+| `:method`     | `keyword`           | `:get`  | HTTP method (`:get`, `:post`, etc.).                                      |
+| `:stale-time` | `number`            | `0`     | Milliseconds data remains fresh before refetch is required.               |
+| `:force?`     | `boolean`           | `false` | When true, skips cache check and forces immediate fetch.                  |
+| `:retry`      | `number \| boolean` | `3`     | Max retry attempts, or `false` to disable.                                |
+| `:on-success` | `vector`            | `nil`   | Message vector dispatched on success `[::msg ...]`.                       |
+| `:on-error`   | `vector`            | `nil`   | Message vector dispatched on final error `[::msg ...]`.                   |
 
 ---
 
@@ -204,82 +221,124 @@ To disable retries, pass `{:retry false}` or `{:retry 0}`.
 
 ### Dispatching Mutations
 
-Mutations execute write operations (`:post`, `:put`, `:patch`, `:delete`) and track state in `context[:mutations <mutation-key>]`. 
+Mutations execute write operations (`:post`, `:put`, `:patch`, `:delete`) and track state in
+`context[:mutations <mutation-key>]`.
 
-Mutations can infer their REST URL directly from vector keys and automatically invalidate matching query caches on success without requiring explicit `:url` or `:invalidate` parameters:
-
-```clojure
-;; Inferred URL: "/todos" (POST), automatically invalidates queries matching [:todos]
-[::query/mutate [:todos]
- {:data {:title "New Task"}}]
-
-;; Inferred URL: "/todos/42" (DELETE), automatically invalidates [:todos] / [:todos 42]
-[::query/mutate [:todos 42]
- {:method :delete}]
-```
-
-Explicit `:url` and `:invalidate` options can still be provided to override or customize behavior:
+Specify `:url` (or derive via `(query/key->url key)`) and pass invalidation message vectors via `:on-settled`:
 
 ```clojure
-(defmethod relm/update ::delete-todo
-  [state context [_ todo-id] _event]
-  [state
-   context
-   [[::query/mutate [:todos todo-id]
-     {:method :delete}]]])
+;; POST request, invalidates [:todos] and its children hierarchically on settled
+[::query/mutate :create-todo
+ {:url        (query/key->url [:todos])
+  :data       {:title "New Task"}
+  :on-settled (query/invalidate-hierarchical [:todos])}]
+
+;; DELETE request, invalidates only the exact [:todos 42] cache
+[::query/mutate :delete-todo
+ {:url        "/todos/42"
+  :method     :delete
+  :on-settled (query/invalidate-exact [:todos 42])}]
 ```
 
 ### Optimistic Updates & Rollback
 
-Provide `:on-mutate` with a message vector (such as `[::query/set-query-data ...]` with an updater function) to optimistically update the cache before the network request finishes. The context prior to the mutation is automatically captured as the rollback snapshot. If the mutation fails, `relm.query` automatically restores the rollback context:
+Provide `:on-mutate` with a message vector (such as `[::query/set-query-data ...]` with an updater function) to
+optimistically update the cache before the network request finishes. The context prior to the mutation is automatically
+captured as the rollback snapshot. If the mutation fails, `relm.query` automatically restores the rollback context:
 
 ```clojure
-[::query/mutate [:todos]
- {:data      {:title "New Item" :completed false}
-  :on-mutate [::query/set-query-data [:todos]
-              (fn [todos] (conj (or todos []) {:title "New Item" :completed false}))]}]
+[::query/mutate :create-todo
+ {:url        (query/key->url [:todos])
+  :data       {:title "New Item" :completed false}
+  :on-mutate  [::query/set-query-data [:todos]
+               (fn [todos] (conj (or todos []) {:title "New Item" :completed false}))]
+  :on-settled (query/invalidate-hierarchical [:todos])}]
 ```
 
 You can also provide `:on-error` and `:on-settled` message vectors:
 
 ```clojure
-[::query/mutate [:todos]
- {:data       new-todo
+[::query/mutate :create-todo
+ {:url        "/todos"
+  :data       new-todo
   :on-mutate  [::query/set-query-data [:todos] (fn [old] (conj (or old []) new-todo))]
   :on-error   [::query/set-query-data [:todos] previous-todos]
-  :on-settled [::query/invalidate [:todos]]}]
+  :on-settled (query/invalidate-hierarchical [:todos])}]
 ```
 
 ### Mutation Options Reference
 
-| Option | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `:data` / `:body` | `any` | `nil` | Request payload sent to the server (`:variables` supported for backward compatibility). |
-| `:base-url` | `string` | `nil` | Base URL prepended to inferred REST path. |
-| `:url` | `string` | Inferred | Target URL for the mutation request. Overrides inferred path / base URL. |
-| `:method` | `keyword` | `:post` | HTTP method (`:post`, `:put`, `:patch`, `:delete`). |
-| `:invalidate` | `vector \| boolean` | `[mutation-key]` | Query key prefixes to invalidate on success. Pass `false` or `nil` to disable automatic invalidation. |
-| `:on-mutate` | `vector` | `nil` | Message vector executed optimistically before request `[::msg ...]`. |
-| `:rollback-context` | `map` | `context` | Context state to restore if mutation fails. Defaults to context before `:on-mutate`. |
-| `:on-success` | `vector` | `nil` | Message vector dispatched on success `[::msg ...]`. |
-| `:on-error` | `vector` | `nil` | Message vector dispatched on error `[::msg ...]`. |
-| `:on-settled` | `vector` | `nil` | Message vector dispatched on settled completion `[::msg ...]`. |
+| Option              | Type      | Default   | Description                                                                                                            |
+|:--------------------|:----------|:----------|:-----------------------------------------------------------------------------------------------------------------------|
+| `:url`              | `string`  | `nil`     | Target URL for the mutation request (explicit or via `(key->url key)`).                                                |
+| `:data` / `:body`   | `any`     | `nil`     | Request payload sent to the server (`:variables` supported for backward compatibility).                                |
+| `:base-url`         | `string`  | `nil`     | Base URL prepended to relative `:url`.                                                                                 |
+| `:method`           | `keyword` | `:post`   | HTTP method (`:post`, `:put`, `:patch`, `:delete`).                                                                    |
+| `:on-mutate`        | `vector`  | `nil`     | Message vector executed optimistically before request `[::msg ...]`.                                                   |
+| `:rollback-context` | `map`     | `context` | Context state to restore if mutation fails. Defaults to context before `:on-mutate`.                                   |
+| `:on-success`       | `vector`  | `nil`     | Message vector or collection of messages dispatched on success `[::msg ...]`.                                          |
+| `:on-error`         | `vector`  | `nil`     | Message vector or collection of messages dispatched on error `[::msg ...]`.                                            |
+| `:on-settled`       | `vector`  | `nil`     | Message vector or collection of messages dispatched on settled completion (e.g. `(invalidate-hierarchical [:todos])`). |
 
 ---
 
-## Hierarchical Cache Invalidation (`::query/invalidate`)
+## Cache Invalidation (`::query/invalidate`)
 
-`relm.query` supports prefix-based hierarchical invalidation. When a key prefix is invalidated, all cached queries matching the prefix are marked stale, and cached queries are automatically refetched in the background:
+`relm.query` provides explicit helpers and update handlers for single key, hierarchical prefix, predicate, and full
+cache invalidation:
+
+### Single / Exact Key Invalidation
+
+Invalidates only the exact matching query key without affecting child or sibling keys:
+
+```clojure
+;; Using message handlers or helper
+[::query/invalidate-exact [:users 1]]
+[::query/invalidate [:users 1] {:exact? true}]
+[::relm/dispatch! (query/invalidate-exact [:users 1])]
+
+;; In mutation on-settled
+{:on-settled (query/invalidate-exact [:users 1])}
+
+;; Using pure reducer on context
+(query/invalidate-exact context [:users 1])
+```
+
+### Hierarchical Prefix Invalidation
+
+Invalidates all cached queries sharing the key prefix:
 
 ```clojure
 ;; Invalidates [:users], [:users 1], [:users 1 :posts], and [:users {:role "admin"}]
-[::query/invalidate [:users]]
+[::query/invalidate-hierarchical [:users]]
+[::query/invalidate [:users] {:hierarchical? true}]
+[::relm/dispatch! (query/invalidate-hierarchical [:users])]
 
-;; Invalidate without automatic background refetching
-[::query/invalidate [:users] {:refetch-active? false}]
+;; In mutation on-settled
+{:on-settled (query/invalidate-hierarchical [:users])}
 
-;; Invalidate with custom predicate
-[::query/invalidate nil {:predicate (fn [key query] (str/starts-with? (str (first key)) ":admin"))}]
+;; Without automatic background refetching
+[::query/invalidate-hierarchical [:users] {:refetch-active? false}]
+(query/invalidate-hierarchical [:users] {:refetch-active? false})
+
+;; Using pure reducer on context
+(query/invalidate-hierarchical context [:users])
+```
+
+### Predicate & All-Queries Invalidation
+
+```clojure
+;; Invalidate by predicate
+[::query/invalidate-predicate (fn [key query] (str/starts-with? (str (first key)) ":admin"))]
+[::relm/dispatch! (query/invalidate-predicate (fn [key query] ...))]
+
+;; Invalidate all cached queries
+[::query/invalidate-all]
+[::relm/dispatch! (query/invalidate-all)]
+
+;; Using pure reducers
+(query/invalidate-all context)
+(query/invalidate-predicate context (fn [key query] ...))
 ```
 
 ---
@@ -293,25 +352,25 @@ All view helpers are pure functions that read from Relm's `context` map:
   (:require [relm.query :as query]))
 ```
 
-| Function | Signature | Description |
-| :--- | :--- | :--- |
-| `query/data` | `(data context key [default-val])` | Returns cached response data for `key`, or `default-val` (defaults to `nil`). |
-| `query/loading?` | `(loading? context key)` | Returns `true` if query is performing its initial data fetch (no cached data yet). |
-| `query/fetching?` | `(fetching? context key)` | Returns `true` if query request is currently in flight (including background refetches). |
-| `query/error` | `(error context key)` | Returns error payload map for `key`, or `nil`. |
-| `query/status` | `(status context key)` | Returns status keyword: `:idle`, `:loading`, `:success`, or `:error`. |
-| `query/stale?` | `(stale? context key [custom-stale-time])` | Returns `true` if query has exceeded stale-time or was marked stale. |
-| `query/get-query` | `(get-query context key)` | Returns raw query entry map (`:data`, `:status`, `:updated-at`, `:fetch-count`, etc.). |
-| `query/mutation` | `(mutation context mutation-key)` | Returns mutation state map from `context`. |
-| `query/mutation-loading?` | `(mutation-loading? context mutation-key)` | Returns `true` if mutation for `mutation-key` is in-flight. |
-| `query/mutation-error` | `(mutation-error context mutation-key)` | Returns error payload for `mutation-key`, or `nil`. |
-| `query/mutation-data` | `(mutation-data context mutation-key)` | Returns response payload data for `mutation-key`. |
+| Function                  | Signature                                  | Description                                                                              |
+|:--------------------------|:-------------------------------------------|:-----------------------------------------------------------------------------------------|
+| `query/data`              | `(data context key [default-val])`         | Returns cached response data for `key`, or `default-val` (defaults to `nil`).            |
+| `query/loading?`          | `(loading? context key)`                   | Returns `true` if query is performing its initial data fetch (no cached data yet).       |
+| `query/fetching?`         | `(fetching? context key)`                  | Returns `true` if query request is currently in flight (including background refetches). |
+| `query/error`             | `(error context key)`                      | Returns error payload map for `key`, or `nil`.                                           |
+| `query/status`            | `(status context key)`                     | Returns status keyword: `:idle`, `:loading`, `:success`, or `:error`.                    |
+| `query/stale?`            | `(stale? context key [custom-stale-time])` | Returns `true` if query has exceeded stale-time or was marked stale.                     |
+| `query/get-query`         | `(get-query context key)`                  | Returns raw query entry map (`:data`, `:status`, `:updated-at`, `:fetch-count`, etc.).   |
+| `query/mutation`          | `(mutation context mutation-key)`          | Returns mutation state map from `context`.                                               |
+| `query/mutation-loading?` | `(mutation-loading? context mutation-key)` | Returns `true` if mutation for `mutation-key` is in-flight.                              |
+| `query/mutation-error`    | `(mutation-error context mutation-key)`    | Returns error payload for `mutation-key`, or `nil`.                                      |
+| `query/mutation-data`     | `(mutation-data context mutation-key)`     | Returns response payload data for `mutation-key`.                                        |
 
 ---
 
 ## Pure Context Cache Reducers
 
-Use these pure functional reducers if you need to inspect or transform context state directly:
+Use these pure functional reducers to inspect or transform context state directly:
 
 ```clojure
 ;; Store query data manually
@@ -323,8 +382,14 @@ Use these pure functional reducers if you need to inspect or transform context s
 ;; Set query error
 (query/set-query-error context [:todos] {:status 500 :message "Server Error"})
 
-;; Invalidate keys matching prefix
-(query/invalidate-query-keys context [:todos])
+;; Invalidate single exact key
+(query/invalidate-exact context [:todos 1])
+
+;; Invalidate keys matching prefix hierarchically
+(query/invalidate-hierarchical context [:todos])
+
+;; Invalidate all queries
+(query/invalidate-all context)
 
 ;; Set mutation state
 (query/set-mutation-state context :create-todo {:status :loading :is-loading? true})
@@ -334,7 +399,8 @@ Use these pure functional reducers if you need to inspect or transform context s
 
 ## Complete Working Example
 
-Below is a complete, runnable component demonstrating cache-first data fetching, background refetching, optimistic mutation creation, and automatic query invalidation:
+Below is a complete, runnable component demonstrating cache-first data fetching, background refetching, optimistic
+mutation creation, and explicit query invalidation:
 
 ```clojure
 (ns my-app.todos
@@ -357,26 +423,30 @@ Below is a complete, runnable component demonstrating cache-first data fetching,
     (let [new-item {:id (rand-int 10000) :title new-title :completed false}]
       [(assoc state :new-title "")
        context
-       [[::relm/dispatch! [::query/mutate [:todos]
-                           {:data      new-item
-                            :on-mutate [::query/set-query-data todos-key
-                                        (fn [items] (into [new-item] (or items [])))]}]]]])))
+       [[::relm/dispatch! [::query/mutate :create-todo
+                           {:url        "/todos"
+                            :data       new-item
+                            :invalidate (query/hierarchical [:todos])
+                            :on-mutate  [::query/set-query-data todos-key
+                                         (fn [items] (into [new-item] (or items [])))]}]]]])))
 
 (defn view [{:keys [new-title]} context]
   (let [todos (query/data context todos-key [])
         loading? (query/loading? context todos-key)
         fetching? (query/fetching? context todos-key)
-        mutation-loading? (query/mutation-loading? context [:todos])]
+        mutation-loading? (query/mutation-loading? context :create-todo)]
     [:div.todos-container
      [:h2 "Todo Manager"]
 
      ;; Action Bar
      [:div.controls
-      [:button {:on {:click [::query/update todos-key {:stale-time 15000}]}}
+      [:button {:on {:click [::query/update todos-key
+                             (query/key->opts todos-key {:stale-time 15000})]}}
        (if fetching? "Fetching..." "Fetch Todos (Cache-First)")]
-      [:button {:on {:click [::query/update todos-key {:force? true}]}}
+      [:button {:on {:click [::query/update todos-key
+                             (query/key->opts todos-key {:force? true})]}}
        "Force Refetch"]
-      [:button {:on {:click [::query/invalidate [:todos]]}}
+      [:button {:on {:click [::query/invalidate-hierarchical [:todos]]}}
        "Invalidate Cache"]]
 
      ;; Create Form

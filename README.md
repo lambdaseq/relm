@@ -203,7 +203,7 @@ Declarative client-side routing with automatic context synchronization:
 
 ### 6. Query & Cache Management (`relm.query`)
 
-TanStack Query-style caching, automatic URL inference, retries, and optimistic mutations:
+TanStack Query-style caching, flexible cache invalidation, retries, and optimistic mutations:
 
 ```clojure
 (ns my-app.posts
@@ -216,7 +216,8 @@ TanStack Query-style caching, automatic URL inference, retries, and optimistic m
         loading?  (query/loading? context posts-key)
         fetching? (query/fetching? context posts-key)]
     [:div
-     [:button {:on {:click [::query/update posts-key {:stale-time 10000}]}}
+     [:button {:on {:click [::query/update posts-key
+                            (query/key->opts posts-key {:stale-time 10000})]}}
       (if fetching? "Fetching..." "Load Posts")]
      (when loading? [:p "Loading..."])
      [:ul (for [{:keys [id title]} posts]

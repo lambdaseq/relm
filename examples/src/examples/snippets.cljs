@@ -265,11 +265,13 @@
    context
    [[::relm/dispatch!
      [::query/mutate [:posts]
-      {:base-url  \"https://jsonplaceholder.typicode.com\"
-       :data      values
-       :on-mutate [::query/set-query-data posts-query-key
-                   (fn [current-posts]
-                     (into [values] (or current-posts [])))]}]]]])
+      {:url        (query/key->url [:posts])
+       :base-url   \"https://jsonplaceholder.typicode.com\"
+       :data       values
+       :on-settled (query/invalidate-hierarchical [:posts])
+       :on-mutate  [::query/set-query-data posts-query-key
+                    (fn [current-posts]
+                      (into [values] (or current-posts [])))]}]]]])
 
 ;; 2. Reactive view inspecting cache state from context
 (defn view
@@ -281,12 +283,13 @@
     [:div
      ;; Cache-first query trigger
      [:button {:on {:click [::query/fetch posts-query-key
-                            {:base-url   \"https://jsonplaceholder.typicode.com\"
-                             :stale-time 10000}]}}
+                            (query/key->opts posts-query-key
+                                             {:base-url   \"https://jsonplaceholder.typicode.com\"
+                                              :stale-time 10000})]}}
       (if fetching? \"Fetching...\" \"Fetch Posts\")]
 
      ;; Hierarchical cache invalidation trigger
-     [:button {:on {:click [::query/invalidate [:posts] {:refetch-active? true}]}}
+     [:button {:on {:click [::query/invalidate-hierarchical [:posts] {:refetch-active? true}]}}
       \"Invalidate Cache\"]
 
      ;; Rendered cached data
