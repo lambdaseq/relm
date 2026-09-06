@@ -301,3 +301,59 @@
 (def QueryExample
   (relm/component
     {:view view}))")
+
+(def batching-code
+  "(ns examples.batching
+  \"Render batching & scheduling example demonstrating high-frequency burst updates, coalescing & efficiency.\"
+  (:require [relm.core :as relm]))
+
+(defonce !telemetry (atom {:total-renders 0}))
+
+;; 1. Handle rapid burst dispatches with execution timing
+(defmethod relm/update ::burst-dispatch
+  [state context [_ size] _event]
+  (let [msgs (vec (repeat size [::increment-single]))]
+    ;; Dispatches 100-1,000 messages in a single vector and measures execution time
+    [state context [[::run-burst! size msgs]]]))
+
+(defmethod relm/update ::increment-single
+  [state context _message _event]
+  [(-> state
+       (update :count inc)
+       (update :total-dispatches inc))
+   context])
+
+;; 2. High-frequency ticker scheduling (4ms sub-frame streaming)
+(defmethod relm/update ::ticker-step
+  [{:keys [ticker-on? ticker-interval-ms worker-count]
+    :or   {ticker-interval-ms 4}
+    :as   state} context _ _event]
+  (if-not ticker-on?
+    [state context]
+    (let [child-msgs (mapv (fn [idx] [::relm/dispatch! {:component-id (str \"worker-\" idx)} [::child-tick]])
+                           (range worker-count))]
+      [(-> state
+           (update :count inc)
+           (update :total-dispatches + (inc worker-count)))
+       context
+       (into [[::relm/dispatch-later! {:ms ticker-interval-ms :dispatch! [::ticker-step]}]]
+             child-msgs)])))
+
+;; 3. Declarative view tracking root frame diffs & coalescing efficiency
+(defn view
+  [{:keys [count total-dispatches ticker-on? ticker-interval-ms last-burst]} _context]
+  (let [{:keys [total-renders]} (swap! !telemetry update :total-renders inc)
+        saved-renders (max 0 (- total-dispatches total-renders))
+        efficiency    (if (pos? total-dispatches)
+                        (Math/round (* 100 (/ saved-renders total-dispatches)))
+                        0)]
+    [:div
+     [:h3 \"Counter: \" count \" | Dispatches: \" total-dispatches \" | DOM Passes: \" total-renders]
+     [:p (str \"Coalesced: \" saved-renders \" (\" efficiency \"% efficiency)\")]
+     [:button {:on {:click [::burst-dispatch 1000]}} \"Burst 1,000 Updates\"]
+     [:button {:on {:click [::toggle-ticker]}} (if ticker-on? \"Stop Ticker\" \"Start Ticker\")]]))
+
+(def BatchingExample
+  (relm/component
+    {:init (fn [_ _] {:count 0 :total-dispatches 0 :ticker-on? false :ticker-interval-ms 4 :worker-count 4})
+     :view view}))")

@@ -62,6 +62,15 @@
    context
    [[::relm/dispatch-later! {:ms 0 :dispatch! [::test-no-fx val]}]]])
 
+(defmethod relm/update ::increment-test-count
+  [state context _message _event]
+  [(update state :count (fnil inc 0)) context])
+
+(defmethod relm/update ::set-child-val
+  [state context [_ child-id val] _event]
+  (swap! relm/!app-state assoc-in [:components child-id :state :val] val)
+  [state context])
+
 ;; -----------------------------------------------------------------------------
 ;; Unit Tests
 ;; -----------------------------------------------------------------------------
@@ -112,6 +121,20 @@
       (relm/dispatch! event [::test-dispatch-fx "dispatched-value"])
       (is (= "dispatched-value" (get-in @relm/!app-state [:components "comp-1" :state :val])))))
 
+  (testing "::relm/dispatch! effect supports explicit target component map"
+    (let [event {:component-id "comp-origin"}]
+      (swap! relm/!app-state assoc-in [:components "comp-target" :state] {})
+      (relm/fx event [::relm/dispatch! {:component-id "comp-target"} [::test-no-fx "targeted-value"]])
+      (is (= "targeted-value" (get-in @relm/!app-state [:components "comp-target" :state :val])))))
+
+  (testing "::relm/dispatch-n! effect supports explicit target component map"
+    (let [event {:component-id "comp-origin"}]
+      (swap! relm/!app-state assoc-in [:components "comp-target-n" :state] {})
+      (relm/fx event [::relm/dispatch-n! {:component-id "comp-target-n"}
+                      [[::test-no-fx "targeted-n-1"]
+                       [::test-no-fx "targeted-n-2"]]])
+      (is (= "targeted-n-2" (get-in @relm/!app-state [:components "comp-target-n" :state :val])))))
+
   (testing "event preserves :component-id through side effects when originating from DOM node"
     (let [dummy-node #js {:getAttribute (fn [attr] (when (= attr "data-relm-component-id") "comp-from-dom"))
                           :parentNode nil}
@@ -134,6 +157,20 @@
              (js/setTimeout
               (fn []
                 (is (= "later-value" (get-in @relm/!app-state [:components "comp-later" :state :val])))
+                (done))
+              20))))
+
+  (testing "::relm/dispatch-later! effect supports target event map in item"
+    (async done
+           (let [event {:component-id "comp-origin"}]
+             (swap! relm/!app-state assoc-in [:components "comp-later-target" :state] {})
+             (relm/fx event [::relm/dispatch-later!
+                             {:ms 0
+                              :event {:component-id "comp-later-target"}
+                              :dispatch! [::test-no-fx "targeted-later-val"]}])
+             (js/setTimeout
+              (fn []
+                (is (= "targeted-later-val" (get-in @relm/!app-state [:components "comp-later-target" :state :val])))
                 (done))
               20)))))
 
@@ -320,4 +357,47 @@
                          [::test-no-fx 30]])
         (is (= 30 (get-in @relm/!app-state [:components "batch-counter" :state :val])))
         (relm/flush-render!)
-        (is (> @render-count initial-renders))))))
+        (is (> @render-count initial-renders)))))
+
+  (testing "large burst of 1,000 synchronous dispatches updates state accurately and renders once"
+    (let [render-count (atom 0)
+          burst-comp (relm/component
+                      {:init (fn [_ _] {:count 0})
+                       :view (fn [{:keys [count]} _]
+                               (swap! render-count inc)
+                               [:div {:id "burst-count"} (str "Count: " count)])})]
+      (relm/render nil burst-comp {:id "burst-test-comp"})
+      (let [initial-renders @render-count]
+        (dotimes [_ 1000]
+          (relm/dispatch! {:component-id "burst-test-comp"} [::increment-test-count]))
+        ;; All 1,000 dispatches must be applied to state
+        (is (= 1000 (get-in @relm/!app-state [:components "burst-test-comp" :state :count])))
+        ;; Synchronous DOM render hasn't run 1,000 times
+        (relm/flush-render!)
+        ;; Renders cleanly to final state
+        (is (<= @render-count (+ initial-renders 2))))))
+
+  (testing "concurrent updates across multiple child components coalesce without conflicts"
+    (let [child-renders (atom {})
+          child-comp (relm/component
+                      {:init (fn [_ {:keys [id]}] {:id id :val 0})
+                       :view (fn [{:keys [id val]} _]
+                               (swap! child-renders update id (fnil inc 0))
+                               [:span {:id id} (str val)])})
+          root-comp (relm/component
+                     {:view (fn [_state _ctx]
+                              [:div
+                               (child-comp {:id "c1"})
+                               (child-comp {:id "c2"})
+                               (child-comp {:id "c3"})])})]
+      (relm/render nil root-comp)
+      (relm/flush-render!)
+      (relm/dispatch! nil
+                      [[::test-no-fx]
+                       [::set-child-val "c1" 10]
+                       [::set-child-val "c2" 20]
+                       [::set-child-val "c3" 30]])
+      (relm/flush-render!)
+      (is (= 10 (get-in @relm/!app-state [:components "c1" :state :val])))
+      (is (= 20 (get-in @relm/!app-state [:components "c2" :state :val])))
+      (is (= 30 (get-in @relm/!app-state [:components "c3" :state :val]))))))

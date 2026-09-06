@@ -26,14 +26,6 @@
          :components {}
          :root       nil}))
 
-(defonce ^:private ^{:doc "Flag indicating whether a Replicant render pass is currently executing."}
-  !rendering?
-  (atom false))
-
-(defonce ^:private ^{:doc "Flag indicating whether an additional render pass was requested while rendering."}
-  !render-pending?
-  (atom false))
-
 (defonce ^:private ^{:doc "Flag indicating whether a render frame has been scheduled via RAF or microtask."}
   !render-scheduled?
   (atom false))
@@ -223,45 +215,27 @@
 (declare -schedule-render!)
 
 (defn- -do-render-root!
-  "Performs a Replicant render pass for the registered root component into its target DOM node.
-  Guarantees that re-entrant state updates or dispatches mid-render are never dropped."
+  "Performs a synchronous Replicant render pass for the registered root component into its target DOM node."
   []
-  (if @!rendering?
-    (reset! !render-pending? true)
-    (do
-      (reset! !render-pending? true)
-      (reset! !rendering? true)
-      (try
-        (loop []
-          (when @!render-pending?
-            (reset! !render-pending? false)
-            (when-let [{:keys [node component args]} (:root @!app-state)]
-              (when component
-                (let [hiccup (-eval-root component args)]
-                  (when node
-                    (r/render node hiccup)))))
-            (when @!render-pending?
-              (recur))))
-        (finally
-          (reset! !rendering? false)
-          (when @!render-pending?
-            (-schedule-render!)))))))
+  (when-let [{:keys [node component args]} (:root @!app-state)]
+    (when component
+      (let [hiccup (-eval-root component args)]
+        (when node
+          (r/render node hiccup))))))
 
 (defn- -schedule-render!
   "Schedules a batched render pass on the next animation frame or microtask tick.
   Batches rapid synchronous state changes into a single DOM update."
   []
   (when (:root @!app-state)
-    (if @!rendering?
-      (reset! !render-pending? true)
-      (when (compare-and-set! !render-scheduled? false true)
-        (let [schedule-fn (cond
-                            (exists? js/requestAnimationFrame) js/requestAnimationFrame
-                            (exists? js/queueMicrotask) js/queueMicrotask
-                            :else (fn [cb] (js/setTimeout cb 0)))]
-          (schedule-fn (fn []
-                         (reset! !render-scheduled? false)
-                         (-do-render-root!))))))))
+    (when (compare-and-set! !render-scheduled? false true)
+      (let [schedule-fn (cond
+                          (exists? js/requestAnimationFrame) js/requestAnimationFrame
+                          (exists? js/queueMicrotask) js/queueMicrotask
+                          :else (fn [cb] (js/setTimeout cb 0)))]
+        (schedule-fn (fn []
+                       (reset! !render-scheduled? false)
+                       (-do-render-root!)))))))
 
 (defn- -on-app-state-change
   "Watch function invoked whenever `!app-state` changes. Triggers batched re-rendering when context
@@ -282,6 +256,7 @@
 (defn flush-render!
   "Immediately executes any pending render passes synchronously."
   []
+  (reset! !render-scheduled? false)
   (-do-render-root!))
 
 (defn render
@@ -517,25 +492,33 @@
 ;; Built-in effect handlers for dispatching follow-up messages from inside effect flows.
 ;; Formats:
 ;; - `[::relm/dispatch! [::message ...]]`
+;; - `[::relm/dispatch! target-event [::message ...]]`
 ;; - `[::relm/dispatch-n! [[::msg-1] [::msg-2]]]`
+;; - `[::relm/dispatch-n! target-event [[::msg-1] [::msg-2]]]`
 ;; - `[::relm/dispatch-later! [{:ms 100 :dispatch! [::msg]} ...]]`
+;; - `[::relm/dispatch-later! [{:ms 100 :event target-event :dispatch! [::msg]} ...]]`
 
 (defmethod fx ::dispatch!
-  [dom-event [_ event]]
-  (dispatch! dom-event event))
+  [dom-event [_ event-or-msg msg]]
+  (if (some? msg)
+    (dispatch! event-or-msg msg)
+    (dispatch! dom-event event-or-msg)))
 
 (defmethod fx ::dispatch-n!
-  [dom-event [_ events]]
-  (dispatch! dom-event events))
+  [dom-event [_ event-or-msgs msgs]]
+  (if (some? msgs)
+    (dispatch! event-or-msgs msgs)
+    (dispatch! dom-event event-or-msgs)))
 
 (defn- -handle-dispatch-later-item
   [dom-event item]
   (let [msg (or (:dispatch! item) (:dispatch item) (:message item))
+        target-event (or (:event item) dom-event)
         delay-ms (or (:ms item) 0)]
     (when msg
       (if (exists? js/setTimeout)
-        (js/setTimeout #(dispatch! dom-event msg) delay-ms)
-        (dispatch! dom-event msg)))))
+        (js/setTimeout #(dispatch! target-event msg) delay-ms)
+        (dispatch! target-event msg)))))
 
 (defmethod fx ::dispatch-later!
   [dom-event [_ items]]

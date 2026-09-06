@@ -7,7 +7,8 @@
   - Subscribing to active route information via Relm context (`current-route`, `current-view`)
   - Rendering top-level navigation with declarative route navigation events (`::relm.reitit/navigate-to`)
   - Mounting the root application component into `js/document.body`"
-  (:require [examples.counter :refer [Counter]]
+  (:require [examples.batching :refer [BatchingExample]]
+            [examples.counter :refer [Counter]]
             [examples.form :refer [FormExample]]
             [examples.http :refer [HttpExample]]
             [examples.navigation :refer [NavigationExample]]
@@ -30,7 +31,8 @@
    {:name :navigation :step "3" :title "Navigation"  :subtitle "History API"    :path "/navigation" :view (fn [] (NavigationExample {}))}
    {:name :nested     :step "4" :title "Nested"      :subtitle "Tree Hierarchy" :path "/nested"     :view (fn [] (NestedExample {}))}
    {:name :form       :step "5" :title "Form"        :subtitle "Validation Engine" :path "/form"    :view (fn [] (FormExample {}))}
-   {:name :query      :step "6" :title "Query"       :subtitle "Server Cache"   :path "/query"      :view (fn [] (QueryExample {}))}])
+   {:name :query      :step "6" :title "Query"       :subtitle "Server Cache"   :path "/query"      :view (fn [] (QueryExample {}))}
+   {:name :batching   :step "7" :title "Batching"    :subtitle "Render Schedule":path "/batching"   :view (fn [] (BatchingExample {}))}])
 
 (def routes
   "Reitit route definitions mapping URL paths to route metadata and view factories."
