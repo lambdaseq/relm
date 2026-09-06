@@ -357,3 +357,50 @@
   (relm/component
     {:init (fn [_ _] {:count 0 :total-dispatches 0 :ticker-on? false :ticker-interval-ms 4 :worker-count 4})
      :view view}))")
+
+(def devtools-code
+  "(ns examples.devtools
+  \"Time-Travel Debugging, Action Inspection & Redux DevTools integration with relm.devtools.\"
+  (:require [relm.core :as relm]
+            [relm.devtools :as devtools]))
+
+;; 1. Connect DevTools on app startup
+(devtools/connect!
+  {:name            \"Relm Examples App\"
+   :max-age         100
+   :trace-effects?  true
+   :log-to-console? true})
+
+;; 2. Time-Travel Commands (Stepping without side-effect re-execution)
+(defn undo-step! []
+  (when (devtools/can-undo?)
+    (devtools/undo!)))
+
+(defn redo-step! []
+  (when (devtools/can-redo?)
+    (devtools/redo!)))
+
+(defn jump-to-action! [idx]
+  (devtools/jump-to! idx))
+
+;; 3. Pure Action Toggling / History Replay
+(defn toggle-past-action! [action-index]
+  ;; Toggles the skipped flag and recalculates state from initial baseline
+  (devtools/toggle-action! action-index))
+
+;; 4. Declarative Timeline View
+(defn history-view [_state _context]
+  [:div.devtools-panel
+   [:h4 (str \"Action History: \" (count (devtools/history)))]
+   [:div.btn-group
+    [:button {:on {:click #(devtools/undo!)}} \"Undo\"]
+    [:button {:on {:click #(devtools/redo!)}} \"Redo\"]
+    [:button {:on {:click #(devtools/reset-to-initial!)}} \"Reset\"]]
+   [:ul
+    (for [[idx entry] (map-indexed vector (devtools/history))]
+      ^{:key (:id entry)}
+      [:li {:class (when (= idx (devtools/current-index)) \"active\")}
+       [:span (pr-str (:action-type entry))]
+       [:button {:on {:click #(devtools/jump-to! idx)}} \"Jump\"]
+       [:button {:on {:click #(devtools/toggle-action! idx)}}
+        (if (:skipped? entry) \"Unskip\" \"Skip\")]])]])")

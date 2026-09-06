@@ -9,6 +9,7 @@
   - Mounting the root application component into `js/document.body`"
   (:require [examples.batching :refer [BatchingExample]]
             [examples.counter :refer [Counter]]
+            [examples.devtools :refer [DevtoolsExample]]
             [examples.form :refer [FormExample]]
             [examples.http :refer [HttpExample]]
             [examples.navigation :refer [NavigationExample]]
@@ -17,6 +18,7 @@
             [examples.ui :as ui]
             [reitit.core :as reitit]
             [relm.core :as relm]
+            [relm.devtools :as devtools]
             [relm.reitit :as relm.reitit]
             [replicant.dom :as r]))
 
@@ -32,7 +34,8 @@
    {:name :nested     :step "4" :title "Nested"      :subtitle "Tree Hierarchy" :path "/nested"     :view (fn [] (NestedExample {}))}
    {:name :form       :step "5" :title "Form"        :subtitle "Validation Engine" :path "/form"    :view (fn [] (FormExample {}))}
    {:name :query      :step "6" :title "Query"       :subtitle "Server Cache"   :path "/query"      :view (fn [] (QueryExample {}))}
-   {:name :batching   :step "7" :title "Batching"    :subtitle "Render Schedule":path "/batching"   :view (fn [] (BatchingExample {}))}])
+   {:name :batching   :step "7" :title "Batching"    :subtitle "Render Schedule":path "/batching"   :view (fn [] (BatchingExample {}))}
+   {:name :devtools   :step "8" :title "DevTools"    :subtitle "Time Travel"    :path "/devtools"   :view (fn [] (DevtoolsExample {}))}])
 
 (def routes
   "Reitit route definitions mapping URL paths to route metadata and view factories."
@@ -161,6 +164,11 @@
 ;; -----------------------------------------------------------------------------
 ;; Bootstrap
 ;; -----------------------------------------------------------------------------
+
+;; Connect Relm DevTools (enables Redux DevTools extension & browser console tracing)
+(devtools/connect! {:name            "Relm Examples"
+                    :log-to-console? true
+                    :trace-effects?  true})
 
 ;; Register Relm's message dispatcher as the Replicant event handler
 (r/set-dispatch! relm/dispatch!)

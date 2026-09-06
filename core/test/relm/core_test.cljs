@@ -401,3 +401,20 @@
       (is (= 10 (get-in @relm/!app-state [:components "c1" :state :val])))
       (is (= 20 (get-in @relm/!app-state [:components "c2" :state :val])))
       (is (= 30 (get-in @relm/!app-state [:components "c3" :state :val]))))))
+
+(deftest dispatch-listener-test
+  (testing "add-dispatch-listener! receives event data and state changes"
+    (let [dispatches (atom [])
+          listener (fn [data] (swap! dispatches conj data))]
+      (relm/add-dispatch-listener! ::test listener)
+      (swap! relm/!app-state assoc-in [:components "test-comp" :state] {:count 0})
+      (relm/dispatch! {:component-id "test-comp"} [::increment-test-count])
+      (is (= 1 (count @dispatches)))
+      (let [entry (first @dispatches)]
+        (is (= [::increment-test-count] (:message entry)))
+        (is (= "test-comp" (:comp-id entry)))
+        (is (= {:count 0} (:prev-state entry)))
+        (is (= {:count 1} (:new-state entry))))
+      (relm/remove-dispatch-listener! ::test)
+      (relm/dispatch! {:component-id "test-comp"} [::increment-test-count])
+      (is (= 1 (count @dispatches))))))

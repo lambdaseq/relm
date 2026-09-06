@@ -28,16 +28,18 @@ This library is a Work In Progress (WIP) and the API may change.
 Add the required modules to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.form   {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.query  {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.reitit {:mvn/version "0.1.0-alpha5"}}}
+{:deps {io.github.conjurernix/relm.core     {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.devtools {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.form     {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.query    {:mvn/version "0.1.0-alpha5"}
+        io.github.conjurernix/relm.reitit   {:mvn/version "0.1.0-alpha5"}}}
 ```
 
 For Leiningen / `project.clj`:
 
 ```clojure
 [io.github.conjurernix/relm.core "0.1.0-alpha5"]
+[io.github.conjurernix/relm.devtools "0.1.0-alpha5"]
 [io.github.conjurernix/relm.form "0.1.0-alpha5"]
 [io.github.conjurernix/relm.query "0.1.0-alpha5"]
 [io.github.conjurernix/relm.reitit "0.1.0-alpha5"]
@@ -50,6 +52,7 @@ For Leiningen / `project.clj`:
 | Module | Namespace | Description | Documentation |
 | :--- | :--- | :--- | :--- |
 | **Core** | `relm.core` | Elm runtime, component lifecycle, state, `update`, and `fx`. | [Core Documentation](core/README.md) |
+| **DevTools** | `relm.devtools` | Redux DevTools extension bridge, time-travel debugging, action history, and diffing. | [DevTools Documentation](devtools/README.md) |
 | **Form** | `relm.form` | Declarative form state, `form/register`, validators, and submission. | [Form Documentation](form/README.md) |
 | **HTTP** | `relm.http` | Fetch API side effects (`::fetch!`, `::abort!`) and JSON decoders. | [HTTP Documentation](core/README.md#http-client-relmhttp) |
 | **Navigation** | `relm.navigation` | Browser History API effects (`::push-state!`, `::back!`, etc.). | [Navigation Documentation](core/README.md#browser-navigation-relmnavigation) |

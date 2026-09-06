@@ -19,6 +19,14 @@
             </ModuleState>
           </value>
         </entry>
+        <entry key="devtools">
+          <value>
+            <ModuleState>
+              <option name="buildSystemId" value="CLOJURE_DEPS" />
+              <option name="displayName" value="devtools" />
+            </ModuleState>
+          </value>
+        </entry>
         <entry key="examples">
           <value>
             <ModuleState>

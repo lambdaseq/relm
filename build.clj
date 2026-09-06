@@ -6,13 +6,14 @@
             [deps-deploy.deps-deploy :as dd]))
 
 (def lib-modules
-  {:core   {:lib 'io.github.conjurernix/relm.core   :dir "core"   :description "Declarative state management for ClojureScript"}
-   :form   {:lib 'io.github.conjurernix/relm.form   :dir "form"   :description "Form state management extension for relm"}
-   :query  {:lib 'io.github.conjurernix/relm.query  :dir "query"  :description "Async query and data fetching extension for relm"}
-   :reitit {:lib 'io.github.conjurernix/relm.reitit :dir "reitit" :description "Reitit router integration for relm"}})
+  {:core     {:lib 'io.github.conjurernix/relm.core     :dir "core"     :description "Declarative state management for ClojureScript"}
+   :devtools {:lib 'io.github.conjurernix/relm.devtools :dir "devtools" :description "Time-travel debugging and Redux DevTools integration for relm"}
+   :form     {:lib 'io.github.conjurernix/relm.form     :dir "form"     :description "Form state management extension for relm"}
+   :query    {:lib 'io.github.conjurernix/relm.query    :dir "query"    :description "Async query and data fetching extension for relm"}
+   :reitit   {:lib 'io.github.conjurernix/relm.reitit   :dir "reitit"   :description "Reitit router integration for relm"}})
 
 (def default-all-modules
-  ["core" "form" "query" "reitit" "examples"])
+  ["core" "devtools" "form" "query" "reitit" "examples"])
 
 (def internal-libs
   (into #{} (map :lib (vals lib-modules))))

@@ -285,6 +285,41 @@
 ;; Dispatch and Message Handling
 ;; -----------------------------------------------------------------------------
 
+(defonce ^:private !dispatch-listeners (atom {}))
+
+(defn add-dispatch-listener!
+  "Registers a listener function `(fn [dispatch-data] ...)` invoked whenever a message
+  is processed by `dispatch!`.
+
+  `k` is a unique key identifying the listener.
+  `dispatch-data` map contains:
+  - `:event`           The original or enriched event map
+  - `:message`         The dispatched message vector
+  - `:comp-id`         Resolved component ID (or nil)
+  - `:prev-state`      Component state before update
+  - `:prev-context`    Global context before update
+  - `:prev-app-state`  Complete runtime app state map before update
+  - `:new-state`       Component state after update
+  - `:new-context`     Global context after update
+  - `:new-app-state`   Complete runtime app state map after update
+  - `:effects`         Vector of side-effect vectors returned by update handler"
+  [k f]
+  (swap! !dispatch-listeners assoc k f))
+
+(defn remove-dispatch-listener!
+  "Removes a previously registered dispatch listener by key `k`."
+  [k]
+  (swap! !dispatch-listeners dissoc k))
+
+(defn- -notify-dispatch-listeners!
+  [data]
+  (doseq [[_ listener-fn] @!dispatch-listeners
+          :when (fn? listener-fn)]
+    (try
+      (listener-fn data)
+      (catch :default _e
+        nil))))
+
 (defn -handle-message
   "Internal message processor for a single message.
   - Resolves target component ID from the event, message, or DOM node.
@@ -305,6 +340,7 @@
                            (get-in @!app-state [:components comp-id]))
           state (:state component-info)
           context (:context @!app-state)
+          prev-app-state @!app-state
           result (update state context message event)
           [new-state new-context effects] (if (vector? result)
                                             result
@@ -313,6 +349,19 @@
                           (cond-> app
                             comp-id (assoc-in [:components comp-id :state] new-state)
                             (some? new-context) (assoc :context new-context))))
+      (let [new-app-state @!app-state]
+        (when (seq @!dispatch-listeners)
+          (-notify-dispatch-listeners!
+           {:event          event
+            :message        message
+            :comp-id        comp-id
+            :prev-state     state
+            :prev-context   context
+            :prev-app-state prev-app-state
+            :new-state      new-state
+            :new-context    new-context
+            :new-app-state  new-app-state
+            :effects        effects})))
       (-dispatch-fx! event effects))))
 
 (defn dispatch!

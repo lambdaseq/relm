@@ -1,11 +1,12 @@
-{:paths ["src" "../core/src" "../form/src" "../query/src" "../reitit/src" "../query/test" "../form/test" "../reitit/test" "../core/test"]
- :deps  {io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha7"}
-         io.github.conjurernix/relm.form   {:mvn/version "0.1.0-alpha7"}
-         io.github.conjurernix/relm.query  {:mvn/version "0.1.0-alpha7"}
-         io.github.conjurernix/relm.reitit {:mvn/version "0.1.0-alpha7"}
-         metosin/reitit                    {:mvn/version "0.11.0-rc1"}
-         thheller/shadow-cljs              {:mvn/version "3.5.0"}
-         hashp/hashp                       {:mvn/version "0.2.2"}}
+{:paths ["src" "../core/src" "../devtools/src" "../form/src" "../query/src" "../reitit/src" "../devtools/test" "../query/test" "../form/test" "../reitit/test" "../core/test"]
+ :deps  {io.github.conjurernix/relm.core     {:local/root "../core"}
+         io.github.conjurernix/relm.devtools {:local/root "../devtools"}
+         io.github.conjurernix/relm.form     {:local/root "../form"}
+         io.github.conjurernix/relm.query    {:local/root "../query"}
+         io.github.conjurernix/relm.reitit   {:local/root "../reitit"}
+         metosin/reitit                      {:mvn/version "0.11.0-rc1"}
+         thheller/shadow-cljs                {:mvn/version "3.5.0"}
+         hashp/hashp                         {:mvn/version "0.2.2"}}
  :aliases
  {:clj-kondo  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2026.08.04"}}
                :main-opts    ["-m" "clj-kondo.main"]}
