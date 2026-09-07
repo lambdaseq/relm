@@ -28,11 +28,11 @@ This library is a Work In Progress (WIP) and the API may change.
 Add the required modules to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core     {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.devtools {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.form     {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.query    {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.reitit   {:mvn/version "0.1.0-alpha5"}}}
+{:deps {io.github.conjurernix/relm.core     {:mvn/version "<version>"}
+        io.github.conjurernix/relm.devtools {:mvn/version "<version>"}
+        io.github.conjurernix/relm.form     {:mvn/version "<version>"}
+        io.github.conjurernix/relm.query    {:mvn/version "<version>"}
+        io.github.conjurernix/relm.reitit   {:mvn/version "<version>"}}}
 ```
 
 For Leiningen / `project.clj`:
