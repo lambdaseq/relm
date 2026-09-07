@@ -206,5 +206,6 @@
 (def NavigationExample
   "Navigation Example component."
   (relm/component
-   {:init init
+   {:component-id "navigation-example"
+    :init init
     :view view}))

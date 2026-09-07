@@ -188,5 +188,6 @@
 (def HttpExample
   "HTTP Example component ready to be mounted."
   (relm/component
-   {:init init
+   {:component-id "http-example"
+    :init init
     :view view}))

@@ -138,7 +138,7 @@
         is-submitting? (form/submitting? form)]
     [:div {:class "max-w-5xl mx-auto"}
      (ui/example-header
-      {:step        "5"
+      {:step        "6"
        :title       "Declarative Forms & Validation"
        :difficulty  "Advanced"
        :description "Declarative form state, built-in composable validators, dirty and touch tracking, cross-field rules, and real-time inspector using `relm.form`."
@@ -256,5 +256,6 @@
 (def FormExample
   "Form Example component ready to be mounted."
   (relm/component
-   {:init init
+   {:component-id "form-example"
+    :init init
     :view view}))

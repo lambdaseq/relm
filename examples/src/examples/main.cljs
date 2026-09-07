@@ -12,6 +12,7 @@
             [examples.devtools :refer [DevtoolsExample]]
             [examples.form :refer [FormExample]]
             [examples.http :refer [HttpExample]]
+            [examples.messaging :refer [MessagingExample]]
             [examples.navigation :refer [NavigationExample]]
             [examples.nested :refer [NestedExample]]
             [examples.query :refer [QueryExample]]
@@ -28,14 +29,15 @@
 
 (def nav-items
   "Ordered list of example metadata for top-level navigation."
-  [{:name :counter    :step "1" :title "Counter"     :subtitle "Elm Basics"     :path "/counter"    :view (fn [] (Counter {:init-count 0}))}
-   {:name :http       :step "2" :title "HTTP"        :subtitle "Async Effects"  :path "/http"       :view (fn [] (HttpExample {}))}
-   {:name :navigation :step "3" :title "Navigation"  :subtitle "History API"    :path "/navigation" :view (fn [] (NavigationExample {}))}
-   {:name :nested     :step "4" :title "Nested"      :subtitle "Tree Hierarchy" :path "/nested"     :view (fn [] (NestedExample {}))}
-   {:name :form       :step "5" :title "Form"        :subtitle "Validation Engine" :path "/form"    :view (fn [] (FormExample {}))}
-   {:name :query      :step "6" :title "Query"       :subtitle "Server Cache"   :path "/query"      :view (fn [] (QueryExample {}))}
-   {:name :batching   :step "7" :title "Batching"    :subtitle "Render Schedule":path "/batching"   :view (fn [] (BatchingExample {}))}
-   {:name :devtools   :step "8" :title "DevTools"    :subtitle "Time Travel"    :path "/devtools"   :view (fn [] (DevtoolsExample {}))}])
+  [{:name :counter    :step "1" :title "Counter"     :subtitle "Elm Basics"         :path "/counter"    :view (fn [] (Counter {:init-count 0}))}
+   {:name :http       :step "2" :title "HTTP"        :subtitle "Async Effects"      :path "/http"       :view (fn [] (HttpExample {}))}
+   {:name :navigation :step "3" :title "Navigation"  :subtitle "History API"        :path "/navigation" :view (fn [] (NavigationExample {}))}
+   {:name :nested     :step "4" :title "Nested"      :subtitle "Tree Hierarchy"     :path "/nested"     :view (fn [] (NestedExample {}))}
+   {:name :messaging  :step "5" :title "Messaging"   :subtitle "Cross-Component"    :path "/messaging"  :view (fn [] (MessagingExample {}))}
+   {:name :form       :step "6" :title "Form"        :subtitle "Validation Engine"  :path "/form"       :view (fn [] (FormExample {}))}
+   {:name :query      :step "7" :title "Query"       :subtitle "Server Cache"       :path "/query"      :view (fn [] (QueryExample {}))}
+   {:name :batching   :step "8" :title "Batching"    :subtitle "Render Schedule"    :path "/batching"   :view (fn [] (BatchingExample {}))}
+   {:name :devtools   :step "9" :title "DevTools"    :subtitle "Time Travel"        :path "/devtools"   :view (fn [] (DevtoolsExample {}))}])
 
 (def routes
   "Reitit route definitions mapping URL paths to route metadata and view factories."
@@ -156,10 +158,11 @@
 (def Examples
   "Root Relm component wrapping the example application shell."
   (relm/component
-   {:init      init
-    :on-init   on-init
-    :on-deinit on-deinit
-    :view      view}))
+   {:component-id "examples-root"
+    :init         init
+    :on-init      on-init
+    :on-deinit    on-deinit
+    :view         view}))
 
 ;; -----------------------------------------------------------------------------
 ;; Bootstrap

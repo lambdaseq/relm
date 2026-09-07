@@ -66,7 +66,7 @@
         title-err (form/error form :title)]
     [:div {:class "max-w-5xl mx-auto"}
      (ui/example-header
-      {:step        "6"
+      {:step        "7"
        :title       "Relm Query (TanStack Query Port)"
        :difficulty  "Advanced"
        :description "Declarative server-state caching, automatic URL inference from vector keys, optimistic mutations, background fetching, and cache invalidation using `relm.query`."
@@ -223,5 +223,6 @@
 (def QueryExample
   "Query example component."
   (relm/component
-   {:init init
+   {:component-id "query-example"
+    :init init
     :view view}))

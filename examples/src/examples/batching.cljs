@@ -50,7 +50,8 @@
 
 (def BatchWorker
   (relm/component
-   {:init child-init
+   {:component-id "batch-worker"
+    :init child-init
     :view child-view}))
 
 ;; -----------------------------------------------------------------------------
@@ -185,7 +186,7 @@
                      (Math/round (/ (* 1000 size) duration-ms)))]
     [:div {:class "max-w-4xl mx-auto space-y-6"}
      (ui/example-header
-      {:step        "7"
+      {:step        "8"
        :title       "Render Batching & Scheduling"
        :difficulty  "Advanced"
        :description "Demonstrates how Relm coalesces rapid bursts of synchronous state dispatches and high-frequency tickers into single-frame DOM updates via requestAnimationFrame / microtasks."
@@ -338,5 +339,6 @@
 
 (def BatchingExample
   (relm/component
-   {:init init
+   {:component-id "batching-example"
+    :init init
     :view view}))

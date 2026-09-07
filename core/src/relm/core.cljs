@@ -188,6 +188,55 @@
         [nil (or new-context context) (into [[::deinit-component comp-id]] (or effects []))])
       [nil context [[::deinit-component comp-id]]])))
 
+;; Built-in update handler for cross-component messaging.
+;; Accepts messages of the form `[::send target-comp-id messages]`.
+;; Executes `messages` (a single message or a vector of messages) with the local state
+;; of the component identified by `target-comp-id`.
+(defmethod update ::send
+  [state context [_ target-comp-id messages :as _message] event]
+  (let [target-id (str target-comp-id)
+        target-info (get-in @!app-state [:components target-id])
+        target-state (:state target-info)
+        msgs (cond
+               (vector-of-vectors? messages) messages
+               (vector? messages) [messages]
+               :else [])
+        target-event (assoc (or event {}) :component-id target-id)
+        [final-target-state final-context all-effects]
+        (reduce
+         (fn [[curr-state curr-ctx acc-fx] msg]
+           (let [res (update curr-state curr-ctx msg target-event)
+                 [nxt-state nxt-ctx step-fx]
+                 (cond
+                   (and (vector? res) (>= (count res) 3))
+                   [(nth res 0) (nth res 1) (nth res 2)]
+
+                   (and (vector? res) (= (count res) 2))
+                   [(nth res 0) (nth res 1) nil]
+
+                   (and (vector? res) (= (count res) 1))
+                   [(nth res 0) curr-ctx nil]
+
+                   (some? res)
+                   [res curr-ctx nil]
+
+                   :else
+                   [curr-state curr-ctx nil])]
+             [nxt-state
+              (or nxt-ctx curr-ctx)
+              (if (seq step-fx)
+                (into (or acc-fx []) step-fx)
+                acc-fx)]))
+         [target-state context []]
+         msgs)]
+    (when (some? target-id)
+      (swap! !app-state assoc-in [:components target-id :state] final-target-state))
+    [(if (= target-id (:component-id event))
+       final-target-state
+       state)
+     (or final-context context)
+     (when (seq all-effects) all-effects)]))
+
 ;; -----------------------------------------------------------------------------
 ;; Component Identification & Rendering Internals
 ;; -----------------------------------------------------------------------------
@@ -362,7 +411,10 @@
             :new-context    new-context
             :new-app-state  new-app-state
             :effects        effects})))
-      (-dispatch-fx! event effects))))
+      (let [fx-event (if (= message-type ::send)
+                       (assoc (or event {}) :component-id (str (second message)))
+                       event)]
+        (-dispatch-fx! fx-event effects)))))
 
 (defn dispatch!
   "Handles message dispatching for components.
@@ -508,8 +560,8 @@
   (Counter {:id \"counter-a\" :initial-count 10})
   (Counter {:id \"counter-b\" :initial-count 20})
   ```"
-  [{:keys [init view on-init on-deinit id]}]
-  (let [comp-type-id (str (or id (random-uuid)))
+  [{:keys [init view on-init on-deinit id component-id]}]
+  (let [comp-type-id (str (or component-id id (random-uuid)))
         init-fn (or init (fn [_ _] nil))
         view-fn (or view (constantly nil))]
     (fn
@@ -521,6 +573,13 @@
          (-render-component default-id init-fn view-fn on-init on-deinit args)))
       ([id args]
        (-render-component id init-fn view-fn on-init on-deinit args)))))
+
+;; Built-in effect handlers for cross-component messaging.
+;; Formats:
+;; - `[::relm/send target-comp-id messages]`
+(defmethod fx ::send
+  [dom-event [_ target-comp-id messages]]
+  (dispatch! dom-event [::send target-comp-id messages]))
 
 ;; Built-in effect handlers for component lifecycle side effects.
 ;; Formats:

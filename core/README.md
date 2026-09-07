@@ -171,6 +171,28 @@ Components can be nested arbitrarily. Each instance maintains isolated local sta
      (Counter {:id (str "counter-" id) :initial-count 0}))])
 ```
 
+### Cross-Component Messaging (`::send`)
+
+Relm supports sending targeted messages directly to another component instance's isolated local state using `::send`:
+
+- As an event message: `[::relm/send target-id [::target-msg arg]]`
+- As a batch of messages: `[::relm/send target-id [[::msg-1] [::msg-2]]]`
+- As a side-effect from `update`: return `[[::relm/send target-id [::msg]]]` in the effects vector.
+
+```clojure
+;; Send direct message to a specific component by ID
+[:button {:on {:click [::relm/send "worker-alpha" [::assign-task {:id 1 :title "Process Data"}]]}}
+ "Assign Task to Alpha"]
+
+;; Update handler returning cross-component message side effects
+(defmethod relm/update ::delegate-work
+  [state context [_ target-id task] _event]
+  [(update state :pending-tasks dec)
+   context
+   [[::relm/send target-id [::assign-task task]]
+    [::relm/send "system-inbox" [::push-notification {:title "Work Delegated"}]]]])
+```
+
 ---
 
 ## HTTP Client (`relm.http`)

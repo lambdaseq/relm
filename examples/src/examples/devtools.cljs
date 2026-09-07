@@ -94,7 +94,7 @@
     [:div {:class "max-w-4xl mx-auto space-y-6"}
      ;; Header
      (ui/example-header
-      {:step        "8"
+      {:step        "9"
        :title       "DevTools"
        :difficulty  "Advanced"
        :description "Time-travel debugging, Redux DevTools extension integration, deterministic history navigation, and side-effect-free action replay."
@@ -231,5 +231,6 @@
 (def DevtoolsExample
   "Relm component demonstrating DevTools time travel and inspection."
   (relm/component
-   {:init init
+   {:component-id "devtools-example"
+    :init init
     :view view}))

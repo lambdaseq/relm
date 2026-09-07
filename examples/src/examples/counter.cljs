@@ -142,5 +142,6 @@
 (def Counter
   "Counter component definition ready to be instantiated as `(Counter {:init-count 0})`."
   (relm/component
-   {:init init
+   {:component-id "counter"
+    :init init
     :view view}))

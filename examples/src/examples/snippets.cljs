@@ -43,7 +43,8 @@
 ;; 5. Component definition
 (def Counter
   (relm/component
-    {:init init
+    {:component-id \"counter\"
+     :init init
      :view view}))")
 
 (def http-code
@@ -98,7 +99,8 @@
 
 (def HttpExample
   (relm/component
-    {:init init
+    {:component-id \"http-example\"
+     :init init
      :view view}))")
 
 (def navigation-code
@@ -142,7 +144,8 @@
 
 (def NavigationExample
   (relm/component
-    {:init init
+    {:component-id \"navigation-example\"
+     :init init
      :view view}))")
 
 (def nested-code
@@ -176,7 +179,8 @@
 
 (def CounterItem
   (relm/component
-    {:init counter-init
+    {:component-id \"counter-item\"
+     :init counter-init
      :view counter-view}))
 
 ;; -----------------------------------------------------------------------------
@@ -193,7 +197,52 @@
 
 (def NestedExample
   (relm/component
-    {:view view}))")
+    {:component-id \"nested-example\"
+     :view view}))")
+
+(def messaging-code
+  "(ns examples.messaging
+  \"Cross-component messaging example demonstrating [::relm/send target-id messages].\"
+  (:require [relm.core :as relm]))
+
+;; 1. Target component with isolated state (e.g. Inbox / Worker)
+(defn- worker-init [_context {:keys [id name initial-tasks]}]
+  {:id id :name name :tasks (or initial-tasks 0) :status :idle})
+
+(defmethod relm/update ::assign-tasks
+  [state context [_ count desc] _event]
+  [(-> state
+       (update :tasks + (or count 1))
+       (assoc :status :active))
+   context])
+
+;; 2. Peer-to-peer delegation via side effect
+(defmethod relm/update ::delegate-work
+  [state context [_ target-id count] _event]
+  (let [n (min (or count 1) (:tasks state 0))]
+    [(update state :tasks - n)
+     context
+     [[::relm/send target-id [::assign-tasks n \"Delegated Tasks\"]]
+      [::relm/send \"system-inbox\" [::push-notification
+                                   {:title \"Work Delegated\"
+                                    :msg (str \"Transferred \" n \" tasks to \" target-id)}]]]]))
+
+;; 3. Direct send, batched send, and broadcast orchestration
+(defn hub-view [_state _context]
+  [:div.hub-controls
+   ;; Single message send:
+   [:button {:on {:click [::relm/send \"worker-alpha\" [::assign-tasks 3 \"Direct Send\"]]}}
+    \"Send 3 Tasks → Alpha\"]
+
+   ;; Batched multi-message send:
+   [:button {:on {:click [::relm/send \"worker-beta\" [[::assign-tasks 5 \"Batch Send\"]
+                                                       [::set-worker-status :busy]]]}}
+    \"Send Batch → Beta\"]])
+
+(def MessagingExample
+  (relm/component
+    {:component-id \"messaging-example\"
+     :view hub-view}))")
 
 (def form-code
   "(ns examples.form
@@ -246,7 +295,8 @@
 
 (def FormExample
   (relm/component
-    {:init init
+    {:component-id \"form-example\"
+     :init init
      :view view}))")
 
 (def query-code
@@ -300,7 +350,8 @@
 
 (def QueryExample
   (relm/component
-    {:view view}))")
+    {:component-id \"query-example\"
+     :view view}))")
 
 (def batching-code
   "(ns examples.batching
@@ -355,7 +406,8 @@
 
 (def BatchingExample
   (relm/component
-    {:init (fn [_ _] {:count 0 :total-dispatches 0 :ticker-on? false :ticker-interval-ms 4 :worker-count 4})
+    {:component-id \"batching-example\"
+     :init (fn [_ _] {:count 0 :total-dispatches 0 :ticker-on? false :ticker-interval-ms 4 :worker-count 4})
      :view view}))")
 
 (def devtools-code

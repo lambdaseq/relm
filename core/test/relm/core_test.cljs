@@ -418,3 +418,44 @@
       (relm/remove-dispatch-listener! ::test)
       (relm/dispatch! {:component-id "test-comp"} [::increment-test-count])
       (is (= 1 (count @dispatches))))))
+
+(deftest cross-component-send-test
+  (testing "::send event updates target component state with a single message"
+    (swap! relm/!app-state assoc-in [:components "sender-comp" :state] {:role "sender"})
+    (swap! relm/!app-state assoc-in [:components "target-comp" :state] {:count 5})
+    (relm/dispatch! {:component-id "sender-comp"}
+                    [::relm/send "target-comp" [::increment-test-count]])
+    (is (= {:role "sender"} (get-in @relm/!app-state [:components "sender-comp" :state])))
+    (is (= {:count 6} (get-in @relm/!app-state [:components "target-comp" :state]))))
+
+  (testing "::send event updates target component state with a vector of messages"
+    (swap! relm/!app-state assoc-in [:components "target-comp" :state] {:count 10})
+    (relm/dispatch! {:component-id "sender-comp"}
+                    [::relm/send "target-comp" [[::increment-test-count]
+                                                [::increment-test-count]
+                                                [::increment-test-count]]])
+    (is (= {:count 13} (get-in @relm/!app-state [:components "target-comp" :state]))))
+
+  (testing "::send effect dispatches ::send message"
+    (reset! test-fx-log [])
+    (swap! relm/!app-state assoc-in [:components "target-comp" :state] {:count 20})
+    (relm/-dispatch-fx! {:component-id "sender-comp"}
+                        [[::relm/send "target-comp" [::increment-test-count]]])
+    (is (= {:count 21} (get-in @relm/!app-state [:components "target-comp" :state]))))
+
+  (testing "::send with effects returned from target component updates target"
+    (reset! test-fx-log [])
+    (swap! relm/!app-state assoc-in [:components "target-comp" :state] {:msg-received nil})
+    (relm/dispatch! {:component-id "sender-comp"}
+                    [::relm/send "target-comp" [::test-single-fx 42]])
+    (is (= {:msg-received 42} (get-in @relm/!app-state [:components "target-comp" :state])))
+    (is (= [42] @test-fx-log))))
+
+(deftest component-id-option-test
+  (testing "component created with :component-id uses that identifier"
+    (let [comp (relm/component
+                {:component-id "my-custom-component"
+                 :init (fn [_ _] {:initialized true})
+                 :view (fn [state _] [:div (str "Init: " (:initialized state))])})
+          hiccup (comp)]
+      (is (= "my-custom-component" (:data-relm-component-id (second hiccup)))))))

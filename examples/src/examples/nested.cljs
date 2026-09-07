@@ -90,7 +90,8 @@
 (def CounterItem
   "Leaf counter component instance used within CardComponent."
   (relm/component
-   {:init counter-init
+   {:component-id "counter-item"
+    :init counter-init
     :view counter-view}))
 
 ;; -----------------------------------------------------------------------------
@@ -150,7 +151,8 @@
 (def CardComponent
   "Card container component embedding nested CounterItem."
   (relm/component
-   {:init card-init
+   {:component-id "card-component"
+    :init card-init
     :view card-view}))
 
 ;; -----------------------------------------------------------------------------
@@ -250,5 +252,6 @@
 (def NestedExample
   "Root nested component container for the example dashboard."
   (relm/component
-   {:init init
+   {:component-id "nested-example"
+    :init init
     :view view}))
