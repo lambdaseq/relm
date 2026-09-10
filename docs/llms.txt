@@ -1,0 +1,305 @@
+# Relm
+
+> A modular Elm-architecture (Model-View-Update + Side Effects) state management and UI framework for Clojure and ClojureScript on top of [Replicant](https://github.com/cjohansen/replicant).
+
+Relm provides a pure, data-driven, functional approach to building user interfaces. It combines isolated local component state, a reactive global context, pure view functions returning Replicant Hiccup data structures, and deterministic side-effect execution.
+
+## Core Mental Model
+
+Relm adheres strictly to the Elm Architecture (MVU + Effects):
+
+1. **Model (State & Context)**:
+   - **Local State** (`state`): Isolated, private immutable map per component instance.
+   - **Global Context** (`context`): Immutable map shared across all components (e.g. routing, server cache, session).
+2. **View**: Pure function `(fn [state context] hiccup)` returning Replicant data structures. No reactive atoms, derefs, or hidden subscriptions inside views.
+3. **Update**: Pure multimethod `(defmethod relm/update ::msg-type [state context message event] [new-state new-context effects])`. Returns updated local state, updated global context, and a vector of declarative side-effect descriptors.
+4. **Effects**: Multimethod `(defmethod relm/fx ::fx-type [event effect-vector] ...)` executing side effects linearly. Effects can dispatch follow-up messages to the runtime.
+
+```
+DOM Event -> relm/dispatch! -> relm/update -> [new-state new-context effects]
+                                                     |             |
+                                            Replicant Render    relm/fx
+```
+
+---
+
+## Suite of Libraries & Dependencies
+
+Add the required modules to `deps.edn`:
+
+```clojure
+{:deps
+ {io.github.conjurernix/relm.core     {:mvn/version "0.1.0-alpha5"}
+  io.github.conjurernix/relm.form     {:mvn/version "0.1.0-alpha5"}
+  io.github.conjurernix/relm.query    {:mvn/version "0.1.0-alpha5"}
+  io.github.conjurernix/relm.reitit   {:mvn/version "0.1.0-alpha5"}
+  io.github.conjurernix/relm.devtools {:mvn/version "0.1.0-alpha5"}}}
+```
+
+### Module Catalog
+
+- **`relm.core`** (`io.github.conjurernix/relm.core`): Elm runtime, `component`, lifecycle hooks (`on-init`, `on-deinit`), `update`, `fx`, render scheduler, and Replicant dispatch integration.
+- **`relm.http`** (included in `relm.core`): Declarative HTTP Fetch API side effects (`::relm.http/fetch!`, `::relm.http/abort!`), JSON/Transit/Text decoding, and request cancellation.
+- **`relm.navigation`** (included in `relm.core`): Browser History API effects (`::relm.navigation/push-state!`, `::replace-state!`, `::back!`, `::forward!`, `::go!`, `::reload!`).
+- **`relm.form`** (`io.github.conjurernix/relm.form`): Form state management, field registration (`form/register`), built-in/custom validators, dirty/touch tracking, and semantic HTML attributes.
+- **`relm.query`** (`io.github.conjurernix/relm.query`): TanStack Query-style declarative server-state cache in global context, vector query keys, stale-while-revalidate, exponential retries, optimistic mutations, and hierarchical invalidation.
+- **`relm.reitit`** (`io.github.conjurernix/relm.reitit`): Client-side routing with Metosin Reitit, automatic route/view context synchronization, declarative navigation messages, and HTML5 history event handling.
+- **`relm.devtools`** (`io.github.conjurernix/relm.devtools`): Redux DevTools extension bridge, time-travel debugging, action history replay, action toggling, and formatted browser console logging.
+
+---
+
+## Quick Reference by Module
+
+### 1. `relm.core`
+
+#### Component Definition & Mounting
+```clojure
+(ns my-app.main
+  (:require [relm.core :as relm]
+            [replicant.dom :as r]))
+
+(defn init [_context {:keys [initial-count] :or {initial-count 0}}]
+  {:count initial-count})
+
+(defn view [{:keys [count]} _context]
+  [:div
+   [:span "Count: " count]
+   [:button {:on {:click [::increment]}} "+1"]
+   [:button {:on {:click [::decrement]}} "-1"]])
+
+(defmethod relm/update ::increment [state context _msg _event]
+  [(update state :count inc) context])
+
+(defmethod relm/update ::decrement [state context _msg _event]
+  [(update state :count dec) context])
+
+(def Counter
+  (relm/component
+    {:component-id "counter"
+     :init         init
+     :view         view}))
+
+;; Bootstrap
+(r/set-dispatch! relm/dispatch!)
+(relm/render js/document.body Counter {:initial-count 10})
+```
+
+#### Update Handler Signature
+`[state context message event] -> [new-state new-context effects-vector]`
+- Returning `[new-state context]` emits no effects.
+- Returning `[state context [[::relm/dispatch! [::other-msg]]]]` dispatches follow-up messages.
+
+#### Built-in Messages & Effects
+- `[::relm/dispatch! msg-or-msgs]`: Dispatches message(s) immediately after update.
+- `[::relm/dispatch-later! delay-ms msg-or-msgs]`: Dispatches message(s) after a timer.
+- `[::relm/batch! effect-vectors]`: Batches multiple side effects.
+- `[::relm/send target-comp-id messages]`: Sends message(s) targeting a specific component's local state.
+
+---
+
+### 2. `relm.http`
+
+Declarative Fetch API requests via effects.
+
+```clojure
+(ns my-app.user
+  (:require [relm.core :as relm]
+            [relm.http :as http]))
+
+(defmethod relm/update ::load-user [state context [_ user-id] _event]
+  [state context
+   [[::http/fetch!
+     {:url             (str "https://api.example.com/users/" user-id)
+      :method          :get
+      :response-format :json
+      :on-success      [::user-loaded]
+      :on-failure      [::user-failed]
+      :abort-id        [:user user-id]}]]])
+
+(defmethod relm/update ::user-loaded [state context [_ {:keys [status body]}]]
+  [(assoc state :user body :loading? false) context])
+
+(defmethod relm/update ::cancel-user-load [state context [_ user-id]]
+  [state context [[::http/abort! [:user user-id]]]])
+```
+
+---
+
+### 3. `relm.navigation`
+
+Browser History API side effects:
+
+```clojure
+(ns my-app.nav
+  (:require [relm.core :as relm]
+            [relm.navigation :as nav]))
+
+(defmethod relm/update ::navigate-to-url [state context [_ url]]
+  [state context [[::nav/push-state! nil url]]])
+
+(defmethod relm/update ::go-back [state context _ _]
+  [state context [[::nav/back!]]])
+```
+
+---
+
+### 4. `relm.form`
+
+Declarative form state inside component local state.
+
+```clojure
+(ns my-app.form-example
+  (:require [relm.core :as relm]
+            [relm.form :as form]))
+
+(defn init [_context _args]
+  {:form (form/create {:validate-on #{:change :blur :submit}})})
+
+(defmethod relm/update ::save-user [state context [_ form-values] _event]
+  [(assoc state :saved? true) context])
+
+(defn view [{:keys [form saved?]} _context]
+  [:form (form/form-attrs form {:on {:submit [::form/submit form {:on-submit [::save-user]}]}})
+   [:div
+    [:label "Email"]
+    [:input (form/register form :email {:type "email" :required "Email required" :email true})]
+    (when-let [err (form/error form :email true)]
+      [:span.error err])]
+
+   [:button {:type "submit" :disabled (form/submitting? form)}
+    (if (form/submitting? form) "Saving..." "Submit")]])
+```
+
+#### Key `relm.form` Functions
+- `(form/create opts)`: Initializes form state map (`:validate-on`, `:initial-values`, `:validators`, `:validate`).
+- `(form/register form path opts)`: Returns Replicant input attributes (`:value`, `:on`, semantic attributes like `:required`, `:pattern`, `:min`, `:max`).
+- `(form/value form path)`: Current field value.
+- `(form/error form path touched-only?)`: Validation error message (optional only if touched).
+- `(form/valid? form)` / `(form/dirty? form)` / `(form/submitting? form)`: Status queries.
+- Built-in validators: `form/required`, `form/email`, `form/min-length`, `form/max-length`, `form/min-num`, `form/max-num`, `form/pattern`, `form/one-of`, `form/compose`.
+
+---
+
+### 5. `relm.query`
+
+Declarative server-state caching in Relm global `context`.
+
+```clojure
+(ns my-app.posts
+  (:require [relm.core :as relm]
+            [relm.query :as query]))
+
+(def posts-key [:posts {:limit 10}])
+
+(defn view [_state context]
+  (let [posts     (query/data context posts-key [])
+        loading?  (query/loading? context posts-key)
+        fetching? (query/fetching? context posts-key)
+        stale?    (query/stale? context posts-key 5000)]
+    [:div
+     [:button {:disabled fetching?
+               :on {:click [::query/fetch posts-key
+                            (query/key->opts posts-key {:base-url "https://api.example.com"
+                                                        :stale-time 10000})]}}
+      (if fetching? "Fetching..." "Fetch Posts")]
+
+     (when loading? [:p "Loading posts..."])
+     [:ul (for [{:keys [id title]} posts]
+            [:li {:key id} title])]]))
+
+;; Optimistic Mutation with Hierarchical Invalidation
+(defmethod relm/update ::add-post [state context [_ new-post]]
+  [state context
+   [[::relm/dispatch!
+     [::query/mutate [:posts]
+      {:url        "https://api.example.com/posts"
+       :method     :post
+       :data       new-post
+       :on-mutate  [::query/set-query-data posts-key
+                    (fn [posts] (into [new-post] (or posts [])))]
+       :on-settled (query/invalidate-hierarchical [:posts])}]]]])
+```
+
+#### Key `relm.query` Functions & Messages
+- Messages: `[::query/fetch key opts]`, `[::query/mutate id opts]`, `[::query/invalidate target opts]`.
+- Helpers: `(query/data context key default)`, `(query/loading? context key)`, `(query/fetching? context key)`, `(query/stale? context key stale-ms)`, `(query/error context key)`.
+- Invalidation helpers: `(query/invalidate-exact key)`, `(query/invalidate-hierarchical prefix)`, `(query/invalidate-all)`.
+- Key builders: `(query/key->url key)`, `(query/key->opts key opts)`.
+
+---
+
+### 6. `relm.reitit`
+
+Declarative routing with Metosin Reitit and automatic context synchronization.
+
+```clojure
+(ns my-app.router
+  (:require [relm.core :as relm]
+            [relm.reitit :as relm.reitit]
+            [reitit.core :as reitit]))
+
+(def routes
+  [["/" {:name :home :view (fn [] [:h1 "Home Page"])}]
+   ["/users/:id" {:name :user :view (fn [{:keys [id]}] [:h1 "User: " id])}]])
+
+(def router (reitit/router routes))
+
+(defn root-view [_state context]
+  (let [view-fn (relm.reitit/current-view context)
+        match   (relm.reitit/current-match context)
+        params  (get-in match [:parameters :path])]
+    [:div
+     [:nav
+      [:button {:on {:click [::relm.reitit/navigate-to "/"]}} "Home"]
+      [:button {:on {:click [::relm.reitit/navigate-to :user {:id 42}]}} "User 42"]]
+     [:main (when view-fn (view-fn params))]]))
+
+(defn on-init [state context _args _event]
+  [state context [[::relm/dispatch! [::relm.reitit/start router {:default-path "/"}]]]])
+
+(def AppRoot (relm/component {:on-init on-init :view root-view}))
+```
+
+#### Key `relm.reitit` Helpers & Messages
+- Messages: `[::relm.reitit/start router opts]`, `[::relm.reitit/navigate-to target params query]`, `[::relm.reitit/replace-to target params query]`, `[::relm.reitit/stop]`.
+- Context queries: `(relm.reitit/current-route context)`, `(relm.reitit/current-view context)`, `(relm.reitit/current-match context)`, `(relm.reitit/path-for context name params query)`.
+
+---
+
+### 7. `relm.devtools`
+
+Redux DevTools and browser console debugging bridge.
+
+```clojure
+(ns my-app.main
+  (:require [relm.core :as relm]
+            [relm.devtools :as devtools]
+            [replicant.dom :as r]))
+
+(devtools/connect!
+  {:name            "My App"
+   :max-age         50
+   :trace-effects?  true
+   :log-to-console? true})
+
+(r/set-dispatch! relm/dispatch!)
+(relm/render js/document.body AppRoot)
+```
+
+---
+
+## Comparison Summary
+
+| Dimension | Relm | re-frame | Elm |
+| :--- | :--- | :--- | :--- |
+| **View Paradigm** | Pure `(fn [state context] hiccup)` | Reagent components dereferencing `RAtom`s | Pure `(fn [model] Html Msg)` |
+| **DOM Renderer** | Replicant (lightweight data VDOM) | React (via Reagent) | Elm Virtual DOM |
+| **State Model** | Hybrid: Local component state + Global context | Single global atom (`app-db`) | Single global `Model` tree |
+| **Update System** | Open multimethod `relm/update` | Interceptor chain (`reg-event-db/fx`) | Closed union type `Msg` |
+| **Side Effects** | Open multimethod `relm/fx` | Event fx map `{:fx [...]}` | Opaque runtime `Cmd` / `Sub` |
+
+---
+
+## Detailed Full Documentation
+
+For the complete reference manual with all API parameters, option tables, in-depth architecture explanations, and recipes, see **`docs/llms-full.txt`**.
