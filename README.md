@@ -6,7 +6,7 @@ A simple, purely functional abstraction layer on top of [Replicant](https://gith
 
 ## Status
 
-This library is a Work In Progress (WIP) and the API may change.
+Version `0.1.0` is available for public testing and use. The documented API is the stable public contract for this release.
 
 ## Overview
 
@@ -28,21 +28,21 @@ This library is a Work In Progress (WIP) and the API may change.
 Add the required modules to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core     {:mvn/version "<version>"}
-        io.github.conjurernix/relm.devtools {:mvn/version "<version>"}
-        io.github.conjurernix/relm.form     {:mvn/version "<version>"}
-        io.github.conjurernix/relm.query    {:mvn/version "<version>"}
-        io.github.conjurernix/relm.reitit   {:mvn/version "<version>"}}}
+{:deps {io.github.conjurernix/relm.core     {:mvn/version "0.1.0"}
+        io.github.conjurernix/relm.devtools {:mvn/version "0.1.0"}
+        io.github.conjurernix/relm.form     {:mvn/version "0.1.0"}
+        io.github.conjurernix/relm.query    {:mvn/version "0.1.0"}
+        io.github.conjurernix/relm.reitit   {:mvn/version "0.1.0"}}}
 ```
 
 For Leiningen / `project.clj`:
 
 ```clojure
-[io.github.conjurernix/relm.core "0.1.0-alpha5"]
-[io.github.conjurernix/relm.devtools "0.1.0-alpha5"]
-[io.github.conjurernix/relm.form "0.1.0-alpha5"]
-[io.github.conjurernix/relm.query "0.1.0-alpha5"]
-[io.github.conjurernix/relm.reitit "0.1.0-alpha5"]
+[io.github.conjurernix/relm.core "0.1.0"]
+[io.github.conjurernix/relm.devtools "0.1.0"]
+[io.github.conjurernix/relm.form "0.1.0"]
+[io.github.conjurernix/relm.query "0.1.0"]
+[io.github.conjurernix/relm.reitit "0.1.0"]
 ```
 
 ---
@@ -219,7 +219,7 @@ TanStack Query-style caching, flexible cache invalidation, retries, and optimist
         loading?  (query/loading? context posts-key)
         fetching? (query/fetching? context posts-key)]
     [:div
-     [:button {:on {:click [::query/update posts-key
+     [:button {:on {:click [::query/fetch posts-key
                             (query/key->opts posts-key {:stale-time 10000})]}}
       (if fetching? "Fetching..." "Load Posts")]
      (when loading? [:p "Loading..."])

@@ -29,11 +29,11 @@ Add the required modules to `deps.edn`:
 
 ```clojure
 {:deps
- {io.github.conjurernix/relm.core     {:mvn/version "0.1.0-alpha5"}
-  io.github.conjurernix/relm.form     {:mvn/version "0.1.0-alpha5"}
-  io.github.conjurernix/relm.query    {:mvn/version "0.1.0-alpha5"}
-  io.github.conjurernix/relm.reitit   {:mvn/version "0.1.0-alpha5"}
-  io.github.conjurernix/relm.devtools {:mvn/version "0.1.0-alpha5"}}}
+ {io.github.conjurernix/relm.core     {:mvn/version "0.1.0"}
+  io.github.conjurernix/relm.form     {:mvn/version "0.1.0"}
+  io.github.conjurernix/relm.query    {:mvn/version "0.1.0"}
+  io.github.conjurernix/relm.reitit   {:mvn/version "0.1.0"}
+  io.github.conjurernix/relm.devtools {:mvn/version "0.1.0"}}}
 ```
 
 ### Module Catalog
@@ -81,7 +81,7 @@ Add the required modules to `deps.edn`:
 
 ;; Bootstrap
 (r/set-dispatch! relm/dispatch!)
-(relm/render js/document.body Counter {:initial-count 10})
+(relm/render! js/document.body Counter {:initial-count 10})
 ```
 
 #### Update Handler Signature
@@ -91,8 +91,8 @@ Add the required modules to `deps.edn`:
 
 #### Built-in Messages & Effects
 - `[::relm/dispatch! msg-or-msgs]`: Dispatches message(s) immediately after update.
-- `[::relm/dispatch-later! delay-ms msg-or-msgs]`: Dispatches message(s) after a timer.
-- `[::relm/batch! effect-vectors]`: Batches multiple side effects.
+- `[::relm/dispatch-later! [{:ms 100 :dispatch! [::msg]}]]`: Dispatches messages after a timer.
+- `[::relm/dispatch-n! [[::msg-1] [::msg-2]]]`: Dispatches multiple messages.
 - `[::relm/send target-comp-id messages]`: Sends message(s) targeting a specific component's local state.
 
 ---
@@ -283,7 +283,7 @@ Redux DevTools and browser console debugging bridge.
    :log-to-console? true})
 
 (r/set-dispatch! relm/dispatch!)
-(relm/render js/document.body AppRoot)
+(relm/render! js/document.body AppRoot)
 ```
 
 ---

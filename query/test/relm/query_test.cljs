@@ -206,7 +206,7 @@
 (deftest query-lifecycle-test
   (testing "::update on empty cache sets loading and emits http/fetch effect with explicit url"
     (let [ctx {}
-          [new-state new-ctx effects] (relm/update nil ctx [::query/fetch [:todos] {:url "/todos"}] nil)]
+          [_new-state new-ctx effects] (relm/update nil ctx [::query/fetch [:todos] {:url "/todos"}] nil)]
       (is (query/loading? new-ctx [:todos]))
       (is (= 1 (count effects)))
       (let [[effect-type req] (first effects)]
@@ -217,7 +217,7 @@
 
   (testing "::update accepts string as opts for url"
     (let [ctx {}
-          [_ new-ctx effects] (relm/update nil ctx [::query/update :todos "/todos"] nil)]
+          [_ new-ctx effects] (relm/update nil ctx [::query/fetch :todos "/todos"] nil)]
       (is (query/loading? new-ctx :todos))
       (is (= 1 (count effects)))
       (is (= "/todos" (get-in (first effects) [1 :url])))))
@@ -296,7 +296,7 @@
                   (query/set-query-data [:users 1] {:id 1} {:url "https://api.example.com/users/1"})
                   (query/set-query-data [:posts] [{:id 100}]))
           [_ ctx-no-refetch effects-none] (relm/update nil ctx [::query/invalidate-hierarchical [:users] {:refetch-active? false}] nil)
-          [_ ctx-refetch effects-refetch] (relm/update nil ctx [::query/invalidate-hierarchical [:users] {:refetch-active? true}] nil)]
+          [_ _ctx-refetch effects-refetch] (relm/update nil ctx [::query/invalidate-hierarchical [:users] {:refetch-active? true}] nil)]
       (is (true? (query/stale? ctx-no-refetch [:users])))
       (is (true? (query/stale? ctx-no-refetch [:users 1])))
       (is (false? (query/stale? ctx-no-refetch [:posts] 60000)))
@@ -309,27 +309,27 @@
     (is (= [[::query/invalidate-exact [:users]]]
            (query/invalidate-exact [:users])))
     (is (= [[::query/invalidate-exact [:users]]]
-           (query/exact [:users])))
-    (is (= [[::query/invalidate-single [:users 1]]]
-           (query/invalidate-single [:users 1])))
-    (is (= [[::query/invalidate-single [:users 1]]]
-           (query/single [:users 1])))
+           (query/invalidate-exact [:users])))
+    (is (= [[::query/invalidate-exact [:users 1]]]
+           (query/invalidate-exact [:users 1])))
+    (is (= [[::query/invalidate-exact [:users 1]]]
+           (query/invalidate-exact [:users 1])))
     (is (= [[::query/invalidate-hierarchical [:users]]]
            (query/invalidate-hierarchical [:users])))
     (is (= [[::query/invalidate-hierarchical [:users]]]
-           (query/hierarchical [:users])))
+           (query/invalidate-hierarchical [:users])))
     (is (= [[::query/invalidate-hierarchical [:users]] [::query/invalidate-hierarchical [:posts]]]
            (query/invalidate-hierarchical [:users] [:posts])))
     (is (= [[::query/invalidate-hierarchical [:users]] [::query/invalidate-hierarchical [:posts]]]
            (query/invalidate-hierarchical [[:users] [:posts]])))
     (is (= [[::query/invalidate-hierarchical [:users] {:refetch-active? false}]]
            (query/invalidate-hierarchical [:users] {:refetch-active? false})))
-    (is (= [[::query/invalidate-prefix [:users]]]
-           (query/invalidate-prefix [:users])))
+    (is (= [[::query/invalidate-hierarchical [:users]]]
+           (query/invalidate-hierarchical [:users])))
     (is (= [[::query/invalidate-all]]
            (query/invalidate-all)))
     (is (= [[::query/invalidate-all]]
-           (query/all)))
+           (query/invalidate-all)))
     (is (= [[::query/invalidate-all-keys]]
            (query/invalidate-all-keys)))
     (is (= [[::query/invalidate-all {:refetch-active? false}]]
@@ -338,14 +338,14 @@
       (is (= [[::query/invalidate-predicate p-fn]]
              (query/invalidate-predicate p-fn)))
       (is (= [[::query/invalidate-predicate p-fn]]
-             (query/predicate p-fn)))))
+             (query/invalidate-predicate p-fn)))))
 
   (testing "::invalidate with invalidation specifiers and messages"
     (let [ctx (-> {}
                   (query/set-query-data [:users] [{:id 1}] {:url "/users"})
                   (query/set-query-data [:users 1] {:id 1} {:url "/users/1"}))
-          [_ exact-ctx exact-fx] (relm/update nil ctx [::query/invalidate [::query/invalidate-exact [:users]]] nil)
-          [_ hier-ctx hier-fx] (relm/update nil ctx [::query/invalidate [::query/invalidate-hierarchical [:users]]] nil)]
+          [_ _exact-ctx exact-fx] (relm/update nil ctx [::query/invalidate [::query/invalidate-exact [:users]]] nil)
+          [_ _hier-ctx hier-fx] (relm/update nil ctx [::query/invalidate [::query/invalidate-hierarchical [:users]]] nil)]
       (is (= 1 (count exact-fx)))
       (is (= 2 (count hier-fx))))))
 
@@ -426,7 +426,7 @@
           ;; Hierarchical invalidation of [:todos] via on-settled
           [_ hier-ctx hier-fx] (relm/update nil ctx [::query/mutate-success [:todos] {:on-settled (query/invalidate-hierarchical [:todos])} response] nil)
           ;; Exact invalidation of [:todos] via on-settled
-          [_ exact-ctx exact-fx] (relm/update nil ctx [::query/mutate-success [:todos] {:on-settled (query/invalidate-exact [:todos])} response] nil)]
+          [_ _exact-ctx exact-fx] (relm/update nil ctx [::query/mutate-success [:todos] {:on-settled (query/invalidate-exact [:todos])} response] nil)]
       (is (= :success (get-in hier-ctx [:mutations [:todos] :status])))
       (is (= [::relm/dispatch! [[::query/invalidate-hierarchical [:todos]]]] (first hier-fx)))
       (is (= [::relm/dispatch! [[::query/invalidate-exact [:todos]]]] (first exact-fx)))))

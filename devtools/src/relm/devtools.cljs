@@ -330,17 +330,17 @@
 (defn reset-to-initial!
   "Restores application state to the initial state recorded when DevTools connected."
   []
-  (let [{:keys [initial-state history instance]} @!devtools-state]
-    (let [target-state (or (when (seq history)
-                             (:prev-app-state (first history)))
-                           initial-state)]
-      (when target-state
-        (swap! !devtools-state assoc :current-index -1)
-        (apply-state-safely! target-state)
-        (when instance
-          (try
-            (.init instance (clj->js-data (sanitize-state-for-devtools target-state)))
-            (catch :default _ nil)))))))
+  (let [{:keys [initial-state history instance]} @!devtools-state
+        target-state (or (when (seq history)
+                           (:prev-app-state (first history)))
+                         initial-state)]
+    (when target-state
+      (swap! !devtools-state assoc :current-index -1)
+      (apply-state-safely! target-state)
+      (when instance
+        (try
+          (.init instance (clj->js-data (sanitize-state-for-devtools target-state)))
+          (catch :default _ nil))))))
 
 (defn commit!
   "Commits the current application state as the new baseline state and clears history."
@@ -436,7 +436,7 @@
          true)))
 
 (defn- record-action!
-  [{:keys [event message comp-id prev-state new-state prev-context new-context prev-app-state new-app-state effects]}]
+  [{:keys [message comp-id prev-state new-state prev-context new-context prev-app-state new-app-state effects]}]
   (let [opts (:options @!devtools-state)
         msg-type (if (vector? message) (first message) message)]
     (when (action-allowed? msg-type opts)

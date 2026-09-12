@@ -56,7 +56,7 @@
    (match-target r-router target params nil nil))
   ([r-router target params query-params]
    (match-target r-router target params query-params nil))
-  ([r-router target params query-params default-path]
+  ([r-router target params _query-params default-path]
    (let [match (cond
                  (string? target)
                  (match-by-path r-router target)
@@ -182,12 +182,6 @@
          (cond-> (:dispatch-initial? options) (set-route-context match)))
      [[::listen-history! {:router r-router :default-path default-path}]]]))
 
-;; Alias for `::start`.
-(defmethod relm/update ::start!
-  [state context message event]
-  (let [[_ r-router opts] message]
-    (relm/update state context [::start r-router opts] event)))
-
 ;; Stops listening for browser popstate events and clears router context.
 ;; Message format: `[::stop]`
 (defmethod relm/update ::stop
@@ -195,11 +189,6 @@
   [state
    (dissoc context :router :router-options :default-path :route :current-route)
    [[::unlisten-history!]]])
-
-;; Alias for `::stop`.
-(defmethod relm/update ::stop!
-  [state context message event]
-  (relm/update state context [::stop] event))
 
 ;; Navigates to a target route (by path string or route name keyword), updates context with the new match,
 ;; and emits a `::nav/push-state!` side effect.
@@ -213,12 +202,6 @@
     [state
      (set-route-context context match)
      (when path [[::nav/push-state! nil path]])]))
-
-;; Alias for `::navigate-to`.
-(defmethod relm/update ::navigate
-  [state context message event]
-  (let [[_ target params query-params] message]
-    (relm/update state context [::navigate-to target params query-params] event)))
 
 ;; Navigates to a target URL path string.
 ;; Message format: `[::navigate-to-path path query-params?]`
@@ -246,12 +229,6 @@
      (set-route-context context match)
      (when path [[::nav/replace-state! nil path]])]))
 
-;; Alias for `::replace-to`.
-(defmethod relm/update ::replace
-  [state context message event]
-  (let [[_ target params query-params] message]
-    (relm/update state context [::replace-to target params query-params] event)))
-
 ;; Replaces current URL path string without creating a new browser history entry.
 ;; Message format: `[::replace-path path query-params?]`
 (defmethod relm/update ::replace-path
@@ -278,12 +255,6 @@
                 (match-target r-router match-or-target params query-params default-path))]
     [state (set-route-context context match)]))
 
-;; Alias for `::route-changed`.
-(defmethod relm/update ::set-route
-  [state context message event]
-  (let [[_ match-or-target params query-params] message]
-    (relm/update state context [::route-changed match-or-target params query-params] event)))
-
 ;; Updates the active Reitit router instance in context and re-evaluates the current route match.
 ;; Message format: `[::set-router new-router opts?]`
 (defmethod relm/update ::set-router
@@ -299,4 +270,3 @@
          (cond-> default-path (assoc :default-path default-path))
          (set-route-context match))
      [[::listen-history! {:router new-router :default-path default-path}]]]))
-

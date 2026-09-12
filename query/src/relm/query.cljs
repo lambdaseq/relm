@@ -5,7 +5,7 @@
   - Vector query key normalization and matching (exact, prefix/hierarchical)
   - Optional helpers to extract URLs and query parameters from vector keys or Reitit routes
   - Explicit and helper-driven cache invalidation (exact single key, hierarchical prefix, predicate, all)
-  - Declarative Relm `update` handlers for queries (`::update`, `::fetch`), mutations (`::mutate`), and invalidation (`::invalidate`)
+  - Declarative Relm `update` handlers for queries (`::fetch`), mutations (`::mutate`), and invalidation (`::invalidate`)
   - Pure context cache state reducers and Hiccup view query helpers
   - Automatic stale detection, configurable retries with exponential backoff, and optimistic mutations"
   (:require [clojure.string :as string]
@@ -85,11 +85,11 @@
     (let [kw (first target)
           kw-name (name kw)]
       (cond
-        (or (= kw ::invalidate-hierarchical) (= kw ::invalidate-prefix) (= kw-name "invalidate-hierarchical") (= kw-name "invalidate-prefix"))
+        (or (= kw ::invalidate-hierarchical) (= kw-name "invalidate-hierarchical"))
         (let [prefix (normalize-key (nth target 1 nil))]
           (fn [k _q] (prefix-match? prefix k)))
 
-        (or (= kw ::invalidate-exact) (= kw ::invalidate-single) (= kw-name "invalidate-exact") (= kw-name "invalidate-single"))
+        (or (= kw ::invalidate-exact) (= kw-name "invalidate-exact"))
         (let [exact-k (normalize-key (nth target 1 nil))]
           (fn [k _q] (key-match? exact-k k)))
 
@@ -187,12 +187,12 @@
     (update context :queries
             (fn [queries]
               (reduce-kv
-                (fn [acc k q]
-                  (if (pred k q)
-                    (assoc acc k (assoc q :stale? true))
-                    (assoc acc k q)))
-                {}
-                (or queries {}))))))
+               (fn [acc k q]
+                 (if (pred k q)
+                   (assoc acc k (assoc q :stale? true))
+                   (assoc acc k q)))
+               {}
+               (or queries {}))))))
 
 ;; -----------------------------------------------------------------------------
 ;; Invalidation Message Helpers
@@ -241,39 +241,6 @@
                 [::invalidate-exact (normalize-key k)]))
             keys))))
 
-(defn invalidate-single
-  "Creates a vector of invalidation message(s) for a single/exact query key,
-  or when passed a context map as the first argument, marks matching cached queries as stale in context.
-  Alias for `invalidate-exact`.
-
-  Examples:
-    `(invalidate-single [:todos 1])`
-    => `[[::query/invalidate-single [:todos 1]]]`"
-  [& args]
-  (if (and (seq args)
-           (map? (first args))
-           (not (vector? (first args)))
-           (or (contains? (first args) :queries)
-               (contains? (first args) :components)
-               (and (> (count args) 1) (or (vector? (second args)) (keyword? (second args)) (string? (second args))))))
-    (let [[context key & [opts]] args]
-      (invalidate-exact context key opts))
-    (let [last-arg (last args)
-          has-opts? (and (> (count args) 1) (map? last-arg) (not (vector? last-arg)))
-          opts (when has-opts? last-arg)
-          raw-keys (if has-opts? (butlast args) args)
-          keys (if (and (= 1 (count raw-keys))
-                        (vector? (first raw-keys))
-                        (seq (first raw-keys))
-                        (vector? (first (first raw-keys))))
-                 (first raw-keys)
-                 raw-keys)]
-      (mapv (fn [k]
-              (if (seq opts)
-                [::invalidate-single (normalize-key k) opts]
-                [::invalidate-single (normalize-key k)]))
-            keys))))
-
 (defn invalidate-hierarchical
   "Creates a vector of invalidation message(s) for hierarchical prefix matching,
   or when passed a context map as the first argument, marks matching cached queries as stale in context.
@@ -318,35 +285,6 @@
               (if (seq opts)
                 [::invalidate-hierarchical (normalize-key p) opts]
                 [::invalidate-hierarchical (normalize-key p)]))
-            prefixes))))
-
-(defn invalidate-prefix
-  "Creates a vector of invalidation message(s) for hierarchical prefix matching,
-  or when passed a context map as the first argument, marks matching cached queries as stale in context.
-  Alias for `invalidate-hierarchical`."
-  [& args]
-  (if (and (seq args)
-           (map? (first args))
-           (not (vector? (first args)))
-           (or (contains? (first args) :queries)
-               (contains? (first args) :components)
-               (and (> (count args) 1) (or (vector? (second args)) (keyword? (second args)) (string? (second args))))))
-    (let [[context prefix & [opts]] args]
-      (invalidate-hierarchical context prefix opts))
-    (let [last-arg (last args)
-          has-opts? (and (> (count args) 1) (map? last-arg) (not (vector? last-arg)))
-          opts (when has-opts? last-arg)
-          raw-prefixes (if has-opts? (butlast args) args)
-          prefixes (if (and (= 1 (count raw-prefixes))
-                            (vector? (first raw-prefixes))
-                            (seq (first raw-prefixes))
-                            (vector? (first (first raw-prefixes))))
-                     (first raw-prefixes)
-                     raw-prefixes)]
-      (mapv (fn [p]
-              (if (seq opts)
-                [::invalidate-prefix (normalize-key p) opts]
-                [::invalidate-prefix (normalize-key p)]))
             prefixes))))
 
 (defn invalidate-predicate
@@ -412,15 +350,6 @@
        [[::invalidate-all-keys]])))
   ([context opts]
    (invalidate-query-keys context :all (assoc (or opts {}) :all? true))))
-
-;; Aliases for invalidation message helpers
-(def exact invalidate-exact)
-(def single invalidate-single)
-(def hierarchical invalidate-hierarchical)
-(def prefix invalidate-prefix)
-(def predicate invalidate-predicate)
-(def all invalidate-all)
-(def all-keys invalidate-all-keys)
 
 ;; -----------------------------------------------------------------------------
 ;; Vector Key-to-URL and Request Helpers (Optional)
@@ -512,7 +441,7 @@
                (join-base-url base-url path)
                path)]
      (cond-> (assoc (or extra-opts {}) :url (or (:url extra-opts) url))
-             (seq params) (assoc :params (merge params (:params extra-opts)))))))
+       (seq params) (assoc :params (merge params (:params extra-opts)))))))
 
 (defn- extract-path-param-keys
   "Extracts path parameter keywords from a route path template (e.g. `\"/users/:id\"` -> `#{:id}`)."
@@ -577,11 +506,11 @@
         merged-method (or (:method opts) :get)
         body-payload (or (:data opts) (:body opts) (:variables opts))]
     (cond-> (assoc opts
-              :url merged-url
-              :method merged-method)
-            (seq merged-params) (assoc :params merged-params)
-            (nil? (:request-content-type opts)) (assoc :request-content-type :json)
-            (some? body-payload) (assoc :body body-payload))))
+                   :url merged-url
+                   :method merged-method)
+      (seq merged-params) (assoc :params merged-params)
+      (nil? (:request-content-type opts)) (assoc :request-content-type :json)
+      (some? body-payload) (assoc :body body-payload))))
 
 (defn build-request
   "Constructs an HTTP request map from `opts` without inferring URL from query key.
@@ -598,11 +527,11 @@
         method (or (:method opts) :get)
         body (or (:data opts) (:body opts) (:variables opts))]
     (cond-> (assoc opts
-              :url full-url
-              :method method)
-            (some? params) (assoc :params params)
-            (nil? (:request-content-type opts)) (assoc :request-content-type :json)
-            (some? body) (assoc :body body))))
+                   :url full-url
+                   :method method)
+      (some? params) (assoc :params params)
+      (nil? (:request-content-type opts)) (assoc :request-content-type :json)
+      (some? body) (assoc :body body))))
 
 ;; -----------------------------------------------------------------------------
 ;; Context Cache State Reducers (Pure Functional)
@@ -756,7 +685,6 @@
   [context mutation-key]
   (:data (get-mutation context mutation-key)))
 
-
 ;; -----------------------------------------------------------------------------
 ;; Relm Update Message Handlers
 ;; -----------------------------------------------------------------------------
@@ -786,7 +714,7 @@
 ;;   3. Otherwise, marks query as loading in context via `set-query-loading` and emits
 ;;      `[::http/fetch! http-req]` with success/failure callback handlers.
 
-(defmethod relm/update ::update
+(defmethod relm/update ::fetch
   [state context [_ key opts] _event]
   (let [norm-key (normalize-key key)
         opts (if (string? opts) {:url opts} (or opts {}))
@@ -803,24 +731,13 @@
       ;; Mark loading and emit HTTP fetch effect
       (let [new-context (set-query-loading context norm-key opts)
             http-req (build-request
-                       new-context
-                       (assoc opts
-                         :on-success [::fetch-success norm-key opts]
-                         :on-failure [::fetch-failure norm-key 0 opts]))]
+                      new-context
+                      (assoc opts
+                             :on-success [::fetch-success norm-key opts]
+                             :on-failure [::fetch-failure norm-key 0 opts]))]
         (if (:url http-req)
           [state new-context [[::http/fetch! http-req]]]
           [state new-context []])))))
-
-;; Alias `::fetch` to `::update`
-;;
-;; Message Signature:
-;;   `[::fetch query-key opts?]`
-;;
-;; Delegates directly to `::update` for semantic readability in fetching queries.
-(defmethod relm/update ::fetch
-  [state context message event]
-  (let [[_ key opts] message]
-    (relm/update state context [::update key opts] event)))
 
 ;; Query fetch success handler: [::fetch-success norm-key opts response]
 (defmethod relm/update ::fetch-success
@@ -852,10 +769,10 @@
   [state context [_ norm-key attempt opts] _event]
   (let [opts (if (string? opts) {:url opts} (or opts {}))
         http-req (build-request
-                   context
-                   (assoc opts
-                     :on-success [::fetch-success norm-key opts]
-                     :on-failure [::fetch-failure norm-key attempt opts]))]
+                  context
+                  (assoc opts
+                         :on-success [::fetch-success norm-key opts]
+                         :on-failure [::fetch-failure norm-key attempt opts]))]
     (if (:url http-req)
       [state context [[::http/fetch! http-req]]]
       [state context []])))
@@ -893,40 +810,40 @@
   (let [target-list (normalize-invalidate-targets targets)
         refetch-active? (get opts :refetch-active? true)]
     (reduce
-      (fn [[ctx effects] target]
-        (let [pred (target->predicate target opts)
-              ctx' (invalidate-query-keys ctx target opts)
-              matched (filter (fn [[k q]] (pred k q))
-                              (:queries ctx'))]
-          (if-not refetch-active?
-            [ctx' effects]
-            (let [ctx'' (reduce (fn [c [k q]]
-                                  (update-in c [:queries k]
-                                             (fn [entry]
-                                               (assoc (or entry {})
-                                                 :is-fetching? true
-                                                 :stale? true
-                                                 :options (merge (:options entry) (:options q))))))
-                                ctx'
-                                matched)
-                  base-url (or (:base-url opts) (get-in ctx [:query :base-url]) (:base-url ctx))
-                  new-fxs (keep (fn [[k q]]
-                                  (let [q-opts (or (:options q) {})
-                                        url (or (:url q-opts) (:url opts))
-                                        merged-opts (cond-> (merge q-opts (dissoc (or opts {}) :refetch-active? :predicate :exact? :hierarchical? :prefix? :all?) {:force? true})
-                                                            url (assoc :url url)
-                                                            (and base-url (nil? (:base-url q-opts))) (assoc :base-url base-url))]
-                                    (when (:url merged-opts)
-                                      [::http/fetch!
-                                       (build-request
-                                         ctx''
-                                         (assoc merged-opts
-                                           :on-success [::fetch-success k merged-opts]
-                                           :on-failure [::fetch-failure k 0 merged-opts]))])))
-                                matched)]
-              [ctx'' (into effects new-fxs)]))))
-      [context []]
-      target-list)))
+     (fn [[ctx effects] target]
+       (let [pred (target->predicate target opts)
+             ctx' (invalidate-query-keys ctx target opts)
+             matched (filter (fn [[k q]] (pred k q))
+                             (:queries ctx'))]
+         (if-not refetch-active?
+           [ctx' effects]
+           (let [ctx'' (reduce (fn [c [k q]]
+                                 (update-in c [:queries k]
+                                            (fn [entry]
+                                              (assoc (or entry {})
+                                                     :is-fetching? true
+                                                     :stale? true
+                                                     :options (merge (:options entry) (:options q))))))
+                               ctx'
+                               matched)
+                 base-url (or (:base-url opts) (get-in ctx [:query :base-url]) (:base-url ctx))
+                 new-fxs (keep (fn [[k q]]
+                                 (let [q-opts (or (:options q) {})
+                                       url (or (:url q-opts) (:url opts))
+                                       merged-opts (cond-> (merge q-opts (dissoc (or opts {}) :refetch-active? :predicate :exact? :hierarchical? :prefix? :all?) {:force? true})
+                                                     url (assoc :url url)
+                                                     (and base-url (nil? (:base-url q-opts))) (assoc :base-url base-url))]
+                                   (when (:url merged-opts)
+                                     [::http/fetch!
+                                      (build-request
+                                       ctx''
+                                       (assoc merged-opts
+                                              :on-success [::fetch-success k merged-opts]
+                                              :on-failure [::fetch-failure k 0 merged-opts]))])))
+                               matched)]
+             [ctx'' (into effects new-fxs)]))))
+     [context []]
+     target-list)))
 
 ;; Query invalidation handler: [::invalidate target opts?]
 ;;
@@ -954,21 +871,11 @@
         [new-context refetch-effects] (invalidate-and-refetch-targets context key opts)]
     [state new-context refetch-effects]))
 
-(defmethod relm/update ::invalidate-single
-  [state context message event]
-  (let [[_ key opts] message]
-    (relm/update state context [::invalidate-exact key opts] event)))
-
 (defmethod relm/update ::invalidate-hierarchical
   [state context [_ prefix opts] _event]
   (let [opts (assoc (or opts {}) :hierarchical? true)
         [new-context refetch-effects] (invalidate-and-refetch-targets context prefix opts)]
     [state new-context refetch-effects]))
-
-(defmethod relm/update ::invalidate-prefix
-  [state context message event]
-  (let [[_ prefix opts] message]
-    (relm/update state context [::invalidate-hierarchical prefix opts] event)))
 
 (defmethod relm/update ::invalidate-all
   [state context [_ opts] _event]
@@ -1010,26 +917,26 @@
         payload (or (:data opts) (:body opts) (:variables opts))
         on-mutate (:on-mutate opts)
         new-context (set-mutation-state
-                      context
-                      mutation-key
-                      {:status      :loading
-                       :is-loading? true
-                       :body        payload
-                       :data        payload
-                       :variables   payload
-                       :options     opts
-                       :updated-at  (now-ms)})
+                     context
+                     mutation-key
+                     {:status      :loading
+                      :is-loading? true
+                      :body        payload
+                      :data        payload
+                      :variables   payload
+                      :options     opts
+                      :updated-at  (now-ms)})
         method (or (:method opts) :post)
         http-req (build-request
-                   new-context
-                   (assoc opts
-                     :method method
-                     :body payload
-                     :on-success [::mutate-success mutation-key opts]
-                     :on-failure [::mutate-failure mutation-key opts]))
+                  new-context
+                  (assoc opts
+                         :method method
+                         :body payload
+                         :on-success [::mutate-success mutation-key opts]
+                         :on-failure [::mutate-failure mutation-key opts]))
         all-effects (cond-> []
-                            (seq on-mutate) (conj [::relm/dispatch! on-mutate])
-                            (:url http-req) (conj [::http/fetch! http-req]))]
+                      (seq on-mutate) (conj [::relm/dispatch! on-mutate])
+                      (:url http-req) (conj [::http/fetch! http-req]))]
     [state new-context all-effects]))
 
 ;; Mutation success handler: [::mutate-success mutation-key opts response]
@@ -1043,20 +950,20 @@
         opts (or opts {})
         data (or (:body response) response)
         new-context (set-mutation-state
-                      context
-                      mutation-key
-                      {:status      :success
-                       :is-loading? false
-                       :data        data
-                       :options     opts
-                       :updated-at  (now-ms)})
+                     context
+                     mutation-key
+                     {:status      :success
+                      :is-loading? false
+                      :data        data
+                      :options     opts
+                      :updated-at  (now-ms)})
         on-success (:on-success opts)
         on-settled (:on-settled opts)
         resolved-on-success (if (fn? on-success) (on-success data) on-success)
         resolved-on-settled (if (fn? on-settled) (on-settled data) on-settled)
         all-effects (cond-> []
-                            (seq resolved-on-success) (conj [::relm/dispatch! resolved-on-success])
-                            (seq resolved-on-settled) (conj [::relm/dispatch! resolved-on-settled]))]
+                      (seq resolved-on-success) (conj [::relm/dispatch! resolved-on-success])
+                      (seq resolved-on-settled) (conj [::relm/dispatch! resolved-on-settled]))]
     [state new-context all-effects]))
 
 ;; Mutation failure handler: [::mutate-failure mutation-key opts response]
@@ -1070,18 +977,18 @@
         opts (or opts {})
         base-context (or rollback-context context)
         new-context (set-mutation-state
-                      base-context
-                      mutation-key
-                      {:status      :error
-                       :is-loading? false
-                       :error       response
-                       :options     opts
-                       :updated-at  (now-ms)})
+                     base-context
+                     mutation-key
+                     {:status      :error
+                      :is-loading? false
+                      :error       response
+                      :options     opts
+                      :updated-at  (now-ms)})
         on-error (:on-error opts)
         on-settled (:on-settled opts)
         resolved-on-error (if (fn? on-error) (on-error response) on-error)
         resolved-on-settled (if (fn? on-settled) (on-settled response) on-settled)
         all-effects (cond-> []
-                            (seq resolved-on-error) (conj [::relm/dispatch! resolved-on-error])
-                            (seq resolved-on-settled) (conj [::relm/dispatch! resolved-on-settled]))]
+                      (seq resolved-on-error) (conj [::relm/dispatch! resolved-on-error])
+                      (seq resolved-on-settled) (conj [::relm/dispatch! resolved-on-settled]))]
     [state new-context all-effects]))

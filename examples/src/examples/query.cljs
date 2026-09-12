@@ -2,7 +2,7 @@
   "TanStack Query showcase component for Relm.
 
   Demonstrates:
-  - Declarative data fetching and caching with vector keys (`[::query/update [:posts {:_limit 5}]]`)
+  - Declarative data fetching and caching with vector keys (`[::query/fetch [:posts {:_limit 5}]]`)
   - Context view inspection with `query/data`, `query/loading?`, `query/fetching?`, `query/stale?`, `query/error`
   - Optimistic mutations with automatic query invalidation and refetching
   - Form state management using `relm.form` (`form/create`, `form/register`, `form/on-submit`)

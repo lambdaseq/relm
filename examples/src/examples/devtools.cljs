@@ -7,9 +7,7 @@
   - Replaying action history purely without side-effect re-execution
   - Toggling/skipping specific past actions via `toggle-action!`
   - Inspecting message dispatches, state diffs, and context changes in real time"
-  (:require [cljs.pprint :refer [pprint]]
-            [clojure.string :as string]
-            [examples.snippets :as snippets]
+  (:require [examples.snippets :as snippets]
             [examples.ui :as ui]
             [relm.core :as relm]
             [relm.devtools :as devtools]))
@@ -17,10 +15,6 @@
 ;; -----------------------------------------------------------------------------
 ;; Helpers
 ;; -----------------------------------------------------------------------------
-
-(defn- format-edn
-  [data]
-  (with-out-str (pprint data)))
 
 ;; -----------------------------------------------------------------------------
 ;; Local Component State & Updates
@@ -175,10 +169,10 @@
                    is-skipped? (:skipped? entry)]
                ^{:key (:id entry)}
                [:div {:class (ui/cx "flex items-center justify-between p-3 rounded-lg border text-xs font-mono transition-all"
-                                     (cond
-                                       is-skipped? "bg-slate-100/60 border-dashed border-slate-300 text-slate-400 line-through opacity-70"
-                                       is-current? "bg-indigo-50/80 border-indigo-300 text-slate-900 shadow-xs font-medium"
-                                       :else "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"))}
+                                    (cond
+                                      is-skipped? "bg-slate-100/60 border-dashed border-slate-300 text-slate-400 line-through opacity-70"
+                                      is-current? "bg-indigo-50/80 border-indigo-300 text-slate-900 shadow-xs font-medium"
+                                      :else "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"))}
                 [:div {:class "flex items-center gap-3 overflow-x-auto"}
                  [:span {:class (ui/cx "h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold"
                                        (if is-current? "bg-indigo-600 text-white" "bg-slate-200 text-slate-600"))}
@@ -186,9 +180,9 @@
                  [:span {:class "font-bold text-indigo-700"}
                   (pr-str (:action-type entry))]
                  (when-let [cid (:comp-id entry)]
-                  [:span {:class "text-slate-400"} (str "@" cid)])
+                   [:span {:class "text-slate-400"} (str "@" cid)])
                  (when (seq (:effects entry))
-                  [:span {:class "px-1.5 py-0.5 rounded bg-pink-100 text-pink-700 text-[10px]"} "effects"])]
+                   [:span {:class "px-1.5 py-0.5 rounded bg-pink-100 text-pink-700 text-[10px]"} "effects"])]
 
                 [:div {:class "flex items-center gap-2 shrink-0"}
                  (ui/button {:variant (if is-current? :default :outline)

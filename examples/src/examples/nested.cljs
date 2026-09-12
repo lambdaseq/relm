@@ -185,7 +185,7 @@
 
 (defn view
   "Renders the dashboard parent component containing dynamic list of child cards."
-  [{:keys [title cards]} context]
+  [{:keys [cards]} context]
   (let [dark? (= (:theme context) :dark)]
     [:div {:class "max-w-4xl mx-auto"}
      (ui/example-header

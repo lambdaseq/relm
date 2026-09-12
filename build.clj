@@ -1,6 +1,7 @@
 (ns build
   (:refer-clojure :exclude [test])
-  (:require [clojure.java.io :as io]
+  (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.tools.build.api :as b]
             [deps-deploy.deps-deploy :as dd]))
@@ -116,6 +117,36 @@
       (throw (ex-info "Tests failed" run-res))))
   opts)
 
+(defn api-check
+  "Checks that canonical API tokens are present in the human and LLM docs.
+   Also rejects removed alpha aliases and stale dependency versions."
+  [_opts]
+  (let [{:keys [version modules]} (edn/read-string (slurp "docs/api.edn"))
+        doc-files ["README.md" "core/README.md" "form/README.md" "query/README.md"
+                   "reitit/README.md" "devtools/README.md" "docs/llms.txt" "docs/llms-full.txt"]
+        docs (map slurp doc-files)
+        all-docs (apply str docs)
+        stale ["0.1.0-alpha5" "0.1.0-alpha7" "0.1.0-alpha8" "<version>"
+               "relm/render " "::query/update" "form/field" "::relm.reitit/start!"
+               "::relm.reitit/stop!"]
+        missing (for [[module {:keys [tokens]}] modules
+                      token tokens
+                      :when (not (re-find (re-pattern (java.util.regex.Pattern/quote token)) all-docs))]
+                  [module token])
+        stale-found (filter #(re-find (re-pattern (java.util.regex.Pattern/quote %)) all-docs) stale)
+        wrong-version (for [f doc-files
+                            :let [content (slurp f)]
+                            :when (or (re-find #"0\.1\.0-alpha" content)
+                                      (re-find #"<version>" content))]
+                        f)]
+    (when (or (seq missing) (seq stale-found) (seq wrong-version))
+      (throw (ex-info "API documentation check failed"
+                      {:missing (vec missing)
+                       :stale (vec stale-found)
+                       :wrong-version (vec wrong-version)})))
+    (println (str "API documentation is aligned for " version " (" (count modules) " modules)."))
+    modules))
+
 (defn jar
   "Builds JARs for all library modules in lockstep version.
    Options:
@@ -182,6 +213,7 @@
   "Runs the CI pipeline: clean, builds JARs, and runs tests for all modules."
   [opts]
   (clean opts)
+  (api-check opts)
   (jar opts)
   (test opts)
   opts)

@@ -1,0 +1,33 @@
+{:version "0.1.0"
+ :modules
+ {:core {:namespace "relm.core"
+         :tokens ["relm/component" "relm/render!" "relm/dispatch!" "relm/dispatch-n!" "relm/update" "relm/fx"
+                  "relm/flush-render!" "relm/add-dispatch-listener!" "relm/remove-dispatch-listener!"
+                  "relm.core/!app-state"]}
+  :http {:namespace "relm.http"
+         :tokens ["::relm.http/fetch!" "::relm.http/abort!"]}
+  :navigation {:namespace "relm.navigation"
+               :tokens ["::relm.navigation/navigate-to!" "::relm.navigation/replace!"
+                        "::relm.navigation/push-state!" "::relm.navigation/replace-state!"
+                        "::relm.navigation/back!" "::relm.navigation/forward!"
+                        "::relm.navigation/go!" "::relm.navigation/reload!"]}
+  :form {:namespace "relm.form"
+         :tokens ["form/create" "form/register" "form/value" "form/values" "form/error"
+                  "form/touched?" "form/dirty?" "form/valid?" "form/submitting?"
+                  "form/on-change" "form/on-blur" "form/on-submit" "form/on-reset"]}
+  :query {:namespace "relm.query"
+          :tokens ["::query/fetch" "::query/mutate" "::query/invalidate"
+                   "query/data" "query/loading?" "query/fetching?" "query/error"
+                   "query/stale?" "query/invalidate-exact" "query/invalidate-hierarchical"
+                   "query/invalidate-predicate" "query/invalidate-all" "query/key->url"
+                   "query/key->opts"]}
+  :reitit {:namespace "relm.reitit"
+           :tokens ["::relm.reitit/start" "::relm.reitit/stop" "::relm.reitit/navigate-to"
+                    "::relm.reitit/replace-to" "::relm.reitit/route-changed"
+                    "::relm.reitit/set-router" "relm.reitit/current-route"
+                    "relm.reitit/current-match" "relm.reitit/current-view" "relm.reitit/path-for"]}
+  :devtools {:namespace "relm.devtools"
+             :tokens ["devtools/connect!" "devtools/disconnect!" "devtools/history"
+                      "devtools/current-index" "devtools/jump-to!" "devtools/undo!"
+                      "devtools/redo!" "devtools/reset-to-initial!" "devtools/commit!"
+                      "devtools/clear-history!" "devtools/replay-actions"]}}}

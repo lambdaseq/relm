@@ -21,15 +21,15 @@
 Add the dependency to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core   {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.reitit {:mvn/version "0.1.0-alpha5"}}}
+{:deps {io.github.conjurernix/relm.core   {:mvn/version "0.1.0"}
+        io.github.conjurernix/relm.reitit {:mvn/version "0.1.0"}}}
 ```
 
 For Leiningen / `project.clj`:
 
 ```clojure
-[io.github.conjurernix/relm.core "0.1.0-alpha5"]
-[io.github.conjurernix/relm.reitit "0.1.0-alpha5"]
+[io.github.conjurernix/relm.core "0.1.0"]
+[io.github.conjurernix/relm.reitit "0.1.0"]
 ```
 
 ---
@@ -39,7 +39,7 @@ For Leiningen / `project.clj`:
 `relm.reitit` synchronizes Reitit routes with Relm's Elm-architecture runtime:
 
 - **Automatic Context Sync**: Matches the current URL on navigation and synchronizes the active router, options, route, and view component in Relm's global `context`.
-- **Pure MVU State Transitions**: Pure `update` message handlers (`::start`, `::stop`, `::set-router`, `::navigate-to`, `::replace-to`, `::route-changed`) without hidden top-level atoms or side effects during state transitions.
+- **Pure MVU State Transitions**: Pure `update` message handlers (`::relm.reitit/start`, `::relm.reitit/stop`, `::relm.reitit/set-router`, `::relm.reitit/navigate-to`, `::relm.reitit/replace-to`, `::relm.reitit/route-changed`) without hidden top-level atoms or side effects during state transitions.
 - **Dedicated Side Effects**: HTML5 History API interactions and `popstate` event listeners are cleanly managed via `relm/fx` side effects (`::listen-history!`, `::unlisten-history!`, `::nav/push-state!`, `::nav/replace-state!`).
 - **Declarative Navigation**: Dispatches pure update messages that update context and trigger History API side effects.
 - **Bi-directional Routing**: Reverse URL generation from route names, route parameters, and query parameters.
@@ -90,7 +90,7 @@ For Leiningen / `project.clj`:
 
 ;; 3. Bootstrap application
 (r/set-dispatch! relm/dispatch!)
-(relm/render js/document.body AppRoot)
+(relm/render! js/document.body AppRoot)
 ```
 
 ---
@@ -154,7 +154,7 @@ Updates route context directly without triggering browser history side effects (
 [::relm.reitit/route-changed match-or-target params query-params]
 ```
 
-### Router Management Messages (`::start`, `::stop`, `::set-router`)
+### Router Management Messages (`::relm.reitit/start`, `::relm.reitit/stop`, `::relm.reitit/set-router`)
 
 Initialize, update, or stop router integration declaratively:
 
@@ -163,7 +163,7 @@ Initialize, update, or stop router integration declaratively:
 [::relm.reitit/start router {:default-path "/"}]
 
 ;; Update active router in context and refresh popstate listener
-[::relm.reitit/set-router new-router {:default-path "/home"}]
+[::relm.reitit/route-changedr new-router {:default-path "/home"}]
 
 ;; Stop popstate listener and clear router context
 [::relm.reitit/stop]
@@ -250,5 +250,5 @@ Dispatching `[::relm.reitit/stop]` triggers the `::unlisten-history!` effect to 
 
 (defn init! []
   (r/set-dispatch! relm/dispatch!)
-  (relm/render js/document.body App))
+  (relm/render! js/document.body App))
 ```

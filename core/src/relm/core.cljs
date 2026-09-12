@@ -2,12 +2,12 @@
   "Core Elm-architecture implementation on top of Replicant for Clojure/ClojureScript.
 
   Provides:
-  - Component lifecycle management (`component`, `render`) with isolated local states
+  - Component lifecycle management (`component`, `render!`) with isolated local states
   - Global application context shared across all components
   - Message-based state updates via the `update` multimethod
   - Side-effect handling via the `fx` multimethod
   - Centralized message dispatching (`dispatch`) integrated with Replicant DOM events"
-  (:refer-clojure :exclude [update render])
+  (:refer-clojure :exclude [update])
   (:require [clojure.string :as string]
             [replicant.dom :as r]
             [replicant.hiccup :as rh]))
@@ -295,8 +295,7 @@
                  (not= (:components old-state) (:components new-state))))
     (-schedule-render!)))
 
-(defonce ^:private -init-watch
-  (add-watch !app-state :relm/root-render -on-app-state-change))
+(add-watch !app-state :relm/root-render -on-app-state-change)
 
 ;; -----------------------------------------------------------------------------
 ;; Public Rendering API
@@ -308,7 +307,7 @@
   (reset! !render-scheduled? false)
   (-do-render-root!))
 
-(defn render
+(defn render!
   "Renders the root component into the given DOM node and tracks it in `!app-state`.
 
   Parameters:
@@ -318,17 +317,13 @@
 
   Example:
   ```clojure
-  (relm/render js/document.body AppRoot {:initial-theme :dark})
+  (relm/render! js/document.body AppRoot {:initial-theme :dark})
   ```"
   ([node root-component]
-   (render node root-component {}))
+   (render! node root-component {}))
   ([node root-component args]
    (swap! !app-state assoc :root {:node node :component root-component :args (or args {})})
    (-do-render-root!)))
-
-(def render!
-  "Alias for `render` with exclamation mark denoting DOM mutation."
-  render)
 
 ;; -----------------------------------------------------------------------------
 ;; Dispatch and Message Handling

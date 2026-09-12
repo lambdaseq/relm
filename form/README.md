@@ -25,15 +25,15 @@
 Add `io.github.conjurernix/relm.form` and `io.github.conjurernix/relm.core` to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.form {:mvn/version "0.1.0-alpha5"}}}
+{:deps {io.github.conjurernix/relm.core {:mvn/version "0.1.0"}
+        io.github.conjurernix/relm.form {:mvn/version "0.1.0"}}}
 ```
 
 For Leiningen / `project.clj`:
 
 ```clojure
-[io.github.conjurernix/relm.core "0.1.0-alpha5"]
-[io.github.conjurernix/relm.form "0.1.0-alpha5"]
+[io.github.conjurernix/relm.core "0.1.0"]
+[io.github.conjurernix/relm.form "0.1.0"]
 ```
 
 ---
@@ -129,7 +129,7 @@ Initialize form state in your component's `init` function:
 | `:validate` | None | Custom validator function: `(fn [val values])` or `(fn [val])`. |
 | `:validators` | None | Vector of validator functions. |
 
-`form/field` is available as an alias for `form/register`.
+`form/register` is available as an alias for `form/register`.
 
 ---
 

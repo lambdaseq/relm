@@ -46,7 +46,7 @@
 
 (defn- form-input
   "Renders a shadcn-styled input with label and automatic error messages."
-  [form path {:keys [label placeholder type required? min max min-length max-length validate] :as opts}]
+  [form path {:keys [label placeholder type required?] :as opts}]
   (let [err (form/error form path true)
         reg-opts (dissoc opts :label :required?)
         reg-attrs (form/register form path (cond-> reg-opts

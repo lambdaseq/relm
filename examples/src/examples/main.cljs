@@ -177,4 +177,4 @@
 (r/set-dispatch! relm/dispatch!)
 
 ;; Mount root component to DOM body
-(relm/render js/document.body Examples {:id "examples-root"})
+(relm/render! js/document.body Examples {:id "examples-root"})

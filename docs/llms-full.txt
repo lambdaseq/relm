@@ -15,7 +15,7 @@
 3. [`relm.core` Reference](#3-relmcore-reference)
    - [Component Definition (`relm/component`)](#component-definition-relmcomponent)
    - [Component Lifecycle Hooks](#component-lifecycle-hooks)
-   - [Mounting and Rendering (`relm/render`, `r/set-dispatch!`)](#mounting-and-rendering)
+   - [Mounting and Rendering (`relm/render!`, `r/set-dispatch!`)](#mounting-and-rendering)
    - [Update Multimethod (`relm/update`)](#update-multimethod-relmupdate)
    - [Side-Effect Multimethod (`relm/fx`)](#side-effect-multimethod-relmfx)
    - [Built-in Messages and Effects](#built-in-messages-and-effects)
@@ -43,7 +43,7 @@
 7. [`relm.query` Reference](#7-relmquery-reference)
    - [Server-State Architecture & Context Cache](#server-state-architecture--context-cache)
    - [Vector Query Keys & Request Helpers](#vector-query-keys--request-helpers)
-   - [Fetching Queries (`::query/update` & `::query/fetch`)](#fetching-queries)
+   - [Fetching Queries (`::query/fetch`)](#fetching-queries)
    - [Mutations & Optimistic UI (`::query/mutate`)](#mutations--optimistic-ui)
    - [Cache Invalidation Strategies](#cache-invalidation-strategies)
    - [Query View Query Helpers](#query-view-query-helpers)
@@ -159,21 +159,21 @@ Relm stores runtime state in a single atom (`relm.core/!app-state`) structured a
 
 ```clojure
 {:deps
- {io.github.conjurernix/relm.core     {:mvn/version "0.1.0-alpha5"}
-  io.github.conjurernix/relm.form     {:mvn/version "0.1.0-alpha5"}
-  io.github.conjurernix/relm.query    {:mvn/version "0.1.0-alpha5"}
-  io.github.conjurernix/relm.reitit   {:mvn/version "0.1.0-alpha5"}
-  io.github.conjurernix/relm.devtools {:mvn/version "0.1.0-alpha5"}}}
+ {io.github.conjurernix/relm.core     {:mvn/version "0.1.0"}
+  io.github.conjurernix/relm.form     {:mvn/version "0.1.0"}
+  io.github.conjurernix/relm.query    {:mvn/version "0.1.0"}
+  io.github.conjurernix/relm.reitit   {:mvn/version "0.1.0"}
+  io.github.conjurernix/relm.devtools {:mvn/version "0.1.0"}}}
 ```
 
 ### Leiningen (`project.clj`)
 
 ```clojure
-[io.github.conjurernix/relm.core "0.1.0-alpha5"]
-[io.github.conjurernix/relm.form "0.1.0-alpha5"]
-[io.github.conjurernix/relm.query "0.1.0-alpha5"]
-[io.github.conjurernix/relm.reitit "0.1.0-alpha5"]
-[io.github.conjurernix/relm.devtools "0.1.0-alpha5"]
+[io.github.conjurernix/relm.core "0.1.0"]
+[io.github.conjurernix/relm.form "0.1.0"]
+[io.github.conjurernix/relm.query "0.1.0"]
+[io.github.conjurernix/relm.reitit "0.1.0"]
+[io.github.conjurernix/relm.devtools "0.1.0"]
 ```
 
 ---
@@ -234,12 +234,10 @@ Components are created with `(relm/component config-map)`.
 (r/set-dispatch! relm/dispatch!)
 
 ;; 2. Mount root component into DOM
-(relm/render (js/document.getElementById "app") Counter {:start 0})
+(relm/render! (js/document.getElementById "app") Counter {:start 0})
 ```
 
-- `(relm/render dom-node component & [args])`: Mounts the root component to `dom-node` and schedules the first render.
-- `(relm/mount dom-node component & [args])`: Alias for `render`.
-- `(relm/unmount dom-node)`: Unmounts the application attached to `dom-node`.
+- `(relm/render! dom-node component & [args])`: Mounts the root component to `dom-node` and schedules the first render.
 - `(relm/flush-render!)`: Synchronously executes any queued animation frame render passes.
 
 ### Update Multimethod (`relm/update`)
@@ -295,8 +293,8 @@ Executes impure operations returned by `update` handlers.
 
 #### Core Side Effects
 - `[::relm/dispatch! msg-or-batch]` — Dispatches message(s) to the runtime.
-- `[::relm/dispatch-later! delay-ms msg-or-batch]` — Dispatches message(s) after `delay-ms` milliseconds via `js/setTimeout`.
-- `[::relm/batch! [effect-1 effect-2 ...]]` — Executes multiple side effects.
+- `[::relm/dispatch-later! [{:ms 100 :dispatch! [::msg]}]]` — Dispatches messages after a delay via `js/setTimeout`.
+- `[::relm/dispatch-n! [[::msg-1] [::msg-2]]]` — Dispatches multiple messages.
 
 ### Inter-Component Messaging & Nested Components
 
@@ -318,15 +316,10 @@ To send messages across components, dispatch `::relm/send`:
    [[::relm/dispatch! [::relm/send "user-details" [::reload]]]]])
 ```
 
-### State Inspection & Manipulation Functions
+### Runtime State
 
-- `(relm/get-state [comp-id])`: Returns local state for a component (or root if omitted).
-- `(relm/get-context)`: Returns the current global context map.
-- `(relm/get-app-state)`: Returns the entire atom content `{:context ... :components ... :root ...}`.
-- `(relm/swap-context! f & args)`: Atomically transforms global context with `(f context args...)`.
-- `(relm/set-context! new-context)`: Replaces global context and schedules a re-render.
-- `(relm/update-context! f & args)`: Updates context with `swap-context!` and schedules re-render.
-- `(relm/reset-app-state! state-map)`: Resets the entire app state and re-renders.
+`relm.core/!app-state` contains the current context, component states, and root render configuration.
+Use it for diagnostics and DevTools integration; application updates should flow through `relm/update`.
 
 ### Dispatch Listeners
 
@@ -615,7 +608,7 @@ Query keys are arbitrary vectors: `[:posts]`, `[:posts {:_limit 5}]`, `[:users 1
 
 ### Fetching Queries
 
-#### Messages: `[::query/update key opts]` or `[::query/fetch key opts]`
+#### Message: `[::query/fetch key opts]`
 
 ```clojure
 (def posts-key [:posts {:_limit 5}])
@@ -768,7 +761,7 @@ Provides integration with the Redux DevTools browser extension, time travel, det
    :collapsed?      true})
 
 (r/set-dispatch! relm/dispatch!)
-(relm/render js/document.body AppRoot)
+(relm/render! js/document.body AppRoot)
 ```
 
 #### DevTools Configuration Options
@@ -908,5 +901,5 @@ A complete working example combining `relm.core`, `relm.form`, `relm.query`, `re
 (defn ^:export start! []
   (devtools/connect! {:name "Relm Full App" :trace-effects? true :log-to-console? true})
   (r/set-dispatch! relm/dispatch!)
-  (relm/render (js/document.getElementById "app") AppRoot))
+  (relm/render! (js/document.getElementById "app") AppRoot))
 ```

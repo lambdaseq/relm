@@ -26,13 +26,13 @@
 Add the dependency to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core {:mvn/version "0.1.0-alpha5"}}}
+{:deps {io.github.conjurernix/relm.core {:mvn/version "0.1.0"}}}
 ```
 
 For Leiningen / `project.clj`:
 
 ```clojure
-[io.github.conjurernix/relm.core "0.1.0-alpha5"]
+[io.github.conjurernix/relm.core "0.1.0"]
 ```
 
 ---
@@ -104,7 +104,7 @@ Components are defined with `relm/component` by passing a configuration map with
 
 ;; Mount into the DOM
 (r/set-dispatch! relm/dispatch!)
-(relm/render js/document.body Counter {:initial-count 10})
+(relm/render! js/document.body Counter {:initial-count 10})
 ```
 
 ### State & Context Model
@@ -259,6 +259,9 @@ Cancel an active in-flight request using its `:request-id`:
 ## Browser Navigation (`relm.navigation`)
 
 `relm.navigation` provides effect handlers for browser history manipulation:
+
+- `::relm.navigation/navigate-to!` assigns a new URL.
+- `::relm.navigation/replace!` replaces the current URL.
 
 ```clojure
 (ns my-app.nav

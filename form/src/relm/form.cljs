@@ -923,10 +923,6 @@
   ([form-state form-key path opts]
    (register-attrs form-state (or form-key (extract-form-key form-state)) path opts)))
 
-(def field
-  "Alias for `register`."
-  register)
-
 ;; -----------------------------------------------------------------------------
 ;; Form State Component Access Helpers
 ;; -----------------------------------------------------------------------------

@@ -22,15 +22,15 @@
 Add `io.github.conjurernix/relm.devtools` and `io.github.conjurernix/relm.core` to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core     {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.devtools {:mvn/version "0.1.0-alpha5"}}}
+{:deps {io.github.conjurernix/relm.core     {:mvn/version "0.1.0"}
+        io.github.conjurernix/relm.devtools {:mvn/version "0.1.0"}}}
 ```
 
 For Leiningen / `project.clj`:
 
 ```clojure
-[io.github.conjurernix/relm.core "0.1.0-alpha5"]
-[io.github.conjurernix/relm.devtools "0.1.0-alpha5"]
+[io.github.conjurernix/relm.core "0.1.0"]
+[io.github.conjurernix/relm.devtools "0.1.0"]
 ```
 
 ---
@@ -93,7 +93,7 @@ Initialize DevTools in your application's entry point:
 
 ;; 2. Standard Relm bootstrap
 (r/set-dispatch! relm/dispatch!)
-(relm/render js/document.body AppRoot)
+(relm/render! js/document.body AppRoot)
 ```
 
 ---

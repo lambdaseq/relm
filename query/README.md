@@ -15,7 +15,7 @@ optimistic mutations, and flexible single/hierarchical/predicate cache invalidat
     - [Vector Key Structure](#vector-key-structure)
     - [Optional URL & Parameter Helpers](#optional-url--parameter-helpers)
     - [Reitit Router Helpers](#reitit-router-helpers)
-- [Queries (`::query/update` & `::query/fetch`)](#queries-queryupdate--queryfetch)
+- [Queries (`::query/fetch`)](#queries-queryfetch)
     - [Dispatching Queries](#dispatching-queries)
     - [Caching & Stale Times](#caching--stale-times)
     - [Exponential Backoff Retries](#exponential-backoff-retries)
@@ -39,15 +39,15 @@ optimistic mutations, and flexible single/hierarchical/predicate cache invalidat
 Add `io.github.conjurernix/relm.query` and `io.github.conjurernix/relm.core` to your `deps.edn`:
 
 ```clojure
-{:deps {io.github.conjurernix/relm.core  {:mvn/version "0.1.0-alpha5"}
-        io.github.conjurernix/relm.query {:mvn/version "0.1.0-alpha5"}}}
+{:deps {io.github.conjurernix/relm.core  {:mvn/version "0.1.0"}
+        io.github.conjurernix/relm.query {:mvn/version "0.1.0"}}}
 ```
 
 For Leiningen / `project.clj`:
 
 ```clojure
-[io.github.conjurernix/relm.core "0.1.0-alpha5"]
-[io.github.conjurernix/relm.query "0.1.0-alpha5"]
+[io.github.conjurernix/relm.core "0.1.0"]
+[io.github.conjurernix/relm.query "0.1.0"]
 ```
 
 ---
@@ -64,7 +64,7 @@ declarative HTTP side effects.
        |  (query/data, query/loading?, query/mutation-loading?) |
        +-------------------------------------------------------+
                |                                       ^
-               | [::query/update key opts]             | Context
+               | [::query/fetch key opts]             | Context
                | [::query/mutate id opts]              | Subscriptions
                v                                       |
        +-------------------------------------------------------+
@@ -97,8 +97,8 @@ declarative HTTP side effects.
   optional helpers.
 - **Pure Elm Lifecycle**: No hidden background stores or stateful class instances; query caches and mutation lifecycles
   live directly in Relm's immutable `context`.
-- **Flexible Invalidation**: Invalidate exact single keys (`query/exact`), hierarchical subtrees (`query/hierarchical`),
-  predicates (`query/predicate`), or all queries (`query/all`).
+- **Flexible Invalidation**: Invalidate exact single keys (`query/invalidate-exact`), hierarchical subtrees (`query/invalidate-hierarchical`),
+  predicates (`query/invalidate-predicate`), or all queries (`query/invalidate-all`).
 - **Optimistic UI Updates**: Instantly update the UI before network requests complete, with automatic snapshot rollback
   on failure.
 - **Smart Retries**: Built-in exponential backoff retry scheduling for resilient data fetching.
@@ -131,12 +131,12 @@ If you want to derive URLs or options from vector keys, `relm.query` provides se
 
 ```clojure
 ;; Explicit URL in query options
-[::query/update [:posts]
+[::query/fetch [:posts]
  {:url    "/api/v1/posts"
   :params {:sort "desc"}}]
 
 ;; Or optionally using key->opts helper
-[::query/update [:posts {:sort "desc"}]
+[::query/fetch [:posts {:sort "desc"}]
  (query/key->opts [:posts {:sort "desc"}] {:base-url "https://api.example.com"})]
 ```
 
@@ -153,21 +153,21 @@ to URL paths:
 
 ---
 
-## Queries (`::query/update` & `::query/fetch`)
+## Queries (`::query/fetch`)
 
 ### Dispatching Queries
 
 Trigger query fetching declaratively inside event handlers or view clicks:
 
 ```clojure
-[:button {:on {:click [::query/update [:todos {:status "active"}]
+[:button {:on {:click [::query/fetch [:todos {:status "active"}]
                        {:url    "/todos"
                         :params {:status "active"}}]}}
  "Load Active Todos"]
 ```
 
-`::query/fetch` is provided as an exact alias for `::query/update`. You can also pass a URL string directly as options:
-`[::query/update :todos "/todos"]`.
+You can pass a URL string directly as options:
+`[::query/fetch :todos "/todos"]`.
 
 ### Caching & Stale Times
 
@@ -181,10 +181,10 @@ Trigger query fetching declaratively inside event handlers or view clicks:
 
 ```clojure
 ;; Cache for 60 seconds (60000 ms)
-[::query/update [:users] {:url "/users" :stale-time 60000}]
+[::query/fetch [:users] {:url "/users" :stale-time 60000}]
 
 ;; Force background refetch regardless of staleness
-[::query/update [:users] {:url "/users" :force? true}]
+[::query/fetch [:users] {:url "/users" :force? true}]
 ```
 
 ### Exponential Backoff Retries
@@ -426,7 +426,7 @@ mutation creation, and explicit query invalidation:
        [[::relm/dispatch! [::query/mutate :create-todo
                            {:url        "/todos"
                             :data       new-item
-                            :invalidate (query/hierarchical [:todos])
+                            :invalidate (query/invalidate-hierarchical [:todos])
                             :on-mutate  [::query/set-query-data todos-key
                                          (fn [items] (into [new-item] (or items [])))]}]]]])))
 
@@ -440,10 +440,10 @@ mutation creation, and explicit query invalidation:
 
      ;; Action Bar
      [:div.controls
-      [:button {:on {:click [::query/update todos-key
+      [:button {:on {:click [::query/fetch todos-key
                              (query/key->opts todos-key {:stale-time 15000})]}}
        (if fetching? "Fetching..." "Fetch Todos (Cache-First)")]
-      [:button {:on {:click [::query/update todos-key
+      [:button {:on {:click [::query/fetch todos-key
                              (query/key->opts todos-key {:force? true})]}}
        "Force Refetch"]
       [:button {:on {:click [::query/invalidate-hierarchical [:todos]]}}

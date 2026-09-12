@@ -113,7 +113,7 @@
 
   (testing "::navigate-to with fallback default-path in context router-options"
     (let [ctx {:router test-router :router-options {:default-path "/users"}}
-          [new-state new-ctx effects] (relm/update nil ctx [::relm.reitit/navigate-to :unknown] nil)]
+          [_new-state new-ctx effects] (relm/update nil ctx [::relm.reitit/navigate-to :unknown] nil)]
       (is (= :users (relm.reitit/current-route new-ctx)))
       (is (= [[::nav/push-state! nil "/users"]] effects))))
 
@@ -127,27 +127,27 @@
 
   (testing "::replace-to by route name updates context and emits replace-state effect"
     (let [ctx {:router test-router}
-          [new-state new-ctx effects] (relm/update nil ctx [::relm.reitit/replace-to :user {:id "5"}] nil)]
+          [_new-state new-ctx effects] (relm/update nil ctx [::relm.reitit/replace-to :user {:id "5"}] nil)]
       (is (= :user (relm.reitit/current-route new-ctx)))
       (is (= [[::nav/replace-state! nil "/user/5"]] effects))))
 
   (testing "::route-changed updates context without emitting side effects"
     (let [ctx {:router test-router}
-          [new-state new-ctx effects] (relm/update nil ctx [::relm.reitit/route-changed "/users"] nil)]
+          [_new-state new-ctx effects] (relm/update nil ctx [::relm.reitit/route-changed "/users"] nil)]
       (is (= :users (relm.reitit/current-route new-ctx)))
       (is (nil? effects))))
 
-  (testing "navigation and replace aliases delegate correctly"
+  (testing "navigation convenience messages delegate correctly"
     (let [ctx {:router test-router}
-          [_ nav-ctx-1 nav-fx-1] (relm/update nil ctx [::relm.reitit/navigate "/users"] nil)
+          [_ nav-ctx-1 nav-fx-1] (relm/update nil ctx [::relm.reitit/navigate-to "/users"] nil)
           [_ nav-ctx-2 nav-fx-2] (relm/update nil ctx [::relm.reitit/navigate-to-path "/users"] nil)
           [_ nav-ctx-3 nav-fx-3] (relm/update nil ctx [::relm.reitit/navigate-to-route :users] nil)
-          [_ rep-ctx-1 rep-fx-1] (relm/update nil ctx [::relm.reitit/replace "/users"] nil)
+          [_ rep-ctx-1 rep-fx-1] (relm/update nil ctx [::relm.reitit/replace-to "/users"] nil)
           [_ rep-ctx-2 rep-fx-2] (relm/update nil ctx [::relm.reitit/replace-path "/users"] nil)
           [_ rep-ctx-3 rep-fx-3] (relm/update nil ctx [::relm.reitit/replace-route :users] nil)
-          [_ set-ctx-1 set-fx-1] (relm/update nil ctx [::relm.reitit/set-route "/users"] nil)
-          [_ start-ctx start-fx] (relm/update nil ctx [::relm.reitit/start! test-router] nil)
-          [_ stop-ctx stop-fx]   (relm/update nil start-ctx [::relm.reitit/stop!] nil)]
+          [_ set-ctx-1 set-fx-1] (relm/update nil ctx [::relm.reitit/route-changed "/users"] nil)
+          [_ start-ctx start-fx] (relm/update nil ctx [::relm.reitit/start test-router] nil)
+          [_ stop-ctx stop-fx]   (relm/update nil start-ctx [::relm.reitit/stop] nil)]
       (is (= :users (relm.reitit/current-route nav-ctx-1)))
       (is (= [[::nav/push-state! nil "/users"]] nav-fx-1))
       (is (= :users (relm.reitit/current-route nav-ctx-2)))

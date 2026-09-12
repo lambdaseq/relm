@@ -158,21 +158,21 @@
               (fn []
                 (is (= "later-value" (get-in @relm/!app-state [:components "comp-later" :state :val])))
                 (done))
-              20))))
-
-  (testing "::relm/dispatch-later! effect supports target event map in item"
-    (async done
-           (let [event {:component-id "comp-origin"}]
-             (swap! relm/!app-state assoc-in [:components "comp-later-target" :state] {})
-             (relm/fx event [::relm/dispatch-later!
-                             {:ms 0
-                              :event {:component-id "comp-later-target"}
-                              :dispatch! [::test-no-fx "targeted-later-val"]}])
-             (js/setTimeout
-              (fn []
-                (is (= "targeted-later-val" (get-in @relm/!app-state [:components "comp-later-target" :state :val])))
-                (done))
               20)))))
+
+(deftest dispatch-later-target-event-test
+  (async done
+         (let [event {:component-id "comp-origin"}]
+           (swap! relm/!app-state assoc-in [:components "comp-later-target" :state] {})
+           (relm/fx event [::relm/dispatch-later!
+                           {:ms 0
+                            :event {:component-id "comp-later-target"}
+                            :dispatch! [::test-no-fx "targeted-later-val"]}])
+           (js/setTimeout
+            (fn []
+              (is (= "targeted-later-val" (get-in @relm/!app-state [:components "comp-later-target" :state :val])))
+              (done))
+            20))))
 
 (deftest batch-dispatch-test
   (testing "dispatch accepts a batch of messages in vector-of-vectors form"
@@ -317,7 +317,7 @@
           test-comp (fn []
                       (swap! rendered-count inc)
                       [:div "rendered"])]
-      (relm/render nil test-comp)
+      (relm/render! nil test-comp)
       (is (= 1 @rendered-count))
       (relm/flush-render!)
       (is (>= @rendered-count 1))))
@@ -337,7 +337,7 @@
           root-comp (relm/component
                      {:view (fn [_state _ctx]
                               [:div (trigger-comp)])})]
-      (relm/render nil root-comp)
+      (relm/render! nil root-comp)
       (relm/flush-render!)
       (is (true? (:re-entrant-triggered? (:context @relm/!app-state))))
       (is (>= @render-passes 1))))
@@ -349,7 +349,7 @@
                          :view (fn [{:keys [count]} _]
                                  (swap! render-count inc)
                                  [:div (str "Count: " count)])})]
-      (relm/render nil counter-comp {:id "batch-counter"})
+      (relm/render! nil counter-comp {:id "batch-counter"})
       (let [initial-renders @render-count]
         (relm/dispatch! {:component-id "batch-counter"}
                         [[::test-no-fx 10]
@@ -366,7 +366,7 @@
                        :view (fn [{:keys [count]} _]
                                (swap! render-count inc)
                                [:div {:id "burst-count"} (str "Count: " count)])})]
-      (relm/render nil burst-comp {:id "burst-test-comp"})
+      (relm/render! nil burst-comp {:id "burst-test-comp"})
       (let [initial-renders @render-count]
         (dotimes [_ 1000]
           (relm/dispatch! {:component-id "burst-test-comp"} [::increment-test-count]))
@@ -390,7 +390,7 @@
                                (child-comp {:id "c1"})
                                (child-comp {:id "c2"})
                                (child-comp {:id "c3"})])})]
-      (relm/render nil root-comp)
+      (relm/render! nil root-comp)
       (relm/flush-render!)
       (relm/dispatch! nil
                       [[::test-no-fx]

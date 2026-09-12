@@ -437,7 +437,7 @@
 
     (testing "field alias produces identical output to register"
       (let [reg-attrs   (form/register f :username {:type "text"})
-            field-attrs (form/field f :username {:type "text"})]
+            field-attrs (form/register f :username {:type "text"})]
         (is (= reg-attrs field-attrs))))
 
     (testing "backwards compatibility: explicit form-key as 2nd argument"
